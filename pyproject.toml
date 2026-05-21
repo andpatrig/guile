@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "guile"
+version = "0.1.0"
+authors = [
+  { name="Andres Patrignani", email="andrespatrignani@ksu.edu" },
+]
+description = "A lightweight framework for creating desktop apps in Python."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pywebview>=5.0",
+    "matplotlib>=3.5"
+]
+
+
+[project.urls]
+"Homepage" = "https://github.com"
+"Bug Tracker" = "https://github.com/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["guile*"]
+
