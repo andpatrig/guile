@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guile — How-to Guide</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap');
+:root {
+  --bg:#f5f4f0;--surface:#ffffff;--surface-2:#f0efe9;--border:#e2e0d8;
+  --border-2:#ccc9be;--text:#1a1916;--text-2:#6b6860;--text-3:#9b9890;
+  --accent:#5b4fff;--accent-bg:#eeecff;--accent-txt:#3b2ee0;
+  --green:#1a7a4a;--green-bg:#e6f4ec;--amber:#8a5a00;--amber-bg:#fdf3dc;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--r:8px;--r-lg:12px;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#141412;--surface:#1e1d1a;--surface-2:#252420;--border:#2e2d28;
+  --border-2:#3a3932;--text:#f0efe8;--text-2:#9b9890;--text-3:#6b6860;
+  --accent:#7b6fff;--accent-bg:#1e1a3a;--accent-txt:#b0a8ff;
+  --green:#4ade80;--green-bg:#0a2318;--amber:#fbbf24;--amber-bg:#1f1500;
+}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.shell{display:flex;min-height:100vh}
+nav{width:210px;flex-shrink:0;position:sticky;top:0;height:100vh;
+  overflow-y:auto;padding:28px 0 40px;border-right:1px solid var(--border);
+  background:var(--surface)}
+.logo{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.logo-name{font-size:22px;font-weight:500;letter-spacing:-0.03em;color:var(--text)}
+.logo-name span{color:var(--accent)}
+.logo-sub{font-size:11px;color:var(--text-3);margin-top:3px;font-family:var(--mono)}
+.nav-cat{font-size:10px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--text-3);padding:14px 20px 5px}
+nav a{display:block;padding:4px 20px;font-size:12.5px;font-family:var(--mono);
+  color:var(--text-2);text-decoration:none;border-left:2px solid transparent;
+  transition:all .1s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+nav a:hover{color:var(--text);background:var(--surface-2)}
+nav a.active{color:var(--accent);border-left-color:var(--accent);background:var(--accent-bg)}
+main{flex:1;padding:52px 60px 80px;min-width:0;max-width:860px}
+h1{font-size:28px;font-weight:700;letter-spacing:-0.02em;margin-bottom:6px}
+.page-sub{color:var(--text-2);font-size:15px;margin-bottom:48px}
+.section{margin-bottom:52px;scroll-margin-top:24px}
+h2{font-size:16px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-3);margin-bottom:20px;padding-bottom:8px;
+  border-bottom:1px solid var(--border)}
+h3{font-size:15px;font-weight:600;color:var(--text);margin:24px 0 10px}
+p{color:var(--text-2);font-size:14px;line-height:1.7;margin-bottom:12px}
+p+p{margin-top:0}
+.card{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-lg);padding:20px;margin-bottom:14px;overflow:hidden}
+pre{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.7;
+  color:var(--text);overflow-x:auto;white-space:pre;margin:8px 0 16px}
+code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
+  padding:2px 6px;border-radius:4px;color:var(--accent)}
+.label{font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text-3);margin-bottom:6px}
+.note{background:var(--amber-bg);border:1px solid rgba(138,90,0,.15);border-radius:var(--r);
+  padding:10px 14px;font-size:13px;color:var(--amber);margin:8px 0 16px}
+.tag{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;
+  border-radius:99px;background:var(--accent-bg);color:var(--accent-txt);margin-right:4px}
+.theme-row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.swatch{border-radius:8px;padding:12px 16px;font-size:12px;font-weight:500;
+  cursor:pointer;border:1px solid rgba(0,0,0,.1);transition:transform .1s}
+.swatch:hover{transform:scale(1.04)}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav>
+  <div class="logo">
+    <div class="logo-name">gui<span>le</span></div>
+    <div class="logo-sub">how-to guide</div>
+  </div>
+  <div class="nav-cat">Themes</div>
+  <a href="#themes-builtin">Built-in themes</a>
+  <a href="#themes-custom">Custom theme</a>
+  <a href="#themes-vars">CSS variables</a>
+  <div class="nav-cat">Layout</div>
+  <a href="#layout-cols">Unequal columns</a>
+  <a href="#layout-grid">CSS grid</a>
+  <a href="#layout-sidebar">Sidebar layout</a>
+  <div class="nav-cat">Custom CSS</div>
+  <a href="#css-style">Inline style=</a>
+  <a href="#css-inject">Inject &lt;style&gt;</a>
+  <a href="#css-vars">Override variables</a>
+</nav>
+
+<main>
+<h1>How-to guide</h1>
+<p class="page-sub">Themes, layout patterns, and custom styling.</p>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="themes-builtin">
+<h2>Built-in themes</h2>
+
+<p>Call <code>gui.theme()</code> as the <strong>first line</strong> inside your <code>ui()</code> function.
+It injects a <code>&lt;style&gt;</code> block that overrides the CSS variables before any widgets render.</p>
+
+<h3>Available presets</h3>
+
+<div class="theme-row">
+  <div class="swatch" style="background:#f2f2f7;color:#1a1916;border-color:#d1d1d6">light<br><small style="opacity:.5">#6366f1</small></div>
+  <div class="swatch" style="background:#0f0f11;color:#f0eff8;border-color:#2a2a30">dark<br><small style="opacity:.5">#818cf8</small></div>
+  <div class="swatch" style="background:#0a0a0f;color:#00f5a0;border-color:#1a2a1a">neon<br><small style="opacity:.5">#00f5a0</small></div>
+  <div class="swatch" style="background:#0c1929;color:#e0f2fe;border-color:#1a3045">ocean<br><small style="opacity:.5">#38bdf8</small></div>
+  <div class="swatch" style="background:#fff1f3;color:#1c0a0d;border-color:#ffd0d8">rose<br><small style="opacity:.5">#f43f5e</small></div>
+  <div class="swatch" style="background:#faf7f0;color:#1c1208;border-color:#e5ddc8">sand<br><small style="opacity:.5">#b45309</small></div>
+</div>
+
+<div class="label">Example</div>
+<pre>@gui.app("My App", width=480, height=400)
+def ui():
+    gui.theme("ocean")          # apply theme first
+
+    with gui.card():
+        gui.title("Hello")
+        gui.button("Click me")</pre>
+
+<div class="label">List all presets in Python</div>
+<pre>import guile as gui
+print(list(gui._THEMES.keys()))
+# ['light', 'dark', 'neon', 'ocean', 'rose', 'sand']</pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="themes-custom">
+<h2>Custom theme</h2>
+
+<p>Start from a preset and override individual values, or build a theme entirely from scratch.</p>
+
+<h3>Override part of a preset</h3>
+<pre>gui.theme("ocean", primary="#ff6b6b")     # ocean colours, red accent
+gui.theme("light", radius=2)              # light theme, sharp corners
+gui.theme("sand",  font="Georgia, serif") # sand but serif font</pre>
+
+<h3>Fully custom</h3>
+<pre>gui.theme(
+    primary = "#0ea5e9",   # sky blue accent
+    bg      = "#f0f9ff",   # very light blue background
+    surface = "#ffffff",   # white cards
+    text    = "#0c1a2e",   # near-black text
+    radius  = 8,           # px, also accepts "8px"
+    font    = "-apple-system, BlinkMacSystemFont, sans-serif",
+)</pre>
+
+<p>All derived colours — hover shade, tint, secondary text, borders — are
+computed automatically from the six values above. You never need to set them manually.</p>
+
+<h3>Switch themes at runtime</h3>
+<p>Because <code>gui.theme()</code> is called inside <code>ui()</code>, it re-runs on every render.
+Tie it to a state value for a live theme switcher:</p>
+<pre>theme_name = gui.state("light")
+
+@gui.app("App", width=480, height=300)
+def ui():
+    gui.theme(theme_name.value)         # re-applied every render
+
+    with gui.card():
+        gui.select(
+            ["light","dark","ocean","neon","rose","sand"],
+            "Theme", value=theme_name, key="theme-sel"
+        )</pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="themes-vars">
+<h2>CSS variables reference</h2>
+
+<p>These are the six variables <code>gui.theme()</code> accepts. All other colours are derived from them.</p>
+
+<div class="card">
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+<thead><tr>
+  <th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">Argument</th>
+  <th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">CSS variable</th>
+  <th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">Default (light)</th>
+  <th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">What it controls</th>
+</tr></thead>
+<tbody>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">primary</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--primary</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#6366f1</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Buttons, sliders, focus rings, links</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">bg</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--bg</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#f2f2f7</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Window / page background</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">surface</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--surface</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#ffffff</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Card and input background</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">text</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--text</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#1c1c1e</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Primary text colour</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">radius</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--r</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">10px</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Border radius of cards and inputs</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent)">font</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2)">--font / font-family</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px">system-ui</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px">Body and widget font stack</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The full list of derived variables (set automatically) is in <code>_template.py</code> under <em>Design tokens</em>.
+You can still override any of them directly via <code>gui.html("&lt;style&gt;:root{--border-focus:#ff0}...&lt;/style&gt;")</code>.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="layout-cols">
+<h2>Unequal columns</h2>
+
+<p>Use <code>gui.row()</code> with <code>style="flex:N"</code> on child containers to get proportional widths.
+The number after <code>flex:</code> is the relative weight.</p>
+
+<h3>Two columns — 1/3 + 2/3</h3>
+<pre>with gui.row(gap=16, align="flex-start"):
+    with gui.col(style="flex:1"):      # takes 1 part
+        with gui.card():
+            gui.title("Sidebar")
+    with gui.col(style="flex:2"):      # takes 2 parts
+        with gui.card():
+            gui.title("Main content")</pre>
+
+<h3>Three columns — equal</h3>
+<pre>with gui.row(gap=12, align="flex-start"):
+    for label in ["Alpha", "Beta", "Gamma"]:
+        with gui.col(style="flex:1"):
+            with gui.card():
+                gui.title(label)</pre>
+
+<h3>Fixed + flexible</h3>
+<pre>with gui.row(gap=12, align="flex-start"):
+    with gui.col(style="width:200px;flex-shrink:0"):
+        with gui.card():
+            gui.title("Fixed 200px")
+    with gui.col(style="flex:1"):
+        with gui.card():
+            gui.title("Fills the rest")</pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="layout-grid">
+<h2>CSS grid</h2>
+
+<p>For more control — unequal rows, spanning cells — use <code>display:grid</code>
+in a <code>style=</code> string on any container.</p>
+
+<h3>Two-column grid with fractional widths</h3>
+<pre>with gui.col(style="display:grid;grid-template-columns:1fr 2fr;gap:16px"):
+    with gui.card():
+        gui.title("Narrow (1fr)")
+    with gui.card():
+        gui.title("Wide (2fr)")</pre>
+
+<h3>Three-column dashboard grid</h3>
+<pre>with gui.col(style="display:grid;"
+             "grid-template-columns:repeat(3,1fr);gap:12px"):
+    for metric, value in [("Revenue","$42k"), ("Users","1,204"), ("Uptime","99.9%")]:
+        with gui.card(padding=16):
+            gui.text(metric, muted=True, size="sm")
+            gui.title(value, size="2xl")</pre>
+
+<h3>Mixed fixed and flexible columns</h3>
+<pre>with gui.col(style="display:grid;"
+             "grid-template-columns:240px 1fr 160px;gap:16px"):
+    with gui.card(): gui.title("Nav")
+    with gui.card(): gui.title("Content")
+    with gui.card(): gui.title("Panel")</pre>
+
+<h3>A cell that spans multiple columns</h3>
+<pre>with gui.col(style="display:grid;grid-template-columns:1fr 1fr;gap:12px"):
+    with gui.card(style="grid-column:1/-1"):   # span all columns
+        gui.title("Full-width header")
+    with gui.card(): gui.title("Left")
+    with gui.card(): gui.title("Right")</pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="layout-sidebar">
+<h2>Sidebar layout</h2>
+
+<p>A common pattern: fixed-width sidebar on the left, scrollable content on the right.</p>
+
+<pre>@gui.app("Dashboard", width=800, height=600)
+def ui():
+    with gui.row(gap=0, style="height:100vh"):
+
+        # ── Sidebar ──────────────────────────────────
+        with gui.col(
+            padding=16, gap=8,
+            style="width:200px;flex-shrink:0;"
+                  "border-right:1px solid var(--border);"
+                  "background:var(--surface)"
+        ):
+            gui.title("Menu", size="lg")
+            gui.divider()
+            gui.button("Dashboard", variant="ghost",
+                       style="width:100%;justify-content:flex-start")
+            gui.button("Reports",   variant="ghost",
+                       style="width:100%;justify-content:flex-start")
+            gui.button("Settings",  variant="ghost",
+                       style="width:100%;justify-content:flex-start")
+
+        # ── Main content ──────────────────────────────
+        with gui.col(padding=24, gap=16, fill=True, scroll=True):
+            gui.title("Dashboard")
+            gui.text("Main content goes here.")</pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="css-style">
+<h2>Inline style=</h2>
+
+<p>Every widget and container accepts a <code>style=</code> argument that appends
+raw CSS to the element. This is for one-off visual tweaks that don't warrant
+a theme change.</p>
+
+<pre># Coloured text
+gui.text("Warning", color="var(--warning)")
+gui.text("Custom hex", color="#0ea5e9")
+
+# Extra spacing on a specific card
+with gui.card(style="margin-top:24px"):
+    gui.title("Spaced out")
+
+# Centred text inside a card
+gui.title("Centred", style="text-align:center")
+
+# Fixed-width number display
+gui.text(count, size="2xl", bold=True, style="min-width:64px;text-align:center")
+
+# Danger zone card
+with gui.card(style="border:1px solid var(--danger-light)"):
+    gui.text("Destructive action", color="var(--danger)", bold=True)</pre>
+
+<div class="note">Layout props (gap, padding, align, justify) control <em>where</em> children sit.
+style= controls <em>how</em> the element itself looks. If you find yourself writing
+<code>style="display:flex;gap:12px"</code>, use <code>gui.row(gap=12)</code> instead.</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="css-inject">
+<h2>Inject a &lt;style&gt; block</h2>
+
+<p>For anything beyond what <code>gui.theme()</code> covers, use <code>gui.html()</code>
+to drop a raw <code>&lt;style&gt;</code> tag into the page.
+Because it's called inside <code>ui()</code>, it re-applies on every render — which is fine,
+the browser just overwrites the rule.</p>
+
+<h3>Custom animation</h3>
+<pre>gui.html("""
+&lt;style&gt;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--success); animation: pulse 1.5s infinite;
+  display: inline-block; margin-right: 6px;
+}
+&lt;/style&gt;
+""")
+gui.html('&lt;span class="live-dot"&gt;&lt;/span&gt; Live')</pre>
+
+<h3>Custom scrollbar</h3>
+<pre>gui.html("""
+&lt;style&gt;
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 2px; }
+&lt;/style&gt;
+""")</pre>
+
+<h3>Google Font</h3>
+<pre>gui.html("""
+&lt;style&gt;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+:root { --font: 'Inter', sans-serif; }
+body  { font-family: var(--font); }
+&lt;/style&gt;
+""")</pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="css-vars">
+<h2>Override individual CSS variables</h2>
+
+<p>The full design system uses CSS custom properties. You can override any of them
+without touching the others. All variables are defined in <code>_template.py</code>.</p>
+
+<h3>Change just the border radius</h3>
+<pre># Sharp, modern look
+gui.html("&lt;style&gt;:root { --r: 2px; --r-sm: 2px; --r-lg: 4px; }&lt;/style&gt;")
+
+# Very rounded, soft look
+gui.html("&lt;style&gt;:root { --r: 20px; --r-sm: 12px; --r-lg: 28px; }&lt;/style&gt;")</pre>
+
+<h3>Change just the shadow</h3>
+<pre># Flat design — no shadow
+gui.html("&lt;style&gt;:root { --shadow: none; --shadow-sm: none; }&lt;/style&gt;")
+
+# Heavy shadow
+gui.html("&lt;style&gt;:root { --shadow: 0 8px 40px rgba(0,0,0,.18); }&lt;/style&gt;")</pre>
+
+<h3>All available variables</h3>
+<pre>/* Colours */
+--primary        accent colour (buttons, sliders, focus rings)
+--primary-h      darker hover shade of primary (auto-derived by gui.theme)
+--primary-light  tint/ghost background for primary (auto-derived)
+--bg             window background
+--surface        card and input background
+--surface-2      slightly tinted surface (hover rows, secondary panels)
+--text           primary text
+--text-2         secondary / muted text
+--border         default border colour
+--border-focus   border colour when an input has focus
+--danger         red for danger buttons and error text
+--danger-light   tint for danger backgrounds
+--success        green for success badges
+--success-light  tint for success backgrounds
+--warning        amber for warning text
+--warning-light  tint for warning backgrounds
+
+/* Shape */
+--r              default border radius   (cards, inputs)
+--r-sm           small border radius     (buttons, badges)
+--r-lg           large border radius     (modals, large cards)
+
+/* Depth */
+--shadow         default card shadow
+--shadow-sm      subtle shadow
+--shadow-lg      prominent shadow
+
+/* Typography */
+--mono           monospace font stack</pre>
+</div>
+
+</main>
+</div>
+
+<script>
+// Active nav on scroll
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+      const a = document.querySelector(`nav a[href="#${e.target.id}"]`);
+      if (a) { a.classList.add('active'); a.scrollIntoView({block:'nearest'}); }
+    }
+  });
+}, {rootMargin:'-10% 0px -80% 0px'});
+document.querySelectorAll('.section').forEach(el => io.observe(el));
+</script>
+</body>
+</html>

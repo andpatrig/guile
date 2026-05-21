@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guile — API Reference</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap');
+
+:root {
+  --bg:         #f5f4f0;
+  --surface:    #ffffff;
+  --surface-2:  #f0efe9;
+  --border:     #e2e0d8;
+  --border-2:   #ccc9be;
+  --text:       #1a1916;
+  --text-2:     #6b6860;
+  --text-3:     #9b9890;
+  --accent:     #5b4fff;
+  --accent-bg:  #eeecff;
+  --accent-txt: #3b2ee0;
+  --green:      #1a7a4a;
+  --green-bg:   #e6f4ec;
+  --amber:      #8a5a00;
+  --amber-bg:   #fdf3dc;
+  --red:        #c0392b;
+  --red-bg:     #fdecea;
+  --teal:       #0f6e6e;
+  --teal-bg:    #e0f4f4;
+  --mono:       'DM Mono', monospace;
+  --sans:       'DM Sans', sans-serif;
+  --r:          8px;
+  --r-lg:       12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:         #141412;
+    --surface:    #1e1d1a;
+    --surface-2:  #252420;
+    --border:     #2e2d28;
+    --border-2:   #3a3932;
+    --text:       #f0efe8;
+    --text-2:     #9b9890;
+    --text-3:     #6b6860;
+    --accent:     #7b6fff;
+    --accent-bg:  #1e1a3a;
+    --accent-txt: #b0a8ff;
+    --green:      #4ade80;
+    --green-bg:   #0a2318;
+    --amber:      #fbbf24;
+    --amber-bg:   #1f1500;
+    --red:        #f87171;
+    --red-bg:     #1f0a0a;
+    --teal:       #2dd4bf;
+    --teal-bg:    #001f1f;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Shell ───────────────────────────────────────────────────────────── */
+.shell { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
+nav {
+  width: 210px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 28px 0 40px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.logo {
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.logo-name {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+.logo-name span { color: var(--accent); }
+.logo-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 3px;
+  font-family: var(--mono);
+}
+
+.nav-cat {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 14px 20px 5px;
+}
+.nav-cat:first-of-type { padding-top: 0; }
+
+nav a {
+  display: block;
+  padding: 4px 20px;
+  font-size: 12.5px;
+  font-family: var(--mono);
+  color: var(--text-2);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: all .1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+nav a:hover { color: var(--text); background: var(--surface-2); }
+nav a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+/* ── Main ────────────────────────────────────────────────────────────── */
+main {
+  flex: 1;
+  padding: 52px 60px 80px;
+  min-width: 0;
+}
+
+/* ── Category sections ───────────────────────────────────────────────── */
+.cat-section { margin-bottom: 56px; }
+
+.cat-heading {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Widget block ────────────────────────────────────────────────────── */
+.widget {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-bottom: 16px;
+  overflow: hidden;
+  scroll-margin-top: 24px;
+}
+
+.widget-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--surface);
+}
+
+.widget-sig {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.widget-sig .fn { color: var(--accent); }
+
+.tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 99px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.tag-layout { background: var(--accent-bg); color: var(--accent-txt); }
+.tag-text   { background: var(--green-bg);  color: var(--green); }
+.tag-input  { background: var(--amber-bg);  color: var(--amber); }
+.tag-media  { background: var(--red-bg);    color: var(--red); }
+.tag-data   { background: var(--teal-bg);   color: var(--teal); }
+.tag-state  { background: var(--accent-bg); color: var(--accent-txt); }
+
+.widget-body {
+  border-top: 1px solid var(--border);
+  padding: 18px;
+}
+
+.desc {
+  font-size: 14px;
+  color: var(--text-2);
+  margin-bottom: 16px;
+  line-height: 1.65;
+  max-width: 680px;
+}
+
+/* Args table */
+.args-wrap {
+  overflow-x: auto;
+  margin-bottom: 16px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+th {
+  text-align: left;
+  color: var(--text-3);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td {
+  padding: 8px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+tr:last-child td { border-bottom: none; }
+td:first-child {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+td:nth-child(2) {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+td:nth-child(3) { color: var(--text-2); }
+
+/* Code example */
+.ex-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav id="sidebar">
+  <div class="logo">
+    <div class="logo-name">gui<span>le</span></div>
+    <div class="logo-sub">API reference v0.1</div>
+  </div>
+  <div id="nav-links"></div>
+</nav>
+
+<main id="main"></main>
+
+</div>
+<script>
+const WIDGETS = [
+  {cat:"Layout", id:"col", name:"gui.col()", tag:"layout",
+   desc:"Vertical flex container. Use as a context manager — everything inside the with block stacks top to bottom. Layout props control where children sit; style= controls how the container itself looks.",
+   args:[
+     ["gap","int = 12","Spacing between children in px"],
+     ["padding","int|str = 0","Inner padding (px or CSS string like '12px 20px')"],
+     ["align","str = 'stretch'","Cross-axis (horizontal): stretch | center | flex-start | flex-end"],
+     ["justify","str = 'flex-start'","Main-axis (vertical): flex-start | center | flex-end | space-between"],
+     ["fill","bool = False","flex:1 — expands to fill available space"],
+     ["scroll","bool = False","Enable vertical scrolling when content overflows"],
+     ["style","str = ''","Raw CSS appended to the element style attribute"],
+     ["key","str = None","Stable DOM ID — required when used inside a loop"],
+   ],
+   },
+
+  {cat:"Layout", id:"row", name:"gui.row()", tag:"layout",
+   desc:"Horizontal flex container. Children sit side by side. align controls vertical alignment; justify controls horizontal distribution.",
+   args:[
+     ["gap","int = 8","Spacing between children in px"],
+     ["padding","int|str = 0","Inner padding"],
+     ["align","str = 'center'","Cross-axis (vertical): center | flex-start | flex-end | baseline | stretch"],
+     ["justify","str = 'flex-start'","Main-axis (horizontal): flex-start | center | flex-end | space-between"],
+     ["fill","bool = False","flex:1"],
+     ["wrap","bool = False","Allow children to wrap onto the next line"],
+     ["style","str = ''","Raw CSS"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Layout", id:"card", name:"gui.card()", tag:"layout",
+   desc:"Raised white surface with a subtle shadow. The primary container for grouping related content.",
+   args:[
+     ["gap","int = 12","Spacing between children"],
+     ["padding","int|str = 20","Inner padding"],
+     ["style","str = ''","Raw CSS — e.g. style='margin:0 20px'"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Layout", id:"scroll", name:"gui.scroll()", tag:"layout",
+   desc:"Scrollable container. Useful when content may overflow vertically and you want a fixed-height scrollable area.",
+   args:[
+     ["style","str = ''","Raw CSS — set max-height here"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Layout", id:"spacer", name:"gui.spacer()", tag:"layout",
+   desc:"Empty space. fill=True creates a greedy spacer that consumes all remaining space — useful for pushing items to opposite ends of a row.",
+   args:[
+     ["h","int = None","Fixed height in px"],
+     ["w_","int = None","Fixed width in px"],
+     ["fill","bool = False","flex:1 — takes all remaining space in the flex container"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Display", id:"title", name:"gui.title()", tag:"text",
+   desc:"Bold heading. Default size xl renders at 24px bold. Use size= to create hierarchy.",
+   args:[
+     ["content","Any","Heading text — State, str, int all work"],
+     ["size","str = 'xl'","xs (11px) | sm (13px) | md (15px) | lg (18px) | xl (24px) | 2xl (32px) | 3xl (44px)"],
+     ["muted","bool = False","Renders in secondary text colour"],
+     ["style","str = ''","Raw CSS"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Display", id:"text", name:"gui.text()", tag:"text",
+   desc:"Inline or block text. The workhorse for displaying any value. State objects, numbers, and strings all render correctly without calling .value.",
+   args:[
+     ["content","Any","Text — State, str, int, float, all converted to string"],
+     ["size","str = 'md'","xs | sm | md | lg | xl | 2xl | 3xl"],
+     ["bold","bool = False","font-weight: 700"],
+     ["italic","bool = False","font-style: italic"],
+     ["muted","bool = False","Secondary text colour"],
+     ["underline","bool = False","text-decoration: underline"],
+     ["mono","bool = False","Monospace font"],
+     ["color","str = None","Any CSS color value"],
+     ["style","str = ''","Raw CSS — e.g. 'text-align:center;min-width:64px'"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Display", id:"badge", name:"gui.badge()", tag:"text",
+   desc:"Small colored pill. Use for status indicators, counts, labels, and tags.",
+   args:[
+     ["text_","Any","Label text"],
+     ["variant","str = 'primary'","primary | success | danger | warning | neutral"],
+     ["style","str = ''","Raw CSS"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Display", id:"divider", name:"gui.divider()", tag:"text",
+   desc:"A horizontal separator line. Useful for visual separation between sections inside a card.",
+   args:[["key","str = None","Stable DOM ID"]],
+   },
+
+  {cat:"Display", id:"progress", name:"gui.progress()", tag:"text",
+   desc:"Horizontal progress bar. value goes from 0 to max. Animates smoothly when the value changes.",
+   args:[
+     ["value","Any","Current progress value"],
+     ["max","int = 100","Maximum value"],
+     ["color","str = None","Bar fill colour as a CSS value. Defaults to --primary."],
+     ["style","str = ''","Raw CSS on the track element"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Display", id:"html", name:"gui.html()", tag:"text",
+   desc:"Raw HTML escape hatch. Inject arbitrary HTML when no widget covers the need.",
+   args:[
+     ["raw","str","Raw HTML string — injected verbatim, not escaped"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Inputs", id:"button", name:"gui.button()", tag:"input",
+   desc:"Clickable button. The on_click lambda takes no arguments. Always set key= when rendering buttons inside loops.",
+   args:[
+     ["label","Any","Button text"],
+     ["on_click","Callable = None","Called with zero arguments when clicked"],
+     ["variant","str = 'primary'","primary | secondary | ghost | danger"],
+     ["size","str = 'md'","sm | md | lg"],
+     ["disabled","bool = False","Greys out and blocks interaction"],
+     ["style","str = ''","Raw CSS"],
+     ["key","str = None","Stable DOM ID — always set in loops"],
+   ],
+   },
+
+  {cat:"Inputs", id:"input", name:"gui.input()", tag:"input",
+   desc:"Single-line text input. Returns an object with .value (str) and .set(). key= is required — it persists the input state across re-renders so text isn't lost on every keypress.",
+   args:[
+     ["label","str = ''","Label rendered above the field"],
+     ["placeholder","str = ''","Grey placeholder text when empty"],
+     ["value","str|State = None","Initial text, or a State for two-way binding"],
+     ["type","str = 'text'","text | password | number | email | search | url"],
+     ["disabled","bool = False","Read-only appearance"],
+     ["on_change","Callable = None","Called with the new string on every keystroke"],
+     ["style","str = ''","Raw CSS — e.g. 'flex:1'"],
+     ["key","str","Required"],
+   ],
+   },
+
+  {cat:"Inputs", id:"textarea", name:"gui.textarea()", tag:"input",
+   desc:"Multi-line text input. Same interface as gui.input() — returns .value, supports .set(), requires key=.",
+   args:[
+     ["label","str = ''","Label above the field"],
+     ["placeholder","str = ''","Placeholder text"],
+     ["value","str|State = None","Initial text or bound State"],
+     ["rows","int = 4","Initial visible row count"],
+     ["disabled","bool = False","Read-only"],
+     ["on_change","Callable = None","Called with new string on each keystroke"],
+     ["style","str = ''","Raw CSS"],
+     ["key","str","Required"],
+   ],
+   },
+
+  {cat:"Inputs", id:"checkbox", name:"gui.checkbox()", tag:"input",
+   desc:"Boolean checkbox with a label. Returns .value (bool) and .set().",
+   args:[
+     ["label","str = ''","Text shown next to the checkbox"],
+     ["value","bool|State = None","Initial checked state or bound State"],
+     ["disabled","bool = False","Non-interactive"],
+     ["on_change","Callable = None","Called with True or False when toggled"],
+     ["key","str","Required"],
+   ],
+   },
+
+  {cat:"Inputs", id:"select", name:"gui.select()", tag:"input",
+   desc:"Dropdown selector. Returns .value (the selected value string). options accepts plain lists, (value, label) tuples, or dicts.",
+   args:[
+     ["options","list|dict","list[str] | list[(value, label)] | {value: label}"],
+     ["label","str = ''","Label above the dropdown"],
+     ["value","str|State = None","Initially selected value. Defaults to first option."],
+     ["disabled","bool = False","Non-interactive"],
+     ["on_change","Callable = None","Called with the selected value string"],
+     ["style","str = ''","Raw CSS"],
+     ["key","str","Required"],
+   ],
+   },
+
+  {cat:"Inputs", id:"slider", name:"gui.slider()", tag:"input",
+   desc:"Range slider. Returns .value (float). The label automatically shows the current value next to it.",
+   args:[
+     ["label","str = ''","Label — current value shown alongside automatically"],
+     ["min","float = 0","Minimum value"],
+     ["max","float = 100","Maximum value"],
+     ["step","float = 1","Increment per tick. Use 0.1 for decimals."],
+     ["value","float|State = None","Initial value. Defaults to min."],
+     ["on_change","Callable = None","Called with the new float value on every drag tick"],
+     ["style","str = ''","Raw CSS"],
+     ["key","str","Required"],
+   ],
+   },
+
+  {cat:"Inputs", id:"date_input", name:"gui.date_input()", tag:"input",
+   desc:"Native OS date picker. Returns .value as YYYY-MM-DD (empty string if nothing is selected).",
+   args:[
+     ["label","str = ''","Label above the field"],
+     ["value","str|State = None","Initial date as 'YYYY-MM-DD'"],
+     ["disabled","bool = False","Read-only"],
+     ["on_change","Callable = None","Called with new date string"],
+     ["style","str = ''","Raw CSS"],
+     ["key","str","Required"],
+   ],
+   },
+
+  {cat:"Inputs", id:"file_picker", name:"gui.file_picker()", tag:"input",
+   desc:"A button that opens the OS native file dialog. Returns .value as the full file path. The filename appears in the button after selection.",
+   args:[
+     ["label","str = 'Choose file…'","Button label"],
+     ["value","str|State = None","Pre-selected path"],
+     ["file_types","tuple = ()","Filter tuples e.g. ('CSV Files (*.csv)', 'All files (*.*)')"],
+     ["save","bool = False","True opens a Save dialog instead of Open"],
+     ["style","str = ''","Raw CSS on the button"],
+     ["key","str","Required"],
+   ],
+   },
+
+  {cat:"Data", id:"table", name:"gui.table()", tag:"data",
+   desc:"Simple data table from a list of dicts. Column headers come from dict keys. Scrollable horizontally on narrow windows.",
+   args:[
+     ["data","list[dict]","Rows as a list of dicts. Each dict is one row."],
+     ["columns","list[str] = None","Keys to show and in what order. Defaults to all keys in first row."],
+     ["style","str = ''","Raw CSS on the scroll wrapper"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Media", id:"figure", name:"gui.figure()", tag:"media",
+   desc:"Embeds a matplotlib Figure as a base64 PNG inline. transparent=True makes the plot background transparent so it blends with the app's light/dark theme automatically.",
+   args:[
+     ["fig","Figure","A matplotlib Figure object"],
+     ["dpi","int = 96","Resolution. Use 72 for lighter renders, 150 for crisp HiDPI."],
+     ["width","str = '100%'","CSS width of the image element"],
+     ["caption","str = None","Caption text shown below the figure"],
+     ["transparent","bool = True","Transparent plot background — matches app theme"],
+     ["static","bool = False","Cache base64 after first render — use for figures that never change"],
+     ["style","str = ''","Raw CSS on the img element"],
+     ["key","str = None","Stable DOM ID"],
+   ],
+   },
+
+  {cat:"Media", id:"leaflet", name:"gui.leaflet()", tag:"media",
+   desc:"Interactive Leaflet map with OpenStreetMap tiles. Requires an internet connection. The user's pan and zoom state is preserved across re-renders.",
+   args:[
+     ["center","tuple","(lat, lon) centre point as floats"],
+     ["zoom","int = 10","Initial zoom level: 1 = world, 10 = city, 15 = street"],
+     ["height","int = 380","Map height in px"],
+     ["markers","list = None","List of gui.Marker objects"],
+     ["style","str = ''","Raw CSS on the map wrapper div"],
+     ["key","str","Required — preserves map state between renders"],
+   ],
+   },
+
+  {cat:"Media", id:"Marker", name:"gui.Marker()", tag:"media",
+   desc:"A map marker for use with gui.leaflet(). popup appears on click; tooltip appears on hover.",
+   args:[
+     ["latlng","tuple","(lat, lon) position as floats"],
+     ["popup","str = None","Content shown when the marker is clicked"],
+     ["tooltip","str = None","Content shown on hover"],
+   ],
+   },
+
+  {cat:"State", id:"state", name:"gui.state()", tag:"state",
+   desc:"Create a reactive value. Any change to .value automatically triggers a UI re-render. The State object proxies arithmetic and comparison operators so you can often use it directly without .value.",
+   args:[
+     ["initial","Any","Starting value — any Python type: int, str, list, dict, bool…"],
+     ["key","str = ''","Optional label for debugging, shown in repr()"],
+   ],
+   },
+];
+
+const TAG_CLASSES = {layout:"tag-layout",text:"tag-text",input:"tag-input",
+                     media:"tag-media",data:"tag-data",state:"tag-state"};
+const TAG_LABELS  = {layout:"layout",text:"display",input:"input",
+                     media:"media",data:"data",state:"state"};
+
+function build() {
+  const cats = [...new Set(WIDGETS.map(w => w.cat))];
+
+  // ── Sidebar ─────────────────────────────────────────────────────────
+  const nav = document.getElementById("nav-links");
+  nav.innerHTML = cats.map(cat => {
+    const ws = WIDGETS.filter(w => w.cat === cat);
+    return `<div class="nav-cat">${cat}</div>` +
+      ws.map(w =>
+        `<a href="#w-${w.id}" data-id="${w.id}">${w.name}</a>`
+      ).join("");
+  }).join("");
+
+  // ── Main content ────────────────────────────────────────────────────
+  const main = document.getElementById("main");
+  main.innerHTML = cats.map(cat => {
+    const ws = WIDGETS.filter(w => w.cat === cat);
+    const blocks = ws.map(w => {
+      const rows = w.args.map(([a,t,d]) =>
+        `<tr><td>${a}</td><td>${t}</td><td>${d}</td></tr>`
+      ).join("");
+      return `
+        <div class="widget" id="w-${w.id}">
+          <div class="widget-head">
+            <span class="widget-sig"><span class="fn">${w.name}</span></span>
+            <span class="tag ${TAG_CLASSES[w.tag]}">${TAG_LABELS[w.tag]}</span>
+          </div>
+          <div class="widget-body">
+            <p class="desc">${w.desc}</p>
+            <div class="args-wrap">
+              <table>
+                <thead>
+                  <tr><th>argument</th><th>type / default</th><th>description</th></tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            <div class="ex-label">Example</div>
+            <pre class="ex-code"></pre>
+          </div>
+        </div>`;
+    }).join("");
+    return `<div class="cat-section">
+      <div class="cat-heading">${cat}</div>
+      ${blocks}
+    </div>`;
+  }).join("");
+}
+
+// Active nav on scroll
+function initObserver() {
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        document.querySelectorAll("nav a").forEach(a => a.classList.remove("active"));
+        const a = document.querySelector(`nav a[data-id="${e.target.id.replace("w-","")}"]`);
+        if (a) {
+          a.classList.add("active");
+          a.scrollIntoView({block:"nearest"});
+        }
+      }
+    });
+  }, {rootMargin:"-10% 0px -80% 0px"});
+
+  document.querySelectorAll(".widget").forEach(el => io.observe(el));
+}
+
+const EXAMPLES = ["with gui.col(gap=16, padding=20):\n    gui.title(\"My App\")\n    gui.text(\"Content here\")", "with gui.row(justify=\"space-between\", align=\"center\"):\n    gui.title(\"Dashboard\")\n    gui.badge(\"Live\", variant=\"success\")\n    gui.button(\"Refresh\", variant=\"ghost\", size=\"sm\",\n               on_click=refresh)", "with gui.card(gap=14, padding=16):\n    gui.text(\"Appearance\", bold=True, muted=True)\n    theme = gui.select([(\"light\",\"Light\"),(\"dark\",\"Dark\")],\n                       key=\"theme\")\n    gui.slider(\"Font size\", min=12, max=24, value=15, key=\"fs\")", "with gui.scroll(style=\"max-height:400px\"):\n    for item in long_list:\n        gui.text(item[\"name\"])", "with gui.row():\n    gui.text(\"Left side\")\n    gui.spacer(fill=True)\n    gui.button(\"Right side\", variant=\"ghost\")\n\ngui.spacer(h=24)", "gui.title(\"Sales Dashboard\")\ngui.title(\"Subtitle\", size=\"md\", muted=True)", "gui.text(count, size=\"2xl\", bold=True)\ngui.text(\"Optional\", muted=True, size=\"sm\")\ngui.text(\"Total\", bold=True, color=\"var(--success)\")", "gui.badge(\"Online\", variant=\"success\")\ngui.badge(\"3 errors\", variant=\"danger\")\ngui.badge(\"5 items\", variant=\"neutral\")", "with gui.card():\n    gui.title(\"Profile\")\n    gui.divider()\n    gui.text(\"Name: Alice\")", "done  = sum(1 for t in todos.value if t[\"done\"])\ntotal = len(todos.value)\ngui.progress(done, max=total or 1)", "gui.html('<span style=\"font-size:2rem\">Hello</span>')\ngui.html(\"<style>:root{--primary:#e11d48}</style>\")", "gui.button(\"Save\", on_click=lambda: save(data.value))\ngui.button(\"Delete\", variant=\"danger\", size=\"sm\",\n           on_click=lambda: delete(selected_id))\ngui.button(\"Reset\", variant=\"ghost\",\n           on_click=lambda: count.set(0))", "name = gui.input(\"Name\", placeholder=\"Your name\", key=\"name\")\n\nwith gui.row(gap=8, align=\"flex-end\"):\n    task = gui.input(placeholder=\"New task\",\n                     key=\"task\", style=\"flex:1\")\n    gui.button(\"Add\", on_click=lambda: (\n        add_todo(task.value), task.set(\"\")))", "notes = gui.textarea(\"Notes\", placeholder=\"Write here\",\n                    rows=6, key=\"notes\")", "email = gui.checkbox(\"Email notifications\",\n                      value=True, key=\"email\")\npush  = gui.checkbox(\"Push notifications\",\n                     value=False, key=\"push\")", "period = gui.select(\n    [(\"7d\",\"Last 7 days\"), (\"30d\",\"Last 30 days\"),\n     (\"1y\",\"Last year\")],\n    \"Date range\", key=\"period\"\n)", "mag = gui.slider(\"Min magnitude\", min=1.5,\n                  max=6.0, step=0.1,\n                  value=2.5, key=\"mag\")\nfiltered = [q for q in quakes if q[\"mag\"] >= mag.value]", "start = gui.date_input(\"From\", key=\"from\")\nend   = gui.date_input(\"To\",   key=\"to\")", "f = gui.file_picker(\n    \"Load dataset\",\n    file_types=(\"CSV Files (*.csv)\", \"All files (*.*)\"),\n    key=\"dataset\"\n)\nif f.value:\n    import pandas as pd\n    df = pd.read_csv(f.value)\n    gui.table(df.head(50).to_dict(\"records\"))", "data = [\n    {\"name\": \"Alice\", \"dept\": \"Eng\"},\n    {\"name\": \"Bob\",   \"dept\": \"Design\"},\n]\ngui.table(data)\ngui.table(data, columns=[\"name\", \"dept\"])", "import matplotlib\nmatplotlib.use(\"Agg\")\nimport matplotlib.pyplot as plt\n\nfig, ax = plt.subplots(figsize=(6, 3))\nax.plot(x, y, color=\"#6366f1\")\nfig.tight_layout()\nguil.figure(fig, dpi=110, caption=\"Monthly revenue\")", "gui.leaflet(\n    center=(51.505, -0.09),\n    zoom=13, height=400,\n    markers=[\n        gui.Marker((51.505, -0.09),\n                   popup=\"Big Ben\",\n                   tooltip=\"Click me\"),\n    ],\n    key=\"map\"\n)", "markers = [\n    gui.Marker(\n        (q[\"lat\"], q[\"lon\"]),\n        popup=\"Depth: \" + str(q[\"depth\"]) + \" km\",\n        tooltip=\"M \" + str(q[\"mag\"])\n    )\n    for q in filtered_quakes\n]", "count = gui.state(0)\nitems = gui.state([])\n\ncount.set(42)\ncount.update(lambda x: x + 1)\ncount.toggle()\n\nif count > 0:\n    gui.badge(\"positive\", variant=\"success\")\n\nitems.set(items.value + [\"new item\"])"];
+build();
+// Fill examples via textContent so braces/backticks are never parsed as JS
+document.querySelectorAll(".widget").forEach((el, i) => {
+  const pre = el.querySelector(".ex-code");
+  if (pre && EXAMPLES[i] !== undefined) pre.textContent = EXAMPLES[i];
+});
+initObserver();
+</script>
+</body>
+</html>

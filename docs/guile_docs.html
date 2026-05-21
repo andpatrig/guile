@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>guile — Python desktop apps, top to bottom</title>
+<link rel="icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><text x="24" y="34" font-family="DM Sans, system-ui, sans-serif" font-weight="500" font-size="34" text-anchor="middle" fill="%231a1916" letter-spacing="-1.5"><tspan fill="%235b4fff">g</tspan>l</text></svg>'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:         #f5f4f0;
+  --surface:    #ffffff;
+  --surface-2:  #f0efe9;
+  --surface-3:  #e9e7df;
+  --border:     #e2e0d8;
+  --border-2:   #ccc9be;
+  --text:       #1a1916;
+  --text-2:     #6b6860;
+  --text-3:     #9b9890;
+  --accent:     #5b4fff;
+  --accent-bg:  #eeecff;
+  --accent-txt: #3b2ee0;
+  --green:      #1a7a4a;
+  --green-bg:   #e6f4ec;
+  --amber:      #8a5a00;
+  --amber-bg:   #fdf3dc;
+  --mono:       'DM Mono', ui-monospace, monospace;
+  --sans:       'DM Sans', system-ui, sans-serif;
+  --r:          8px;
+  --r-lg:       14px;
+  --shadow-sm:  0 1px 2px rgba(20,18,14,.04);
+  --shadow:     0 6px 24px -8px rgba(20,18,14,.08), 0 2px 4px rgba(20,18,14,.04);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+/* ── Wordmark ─────────────────────────────────────────────────────────── */
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  white-space: nowrap;
+  color: currentColor;
+}
+.wordmark .gui { color: var(--accent); }
+
+/* ── Top bar ──────────────────────────────────────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 36px;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 11px; }
+.brand .wordmark { font-size: 22px; }
+.brand-ver {
+  font-family: var(--mono); font-size: 10.5px;
+  padding: 2px 7px; border: 1px solid var(--border); border-radius: 99px;
+  color: var(--text-3); margin-left: 4px;
+}
+.topnav { display: flex; align-items: center; gap: 4px; }
+.topnav a {
+  font-family: var(--mono); font-size: 12.5px; color: var(--text-2);
+  padding: 7px 11px; border-radius: var(--r); transition: background .12s, color .12s;
+}
+.topnav a:hover { background: var(--surface-2); color: var(--text); }
+.topnav .gh {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--r);
+  margin-left: 6px;
+}
+.topnav .gh:hover { border-color: var(--border-2); background: var(--surface); }
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  padding: 96px 36px 72px;
+  overflow: hidden;
+}
+.hero-inner { max-width: 880px; margin: 0 auto; position: relative; z-index: 2; }
+.hero-stack { display: flex; flex-direction: column; align-items: flex-start; }
+
+.hero-wordmark { margin: 22px 0; line-height: 1; }
+.hero-wordmark .wordmark {
+  font-size: clamp(76px, 13vw, 152px);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+}
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .09em;
+  padding: 5px 10px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 99px;
+  margin-bottom: 22px;
+}
+.eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+h1.hero-tagline {
+  font-size: clamp(22px, 2.6vw, 32px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text-2);
+  margin-bottom: 22px;
+  max-width: 720px;
+  text-wrap: balance;
+}
+h1.hero-tagline em { font-style: italic; font-weight: 300; color: var(--text); }
+
+.hero-sub {
+  font-size: 17px; line-height: 1.55; color: var(--text-2);
+  max-width: 540px; margin-bottom: 28px; text-wrap: pretty;
+}
+
+.cta-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 18px; border-radius: var(--r);
+  font-size: 13.5px; font-weight: 500;
+  transition: transform .08s, background .15s, border-color .15s;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--text); color: var(--bg); }
+.btn-primary:hover { background: color-mix(in srgb, var(--text) 85%, var(--accent)); }
+.btn-secondary {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+}
+.btn-secondary:hover { border-color: var(--border-2); }
+.btn .arrow { transition: transform .15s; }
+.btn:hover .arrow { transform: translateX(2px); }
+
+/* Hero manifesto — closing philosophical note */
+.hero-manifesto {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+  max-width: 540px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-3);
+  letter-spacing: -0.005em;
+}
+.hero-manifesto em { font-style: italic; font-weight: 400; color: var(--text-2); }
+
+/* Soft halo behind the hero */
+.hero::after {
+  content: ""; position: absolute; inset: -40% 0 auto auto; width: 60vw; height: 60vw;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%);
+  filter: blur(40px); pointer-events: none; z-index: 0;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────── */
+section { padding: 64px 36px; position: relative; }
+.section-inner { max-width: 1080px; margin: 0 auto; }
+.section-head { margin-bottom: 36px; }
+.section-eyebrow {
+  font-family: var(--mono); font-size: 11px; color: var(--accent-txt);
+  text-transform: uppercase; letter-spacing: .12em;
+  margin-bottom: 10px;
+}
+.section-title {
+  font-size: clamp(26px, 3.2vw, 36px); font-weight: 600;
+  letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 10px;
+  text-wrap: balance;
+}
+.section-lede {
+  font-size: 16px; color: var(--text-2); max-width: 640px;
+  line-height: 1.6; text-wrap: pretty;
+}
+
+/* Inline Python keyword */
+.py-kw {
+  font-family: 'Menlo', 'Monaco', 'Source Code Pro', 'Consolas', var(--mono);
+  font-size: 0.92em;
+  font-weight: 700;
+  color: #007020;
+  background: none;
+  padding: 0;
+  letter-spacing: -0.01em;
+}
+.section-lede code.inline {
+  font-family: var(--mono); font-size: 13px;
+  background: var(--surface-2);
+  padding: 2px 6px; border-radius: 4px;
+}
+
+/* Quick start — code + window */
+.qs-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; align-items: stretch;
+}
+@media (max-width: 880px) { .qs-grid { grid-template-columns: 1fr; } }
+.code-window, .preview-window {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.win-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.win-dots { display: flex; gap: 6px; }
+.win-dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--border-2); display: inline-block; }
+.win-title { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); margin-left: 6px; }
+.win-tabs { margin-left: auto; display: flex; gap: 4px; }
+.win-tab {
+  font-family: var(--mono); font-size: 11px; color: var(--text-3);
+  padding: 3px 8px; border-radius: 4px;
+}
+.win-tab.active { color: var(--text); background: var(--surface); border: 1px solid var(--border); }
+
+pre.code {
+  flex: 1; margin: 0;
+  padding: 18px 20px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.75;
+  color: var(--text); overflow-x: auto;
+  background: var(--surface);
+}
+pre.code .kw    { color: var(--accent); }
+pre.code .str   { color: var(--green); }
+pre.code .num   { color: var(--amber); }
+pre.code .com   { color: var(--text-3); font-style: italic; }
+pre.code .fn    { color: var(--text); font-weight: 500; }
+pre.code .punct { color: var(--text-3); }
+pre.code .id    { color: var(--text); }
+
+/* Mock app preview */
+.preview-body {
+  flex: 1; padding: 28px; display: flex;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: var(--surface-2);
+}
+.fake-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 22px 26px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  box-shadow: var(--shadow-sm);
+  min-width: 240px;
+}
+.fake-card .ftitle { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.fake-counter-row { display: flex; align-items: center; gap: 14px; }
+.fake-btn {
+  width: 36px; height: 36px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r); display: grid; place-items: center;
+  font-size: 16px; font-weight: 500; color: var(--text);
+  cursor: pointer; user-select: none; transition: all .12s;
+}
+.fake-btn:hover { background: var(--surface); border-color: var(--border-2); }
+.fake-btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+.fake-btn.primary:hover { filter: brightness(0.95); }
+.fake-count {
+  font-size: 28px; font-weight: 600; min-width: 60px; text-align: center;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+.fake-hint {
+  font-family: var(--mono); font-size: 10.5px; color: var(--text-3);
+  letter-spacing: .04em;
+}
+
+/* "Ships with" strip under quick-start */
+.qs-ships {
+  margin-top: 22px;
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-2);
+  border-radius: var(--r-lg);
+}
+.qs-ships-label {
+  font-family: var(--mono); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .09em;
+  color: var(--text-3); margin-right: 4px;
+}
+.qs-ships-chip {
+  font-family: var(--mono); font-size: 12px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  color: var(--text);
+}
+.qs-ships-more {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--accent-txt);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.qs-ships-more .arrow { transition: transform .15s; }
+.qs-ships-more:hover .arrow { transform: translateX(3px); }
+
+/* ── Install pill (click-to-copy) ──────────────────────────────────────── */
+.install {
+  display: inline-flex; align-items: center;
+  margin-top: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-family: var(--mono); font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  overflow: hidden;
+}
+.install:hover { border-color: var(--border-2); }
+.install .ip-text { padding: 9px 14px; display: inline-flex; gap: 8px; align-items: center; }
+.install .ip-prompt { color: var(--text-3); user-select: none; }
+.install .ip-cmd    { color: var(--text); }
+.install .ip-copy {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 12px;
+  border-left: 1px solid var(--border);
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text-3); letter-spacing: .04em;
+}
+.install:hover .ip-copy { color: var(--accent-txt); background: var(--surface-2); }
+.install.copied .ip-copy { color: var(--green); }
+.install .ip-copy .icon-copied { display: none; }
+.install.copied .ip-copy .icon-copy { display: none; }
+.install.copied .ip-copy .icon-copied { display: inline-flex; }
+.install .ip-copy .label-copy { display: inline; }
+.install .ip-copy .label-copied { display: none; }
+.install.copied .ip-copy .label-copy { display: none; }
+.install.copied .ip-copy .label-copied { display: inline; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <a class="brand" href="#top" aria-label="guile home">
+    <span class="wordmark"><span class="gui">gui</span>le</span>
+    <span class="brand-ver">v0.1</span>
+  </a>
+  <nav class="topnav">
+    <a href="#start">Quick start</a>
+    <a href="guile_howto.html">How-to</a>
+    <a href="guile_reference.html">Reference</a>
+    <a class="gh" href="#" onclick="event.preventDefault()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.55v-2c-3.22.7-3.9-1.55-3.9-1.55-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.28-5.27-5.71 0-1.26.45-2.3 1.2-3.11-.12-.3-.52-1.48.11-3.08 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.18-1.18 3.18-1.18.62 1.6.23 2.78.11 3.08.75.81 1.2 1.85 1.2 3.11 0 4.44-2.71 5.42-5.29 5.7.41.36.78 1.05.78 2.13v3.15c0 .31.21.66.8.55A11.5 11.5 0 0 0 12 .5Z"/>
+      </svg>
+      <span>GitHub</span>
+    </a>
+  </nav>
+</header>
+
+<!-- ── Hero ───────────────────────────────────────────────────────────── -->
+<section class="hero" id="top">
+  <div class="hero-inner">
+    <div class="hero-stack">
+      <div class="eyebrow"><span class="dot"></span> v0.1 · MIT · Python ≥ 3.9</div>
+      <div class="hero-wordmark">
+        <span class="wordmark"><span class="gui">gui</span>le</span>
+      </div>
+      <h1 class="hero-tagline">
+        Python desktop apps,&nbsp;<em>top to bottom.</em>
+      </h1>
+      <p class="hero-sub">
+        A lightweight framework for the kind of internal dashboards, data explorers, and parameter
+        tools you need at work or at home. Write Python, get a native window —
+        no full-page re-execution on refresh, no nesting hell, no server.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#start">
+          Get started
+          <svg class="arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <a class="btn btn-secondary" href="guile_reference.html">API reference</a>
+      </div>
+
+      <!-- Install pill (click-to-copy) -->
+      <div class="install" id="install-pill" role="button" tabindex="0" aria-label="Copy 'pip install guile' to clipboard">
+        <span class="ip-text">
+          <span class="ip-prompt">$</span>
+          <span class="ip-cmd">pip install guile</span>
+        </span>
+        <span class="ip-copy">
+          <span class="icon-copy">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M2 8 V2 H8" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            </svg>
+          </span>
+          <span class="icon-copied">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2 6 L5 9 L10 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="label-copy">COPY</span>
+          <span class="label-copied">COPIED</span>
+        </span>
+      </div>
+
+      <p class="hero-manifesto">
+        The right tool for a simple lab or personal project — <em>and deliberately nothing more.</em>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quick start ────────────────────────────────────────────────────── -->
+<section id="start">
+  <div class="section-inner">
+    <div class="section-head">
+      <div class="section-eyebrow">— Quick start</div>
+      <h2 class="section-title">A counter, end to end.</h2>
+      <p class="section-lede">
+        This is the entire app. Layout is written top-to-bottom using <code class="py-kw">with</code> blocks — indentation matches the finished UI. <code class="inline">gui.state</code> holds the value; the buttons mutate it; the text re-reads it.
+      </p>
+    </div>
+    <div class="qs-grid">
+      <div class="code-window">
+        <div class="win-bar">
+          <div class="win-dots"><i></i><i></i><i></i></div>
+          <div class="win-title">counter.py</div>
+          <div class="win-tabs"><span class="win-tab active">py</span></div>
+        </div>
+<pre class="code"><code><span class="kw">import</span> <span class="id">guile</span> <span class="kw">as</span> <span class="id">gui</span>
+
+<span class="id">count</span> <span class="punct">=</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">state</span><span class="punct">(</span><span class="num">0</span><span class="punct">)</span>
+
+<span class="punct">@</span><span class="id">gui</span><span class="punct">.</span><span class="fn">app</span><span class="punct">(</span><span class="str">"Counter"</span><span class="punct">,</span> <span class="id">width</span><span class="punct">=</span><span class="num">400</span><span class="punct">,</span> <span class="id">height</span><span class="punct">=</span><span class="num">300</span><span class="punct">)</span>
+<span class="kw">def</span> <span class="fn">ui</span><span class="punct">():</span>
+    <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">card</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">14</span><span class="punct">):</span>
+        <span class="id">gui</span><span class="punct">.</span><span class="fn">title</span><span class="punct">(</span><span class="str">"Counter"</span><span class="punct">)</span>
+        <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">row</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">16</span><span class="punct">):</span>
+            <span class="id">gui</span><span class="punct">.</span><span class="fn">button</span><span class="punct">(</span><span class="str">"−"</span><span class="punct">,</span> <span class="id">variant</span><span class="punct">=</span><span class="str">"secondary"</span><span class="punct">,</span>
+                       <span class="id">on_click</span><span class="punct">=</span><span class="kw">lambda</span><span class="punct">:</span> <span class="id">count</span><span class="punct">.</span><span class="fn">update</span><span class="punct">(</span><span class="kw">lambda</span> <span class="id">x</span><span class="punct">:</span> <span class="id">x</span><span class="punct"> - </span><span class="num">1</span><span class="punct">))</span>
+            <span class="id">gui</span><span class="punct">.</span><span class="fn">text</span><span class="punct">(</span><span class="id">count</span><span class="punct">,</span> <span class="id">size</span><span class="punct">=</span><span class="str">"2xl"</span><span class="punct">,</span> <span class="id">bold</span><span class="punct">=</span><span class="kw">True</span><span class="punct">)</span>
+            <span class="id">gui</span><span class="punct">.</span><span class="fn">button</span><span class="punct">(</span><span class="str">"+"</span><span class="punct">,</span>
+                       <span class="id">on_click</span><span class="punct">=</span><span class="kw">lambda</span><span class="punct">:</span> <span class="id">count</span><span class="punct">.</span><span class="fn">update</span><span class="punct">(</span><span class="kw">lambda</span> <span class="id">x</span><span class="punct">:</span> <span class="id">x</span><span class="punct"> + </span><span class="num">1</span><span class="punct">))</span>
+</code></pre>
+      </div>
+      <div class="preview-window">
+        <div class="win-bar">
+          <div class="win-dots"><i></i><i></i><i></i></div>
+          <div class="win-title">Counter — preview</div>
+          <div class="win-tabs"><span class="win-tab">native window</span></div>
+        </div>
+        <div class="preview-body">
+          <div class="fake-card">
+            <div class="ftitle">Counter</div>
+            <div class="fake-counter-row">
+              <button class="fake-btn" id="counter-dec" aria-label="decrement">−</button>
+              <div class="fake-count" id="counter-value">7</div>
+              <button class="fake-btn primary" id="counter-inc" aria-label="increment">+</button>
+            </div>
+            <div class="fake-hint" id="counter-hint">try the buttons</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="qs-ships">
+      <span class="qs-ships-label">v0.1 ships with</span>
+      <span class="qs-ships-chip">4 built-in themes</span>
+      <span class="qs-ships-chip">CSS grid layouts</span>
+      <span class="qs-ships-chip">15+ widgets</span>
+      <a class="qs-ships-more" href="guile_reference.html">see the reference <span class="arrow">→</span></a>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ── Install pill: click to copy ────────────────────────────────────────
+  (function () {
+    const pill = document.getElementById('install-pill');
+    if (!pill) return;
+    const cmd = pill.querySelector('.ip-cmd').textContent.trim();
+    let timer = null;
+    const copy = async () => {
+      try { await navigator.clipboard.writeText(cmd); } catch (e) {}
+      pill.classList.add('copied');
+      clearTimeout(timer);
+      timer = setTimeout(() => pill.classList.remove('copied'), 1400);
+    };
+    pill.addEventListener('click', copy);
+    pill.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copy(); }
+    });
+  })();
+
+  // ── Counter preview ───────────────────────────────────────────────────
+  (function () {
+    const valueEl = document.getElementById('counter-value');
+    const hintEl  = document.getElementById('counter-hint');
+    const dec     = document.getElementById('counter-dec');
+    const inc     = document.getElementById('counter-inc');
+    if (!valueEl || !dec || !inc) return;
+    let n = 7;
+    const render = () => {
+      valueEl.textContent = n;
+      hintEl.textContent  = (n === 7) ? 'try the buttons' : ('count: ' + n);
+    };
+    dec.addEventListener('click', () => { n -= 1; render(); });
+    inc.addEventListener('click', () => { n += 1; render(); });
+  })();
+</script>
+
+</body>
+</html>
