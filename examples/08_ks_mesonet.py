@@ -1,10 +1,15 @@
+# Import guile library
 import guile as gui
+
+# Import science libraries
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
-df = gui.state(None)
-status_box = gui.state(None)
 
+# Custom function
 def get_ks_mesonet(station, start_date, end_date, variables, interval='day'):
+    """Function that requests weather data from the Kansas Mesonet."""
     fmt = '%Y%m%d%H%M%S'
     start_date = pd.to_datetime(start_date).strftime(fmt)
     end_date = pd.to_datetime(end_date).strftime(fmt)
@@ -14,35 +19,26 @@ def get_ks_mesonet(station, start_date, end_date, variables, interval='day'):
     df = pd.read_csv(url, na_values='M')
     return df
 
+# guile state variables
+data = gui.state(None)
 
+def run():
+    data.set(get_ks_mesonet(station,start_date,end_date,variables,interval))
 
+# guile layout
 @gui.app("Kansas Mesonet Data Explorer", width=800, height=400)
-def gui():
+def ui():
     with gui.row():
         with gui.col():
             station = gui.select(label='Station', options=['Manhattan','Ashland Bottoms'])
-            interval = gui.select(label='Interval', options=[('day','Daily'),('hourly','Hourly')])
-            variables = gui.checkbox("TEMP2MAVG", value=False)
             start_date = gui.date_input("From", key="from")
             end_date = gui.date_input("To", key="to")
-
-            run = gui.button("Request", on_click=get_ks_mesonet)
+            variables = gui.multiselect(["TEMP2MAVG","SRAVG"])
+            interval = gui.select(label='Interval', options=[('day','Daily'),('hourly','Hourly')])
+            gui.button("Request", on_click=run)
 
         with gui.col():
-            if df is None:
-                status_box.set('No data'))
+            if data.value is None:
+                gui.text('No data yet')
             else:
-                table = gui.table(df)
-
-
-
-df = gui.state(None)   # None = nothing loaded
-
-def load_file(path):
-    df.set(pd.read_csv(path))   # triggers re-render
-
-# ui() just asks one question:
-if df.value is None:
-    # show placeholder
-else:
-    gui.table(df.value.to_dict("records"))
+                table = gui.table(data.value)

@@ -449,56 +449,86 @@ gui.html("&lt;style&gt;:root { --shadow: 0 8px 40px rgba(0,0,0,.18); }&lt;/style
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
 <div class="section" id="callbacks-vs-streamlit">
-<h2>Functions &amp; callbacks</h2>
+<h2>The canonical guile pattern</h2>
 
-<p>The biggest mental shift coming from Streamlit is how interactions
-trigger code. In Streamlit the whole script re-runs on every interaction
-and you check widget return values inline. In guile the UI renders once
-and events call your functions directly.</p>
+<p>Every guile app follows the same structure, regardless of complexity.
+Understanding this structure once means you can build any app.</p>
 
-<h3>The Streamlit way — does not work in guile</h3>
+<p>There are four parts, always in this order:</p>
 
-<pre>import streamlit as st
-
-celsius = 0.0
-if st.button("Convert"):          # returns True when clicked
-    celsius = (fahrenheit - 32) * 5 / 9
-    st.write(f"{celsius:.1f} °C") # only shows after click</pre>
-
-<h3>The guile way — callbacks drive state</h3>
+<ol style="color:var(--text-2);font-size:14px;line-height:2;padding-left:20px;margin-bottom:16px">
+  <li><strong style="color:var(--text)">Your functions</strong> — pure Python, no guile inside</li>
+  <li><strong style="color:var(--text)">State variables</strong> — one per piece of data the app needs to remember</li>
+  <li><strong style="color:var(--text)">Callbacks</strong> — call your functions, store the results in state</li>
+  <li><strong style="color:var(--text)">ui()</strong> — reads state, builds the layout, nothing else</li>
+</ol>
 
 <pre>import guile as gui
 
-fahrenheit = gui.state(98.6)
-celsius    = gui.state(0.0)
 
-# The conversion function knows nothing about guile.
-# It takes a number and returns a number — pure Python.
+# ── 1. Your function — pure Python, no guile ─────────────────────────
+#       Works identically in a script, notebook, or test.
 def to_celsius(f):
     return (f - 32) * 5 / 9
 
-# The callback is the thin bridge: call the function, store the result.
+
+# ── 2. State — everything the app needs to remember ──────────────────
+fahrenheit = gui.state(32.0)
+celsius    = gui.state(None)
+
+
+# ── 3. Callback — calls your function, stores the result ─────────────
+#       This is the only place where your code and guile meet.
 def convert():
     celsius.set(round(to_celsius(fahrenheit.value), 2))
 
-@gui.app("Temperature converter", width=380, height=280)
-def ui():
-    with gui.col(align="center", justify="center", style="height:100vh"):
-        with gui.card(gap=14):
-            gui.title("°F → °C")
-            gui.number_input("Fahrenheit", value=fahrenheit,
-                             on_change=fahrenheit.set, step=0.1)
-            gui.button("Convert", on_click=convert)
-            if celsius.value != 0.0 or fahrenheit.value == 32:
-                gui.text(f"{celsius.value} °C", size="xl", bold=True,
-                         color="var(--primary)")</pre>
 
-<div class="note">
-<strong>Rule:</strong> nothing inside <code>ui()</code> should have side effects.
-<code>ui()</code> only reads state and builds the layout.
-All mutations — <code>.set()</code>, <code>.update()</code> — happen
-in callback functions like <code>convert()</code>.
-</div>
+# ── 4. ui() — reads state, builds layout, no logic inside ────────────
+@gui.app("Temperature converter", width=380, height=300)
+def ui():
+    with gui.col(padding=24, gap=14):
+        gui.title("°F  →  °C")
+        gui.number_input("Fahrenheit", value=fahrenheit,
+                         on_change=fahrenheit.set, step=0.5)
+        gui.button("Convert", on_click=convert)
+        if celsius.value is not None:
+            gui.text(f"{celsius.value} °C", size="2xl", bold=True)</pre>
+
+<h3>Why <code>on_change=fahrenheit.set</code>?</h3>
+
+<p>When the user types a new value, <code>on_change</code> fires and
+calls <code>fahrenheit.set(new_value)</code>. This stores the value in
+state so that <code>convert()</code> can read it later via
+<code>fahrenheit.value</code>. Without <code>on_change=</code> the
+widget would display correctly but the state would never update, and
+<code>convert()</code> would always see the original value.</p>
+
+<h3>What is <code>key=</code> for?</h3>
+
+<p><code>key=</code> is a stable identifier for the DOM — it tells
+guile which element is which between re-renders, so inputs keep their
+focus and don't reset unexpectedly. It has <strong>no connection</strong>
+to the state variable name. Writing <code>key="fahrenheit"</code> when
+you also have <code>fahrenheit = gui.state(...)</code> is purely a
+readability convention. You could write <code>key="abc"</code> and
+the app would behave identically. <code>key=</code> can be omitted
+entirely for simple apps — guile assigns one automatically.</p>
+
+<h3>Comparison with Streamlit</h3>
+
+<pre># Streamlit — checks widget return value inline, re-runs everything
+import streamlit as st
+f = st.number_input("Fahrenheit", value=32.0)
+if st.button("Convert"):
+    st.write(f"{(f - 32) * 5 / 9:.1f} °C")
+
+# Guile — state + callback, ui() only displays
+# (see full example above)</pre>
+
+<p>Both approaches work for simple apps. The guile pattern scales better
+because your processing functions stay independent of the UI framework —
+they can be reused in notebooks, tests, or other scripts without any
+changes.</p>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -586,14 +616,21 @@ the current value at the time the widget is created.</p>
 
 <pre>cities = ["Nairobi", "Tokyo", "Paris"]
 
-# ✗ Wrong — all three lambdas close over the same `city` variable.
-#   Every button will print "Paris" (the last value).
+# ✗ Wrong — all three lambdas hold a reference to `city`, not its value.
+#   By the time a button is clicked the loop is done and `city` is
+#   always "Paris" (the last value). Every button does the same thing.
 for city in cities:
     gui.button(f"Show {city}", on_click=lambda: print(city))
 
-# ✓ Correct — c=city captures the current value at each iteration.
+# ✓ Correct — c=city is evaluated immediately at lambda creation time.
+#   Each lambda gets its own private copy of the current value.
 for city in cities:
-    gui.button(f"Show {city}", on_click=lambda c=city: print(c))</pre>
+    gui.button(f"Show {city}", on_click=lambda c=city: print(c))
+
+# ✗ Also wrong — `i` is a required parameter; guile calls on_click
+#   with zero arguments, so this crashes on first click.
+for city in cities:
+    gui.button(f"Show {city}", on_click=lambda i: print(city))</pre>
 
 <h3>Real example: per-row delete button</h3>
 
