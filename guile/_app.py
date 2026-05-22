@@ -28,7 +28,8 @@ from typing import Callable, Optional
 from .state import register as _reg_listener, unregister as _unreg_listener
 from .ui import (
     Column,
-    _reset_render, _commit_callbacks, dispatch as _dispatch,
+    _reset_render, _commit_callbacks,
+    dispatch as _dispatch, dispatch_silent as _dispatch_silent,
     _clear_state_store, _set_window,
 )
 from ._template import get_html
@@ -245,7 +246,7 @@ class _Bridge:
         on onblur (via the normal handle() path) after the user finishes.
         """
         threading.Thread(
-            target=_dispatch, args=(cid, value), daemon=True
+            target=_dispatch_silent, args=(cid, value), daemon=True
         ).start()
 
     def _run(self, cid: str, value):

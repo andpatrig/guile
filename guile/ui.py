@@ -78,8 +78,9 @@ def _attach(node: "Node"):
 # always hold a reference to the same live object.
 
 _id_counter:    int  = 0
-_callbacks:     dict = {}   # scratch — rebuilt every render
-_live_callbacks: dict = {}  # committed snapshot — always safe to read
+_callbacks:       dict = {}  # scratch — rebuilt every render
+_live_callbacks:  dict = {}  # committed snapshot — always safe to read
+_silent_callbacks: dict = {} # silent handlers (no re-render on update)
 
 def _reset_render():
     """Start a fresh render: reset IDs, callbacks, and the auto-key counter."""
@@ -87,11 +88,16 @@ def _reset_render():
     _id_counter       = 0
     _auto_key_counter = 0   # must reset so widget N always gets key _auto_N
     _callbacks.clear()
+    _silent_callbacks.clear()
 
 def _commit_callbacks():
     """After a render completes, promote scratch callbacks to live."""
     _live_callbacks.clear()
-    _live_callbacks.update(_callbacks)
+    _live_callbacks.update({k: v for k, v in _callbacks.items()
+                            if not k.endswith('__silent')})
+    _silent_callbacks.clear()
+    _silent_callbacks.update({k[:-8]: v for k, v in _callbacks.items()
+                              if k.endswith('__silent')})
 
 def _next_id(key: Optional[str] = None) -> str:
     global _id_counter
@@ -103,6 +109,28 @@ def _next_id(key: Optional[str] = None) -> str:
 def _reg(cid: str, fn: Callable):
     """Register an event handler for this render pass."""
     _callbacks[cid] = fn
+
+def dispatch_silent(cid: str, value: Any = None):
+    """
+    Call the handler for cid but bypass State._fire() so no re-render occurs.
+    The handler must call state.set_silent() instead of state.set().
+    Used by multiselect onchange to keep state current mid-selection.
+    """
+    fn = _live_callbacks.get(cid)
+    if not fn:
+        return
+    # Temporarily patch set → set_silent on all State objects touched
+    # by routing through a wrapper that intercepts the final .set() call.
+    # Simpler: store the value directly via a dedicated silent handler
+    # registered alongside the normal handler.
+    silent_fn = _silent_callbacks.get(cid)
+    if silent_fn:
+        try:
+            silent_fn(value)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
 
 def dispatch(cid: str, value: Any = None):
     """
@@ -859,7 +887,16 @@ class _MultiSelect(_Leaf):
             if on_change:
                 on_change(selected)
 
+        def _silent_handler(v):
+            import json
+            try:
+                selected = json.loads(v) if v else []
+            except (ValueError, TypeError):
+                selected = [v] if v else []
+            self._state.set_silent(selected)
+
         _reg(self.id, _handler)
+        _callbacks[self.id + '__silent'] = _silent_handler
 
     @property
     def value(self) -> list: return self._state.value

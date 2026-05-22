@@ -63,6 +63,12 @@ class State:
     def set(self, new: Any):
         self.value = new
 
+    def set_silent(self, new: Any):
+        """Update value without firing listeners or triggering a re-render.
+        Used internally by multiselect to keep state current mid-selection.
+        """
+        self._v = new
+
     def update(self, fn: Callable):
         self.value = fn(self._v)
 
