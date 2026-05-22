@@ -98,7 +98,21 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
 
 <main>
 <h1>How-to guide</h1>
-<p class="page-sub">Themes, layout patterns, and custom styling.</p>
+<p class="page-sub">Themes, layout, styling, and the callback pattern.</p>
+
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:40px;max-width:680px">
+<p style="margin-bottom:10px;color:var(--text);font-size:15px;font-weight:500">The core promise</p>
+<p style="color:var(--text-2);font-size:14px;line-height:1.75;margin:0">
+Most scientists and engineers already have working Python code —
+functions that load data, run models, compute results.
+Guile is designed so that code stays <em>completely untouched</em>.
+You write a thin app layer on top: some state, a few callbacks that
+call your existing functions, and a <code>ui()</code> that displays
+the results. The distance between a working script and a shareable
+desktop app is typically twenty to thirty lines of glue code.
+None of those lines touch the code you already wrote.
+</p>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
 <div class="section" id="themes-builtin">
