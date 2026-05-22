@@ -503,6 +503,24 @@ state so that <code>convert()</code> can read it later via
 widget would display correctly but the state would never update, and
 <code>convert()</code> would always see the original value.</p>
 
+<h3>State declarations are your defaults</h3>
+
+<p>The <code>gui.state()</code> lines at the top of your script are the
+single source of truth for starting values. You never need to repeat a
+default inside a widget call — the widget reads its current value from
+state and displays that.</p>
+
+<pre>station = gui.state("Manhattan")   # "Manhattan" is the default
+
+# In ui() — no default needed here, the widget reads from state
+gui.select(["Manhattan", "Ashland Bottoms"], "Station",
+           value=station, on_change=station.set, key="station")</pre>
+
+<p>To reset to the default from a button, just call
+<code>station.set("Manhattan")</code> in a callback. The state
+declarations at the top are the one place you look to see all
+starting values for the app.</p>
+
 <h3>What is <code>key=</code> for?</h3>
 
 <p><code>key=</code> is a stable identifier for the DOM — it tells

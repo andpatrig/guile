@@ -21,6 +21,10 @@ def get_ks_mesonet(station, start_date, end_date, variables, interval='day'):
 
 # guile state variables
 data = gui.state(None)
+station = gui.state('Manhattan')
+start_date = 
+end_date =
+interval =
 
 def run():
     data.set(get_ks_mesonet(station,start_date,end_date,variables,interval))
