@@ -41,7 +41,7 @@ from .ui import (
     _Text, _Title, _Badge, _Spacer, _Divider, _ProgressBar, _Html,
     # Inputs
     _Button, _Input, _NumberInput, _TextArea, _Checkbox, _Select, _MultiSelect, _Slider,
-    _DateInput, _FilePicker,
+    _DateInput, _DateTimeInput, _FilePicker,
     # Media
     _Figure, _Map, Marker,
     # Data
@@ -267,6 +267,24 @@ def date_input(label: str = "", *, value: Optional[Union[str, State]] = None,
     """Native date picker. Returns .value (str) as YYYY-MM-DD. Always provide key=."""
     return _DateInput(label, value=value, disabled=disabled,
                       on_change=on_change, style=style, key=key)
+
+def datetime_input(label: str = "", *, value: Optional[Union[str, State]] = None,
+                   disabled: bool = False, on_change: Optional[Callable] = None,
+                   style: str = "", key: Optional[str] = None) -> _DateTimeInput:
+    """
+    Native datetime picker. Returns .value (str) as YYYY-MM-DDTHH:MM.
+
+    Uses the browser's native datetime-local input — no external library needed.
+    To parse the value in Python:
+        from datetime import datetime
+        dt = datetime.fromisoformat(widget.value)   # e.g. 2024-06-15T09:30
+
+    To pre-fill with a specific datetime:
+        gui.datetime_input("Start", value="2024-06-15T09:30", key="start")
+    """
+    return _DateTimeInput(label, value=value, disabled=disabled,
+                          on_change=on_change, style=style, key=key)
+
 
 def file_picker(label: str = "Choose file…", *,
                 value: Optional[Union[str, State]] = None,

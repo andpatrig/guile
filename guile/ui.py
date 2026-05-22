@@ -971,6 +971,51 @@ class _DateInput(_Leaf):
                 f'</div>')
 
 
+class _DateTimeInput(_Leaf):
+    """
+    Native datetime picker. Returns .value (str) as YYYY-MM-DDTHH:MM.
+
+    Uses the browser's native <input type="datetime-local">.
+    The returned string follows the HTML datetime-local format:
+        "2024-06-15T09:30"
+
+    To parse it in Python:
+        from datetime import datetime
+        dt = datetime.fromisoformat(widget.value)
+    """
+    def __init__(self, label: str = "", *, value: Optional[Union[str, State]] = None,
+                 disabled: bool = False, on_change: Optional[Callable] = None,
+                 style: str = "", key: Optional[str] = None):
+        self._label    = label
+        self._disabled = disabled
+        self._style    = style
+        _key           = _auto_key(key)
+        initial        = value.value if isinstance(value, State) else (value or "")
+        self._state    = value if isinstance(value, State)                          else _get_or_create_state(_key, initial)
+        super().__init__(key)
+        def _handler(v):
+            self._state.set(v)
+            if on_change: on_change(v)
+        _reg(self.id, _handler)
+
+    @property
+    def value(self) -> str: return self._state.value
+    def set(self, v):        self._state.set(v)
+    def update(self, fn):    self._state.update(fn)
+
+    def render(self) -> str:
+        val = self._state.value
+        js  = f"window._guile.trigger('{self.id}',this.value)"
+        lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
+               f'{_txt(self._label)}</span>') if self._label else ""
+        dis = " disabled" if self._disabled else ""
+        return (f'<div id="{self.id}" class="guile-field" style="{self._style}">'
+                f'{lbl}'
+                f'<input type="datetime-local" class="guile-input"'
+                f' value="{_esc(val)}" onchange="{js}"{dis}>'
+                f'</div>')
+
+
 class _FilePicker(_Leaf):
     """
     Button that opens the OS native file dialog. Returns .value (str) with
