@@ -90,6 +90,10 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
   <a href="#css-style">Inline style=</a>
   <a href="#css-inject">Inject &lt;style&gt;</a>
   <a href="#css-vars">Override variables</a>
+  <div class="nav-cat">Functions &amp; logic</div>
+  <a href="#callbacks-vs-streamlit">vs Streamlit</a>
+  <a href="#callbacks-pure">Keep functions pure</a>
+  <a href="#callbacks-args">Passing arguments</a>
 </nav>
 
 <main>
@@ -428,6 +432,188 @@ gui.html("&lt;style&gt;:root { --shadow: 0 8px 40px rgba(0,0,0,.18); }&lt;/style
 --mono           monospace font stack</pre>
 </div>
 
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="callbacks-vs-streamlit">
+<h2>Functions &amp; callbacks</h2>
+
+<p>The biggest mental shift coming from Streamlit is how interactions
+trigger code. In Streamlit the whole script re-runs on every interaction
+and you check widget return values inline. In guile the UI renders once
+and events call your functions directly.</p>
+
+<h3>The Streamlit way — does not work in guile</h3>
+
+<pre>import streamlit as st
+
+celsius = 0.0
+if st.button("Convert"):          # returns True when clicked
+    celsius = (fahrenheit - 32) * 5 / 9
+    st.write(f"{celsius:.1f} °C") # only shows after click</pre>
+
+<h3>The guile way — callbacks drive state</h3>
+
+<pre>import guile as gui
+
+fahrenheit = gui.state(98.6)
+celsius    = gui.state(0.0)
+
+# The conversion function knows nothing about guile.
+# It takes a number and returns a number — pure Python.
+def to_celsius(f):
+    return (f - 32) * 5 / 9
+
+# The callback is the thin bridge: call the function, store the result.
+def convert():
+    celsius.set(round(to_celsius(fahrenheit.value), 2))
+
+@gui.app("Temperature converter", width=380, height=280)
+def ui():
+    with gui.col(align="center", justify="center", style="height:100vh"):
+        with gui.card(gap=14):
+            gui.title("°F → °C")
+            gui.number_input("Fahrenheit", value=fahrenheit,
+                             on_change=fahrenheit.set, step=0.1)
+            gui.button("Convert", on_click=convert)
+            if celsius.value != 0.0 or fahrenheit.value == 32:
+                gui.text(f"{celsius.value} °C", size="xl", bold=True,
+                         color="var(--primary)")</pre>
+
+<div class="note">
+<strong>Rule:</strong> nothing inside <code>ui()</code> should have side effects.
+<code>ui()</code> only reads state and builds the layout.
+All mutations — <code>.set()</code>, <code>.update()</code> — happen
+in callback functions like <code>convert()</code>.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="callbacks-pure">
+<h2>Keep your functions pure</h2>
+
+<p>The real payoff of the callback pattern: your processing functions
+stay completely unaware of guile. They take inputs and return outputs,
+nothing more. This means they work identically in Jupyter, in tests,
+in scripts — the guile app is just one consumer of the same functions.</p>
+
+<pre>import guile as gui
+
+# ── Pure functions — no guile imports, no .set() calls ───────────────
+# These could live in a separate module. They work the same in a
+# Jupyter notebook, a unit test, or a command-line script.
+
+def to_celsius(f: float) -> float:
+    return (f - 32) * 5 / 9
+
+def to_fahrenheit(c: float) -> float:
+    return c * 9 / 5 + 32
+
+def feels_like(temp_c: float, wind_kmh: float) -> float:
+    """Wind chill (°C) — valid for temp ≤ 10 °C and wind ≥ 4.8 km/h."""
+    return (13.12 + 0.6215 * temp_c
+            - 11.37 * wind_kmh**0.16
+            + 0.3965 * temp_c * wind_kmh**0.16)
+
+
+# ── State ─────────────────────────────────────────────────────────────
+temp_f  = gui.state(32.0)
+wind    = gui.state(20.0)
+results = gui.state(None)   # None = not yet calculated
+
+
+# ── Callbacks — the thin bridge between pure functions and guile ──────
+def calculate():
+    f   = temp_f.value
+    w   = wind.value
+    c   = to_celsius(f)
+    wc  = feels_like(c, w) if c <= 10 and w >= 4.8 else None
+    results.set({
+        "celsius":    round(c, 1),
+        "feels_like": round(wc, 1) if wc is not None else "N/A",
+    })
+
+
+# ── UI ────────────────────────────────────────────────────────────────
+@gui.app("Weather calculator", width=420, height=360)
+def ui():
+    with gui.col(padding=24, gap=14):
+        gui.title("Weather calculator")
+
+        with gui.card(gap=12):
+            gui.number_input("Temperature (°F)", value=temp_f,
+                             on_change=temp_f.set, step=0.5)
+            gui.number_input("Wind speed (km/h)", value=wind,
+                             on_change=wind.set, step=1.0, min=0)
+            gui.button("Calculate", on_click=calculate)
+
+        if results.value is not None:
+            r = results.value
+            with gui.card(gap=8):
+                gui.text(f"Temperature:  {r['celsius']} °C",   bold=True)
+                gui.text(f"Wind chill:   {r['feels_like']} °C", bold=True)</pre>
+
+<p>Notice that <code>to_celsius()</code>, <code>to_fahrenheit()</code>,
+and <code>feels_like()</code> contain zero guile references.
+You could copy them into a notebook and use them immediately.
+The <code>calculate()</code> callback is the only place where
+guile state and your own logic meet.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="callbacks-args">
+<h2>Passing arguments to callbacks</h2>
+
+<p>Callbacks registered with <code>on_click=</code> take no arguments.
+When you need to pass a value — the most common case is a list of items
+each with their own button — use a default-argument lambda to capture
+the current value at the time the widget is created.</p>
+
+<h3>The loop capture problem</h3>
+
+<pre>cities = ["Nairobi", "Tokyo", "Paris"]
+
+# ✗ Wrong — all three lambdas close over the same `city` variable.
+#   Every button will print "Paris" (the last value).
+for city in cities:
+    gui.button(f"Show {city}", on_click=lambda: print(city))
+
+# ✓ Correct — c=city captures the current value at each iteration.
+for city in cities:
+    gui.button(f"Show {city}", on_click=lambda c=city: print(c))</pre>
+
+<h3>Real example: per-row delete button</h3>
+
+<pre>import guile as gui
+
+rows = gui.state([
+    {"id": 1, "name": "Alice", "score": 92},
+    {"id": 2, "name": "Bob",   "score": 78},
+    {"id": 3, "name": "Carol", "score": 85},
+])
+
+def delete(row_id):
+    rows.set([r for r in rows.value if r["id"] != row_id])
+
+@gui.app("Gradebook", width=480, height=360)
+def ui():
+    with gui.col(padding=20, gap=12):
+        gui.title("Gradebook")
+
+        with gui.card(gap=8):
+            for row in rows.value:
+                with gui.row(justify="space-between", align="center",
+                             key=str(row["id"])):
+                    gui.text(row["name"], bold=True)
+                    gui.badge(str(row["score"]), variant="primary")
+                    gui.button("✕", variant="ghost", size="sm",
+                               # capture row["id"] now, not at click time
+                               on_click=lambda i=row["id"]: delete(i),
+                               key=f"del-{row['id']}")</pre>
+
+<p>The <code>key=f"del-{row['id']}"</code> on the button is also
+important here — it gives each button a stable DOM ID so the patcher
+can tell them apart when the list changes length.</p>
+</div>
 </main>
 </div>
 
