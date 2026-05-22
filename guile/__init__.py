@@ -46,6 +46,8 @@ from .ui import (
     _Figure, _Map, Marker,
     # Data
     _Table,
+    # Overlay
+    _Modal,
     # Theme
     _Theme, THEMES,
 )
@@ -355,6 +357,108 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
                 markers=markers, style=style, key=key)
 
 
+
+# ── Notify (imperative toast — bypasses the render cycle) ────────────────────
+
+def notify(message: str, *,
+           variant: str = "success",
+           duration: float = 3.0) -> None:
+    """
+    Show a temporary notification toast by injecting it directly into the
+    browser DOM. No state variable or re-render required.
+
+    Call from callbacks only — not from inside ui().
+    The window must be open before notify() is called.
+
+        def save(path):
+            df.value.to_csv(path, index=False)
+            gui.notify("File saved!", variant="success")
+
+        def delete():
+            rows.set([])
+            gui.notify("All rows cleared.", variant="warning", duration=5)
+
+    Variants: "success", "danger", "warning", "primary", "neutral"
+    duration: seconds before auto-dismiss (default 3).
+    """
+    from ._app import _App
+    import html as _h
+    app = _App._current
+    if not app or not app._window:
+        return
+
+    COLOURS = {
+        "success": ("#16a34a", "#dcfce7"),
+        "danger":  ("#dc2626", "#fee2e2"),
+        "warning": ("#d97706", "#fef3c7"),
+        "primary": ("#6366f1", "#ede9fe"),
+        "neutral": ("#6b7280", "#f3f4f6"),
+    }
+    fg, bg = COLOURS.get(variant, COLOURS["primary"])
+    msg    = _h.escape(str(message)).replace("'", "\'")
+    ms     = int(duration * 1000)
+
+    close_style = (
+        "background:none;border:none;cursor:pointer;"
+        f"font-size:16px;line-height:1;color:{fg};"
+        "padding:0;margin-left:8px;opacity:.7"
+    )
+    close_btn = f'<button onclick="this.parentNode.remove()" style="{close_style}">&#x2715;</button>'
+    inner     = f"<span>{msg}</span>{close_btn}"
+    card_css  = f"background:{bg};color:{fg};border:1.5px solid {fg};"
+
+    js = ";".join([
+        "(function()",
+        "{var e=document.createElement('div')",
+        "e.className='guile-notify'",
+        f"e.style.cssText={repr(card_css)}",
+        f"e.innerHTML={repr(inner)}",
+        "document.body.appendChild(e)",
+        f"setTimeout(function(){{if(e.parentNode)e.remove();}},{ms})",
+        "})()"
+    ])
+    app._window.evaluate_js(js)
+
+
+# ── Overlays ────────────────────────────────────────────────────────────────
+
+def modal(title: str = "", *,
+          visible: bool = True,
+          on_close: Optional[Callable] = None,
+          width: int = 420,
+          style: str = "",
+          key: Optional[str] = None) -> _Modal:
+    """
+    Blocking modal dialog. Use as a context manager.
+
+    When visible=False the modal renders nothing (no overhead).
+    Always supply on_close= so the backdrop and ✕ button work.
+
+        confirm = gui.state(False)
+
+        def request_delete():
+            confirm.set(True)
+
+        def do_delete():
+            # perform deletion
+            confirm.set(False)
+
+        @gui.app("My App")
+        def ui():
+            gui.button("Delete", on_click=request_delete)
+
+            with gui.modal("Confirm delete",
+                           visible=confirm.value,
+                           on_close=lambda: confirm.set(False)):
+                gui.text("This cannot be undone.")
+                with gui.row(gap=8, justify="flex-end"):
+                    gui.button("Cancel", variant="ghost",
+                               on_click=lambda: confirm.set(False))
+                    gui.button("Delete", variant="danger",
+                               on_click=do_delete)
+    """
+    return _Modal(title, visible=visible, on_close=on_close,
+                  width=width, style=style, key=key)
 
 # ── Theme ──────────────────────────────────────────────────────────────────
 

@@ -1394,11 +1394,84 @@ class _Map(_Leaf):
         }
         cfg_json = _esc(json.dumps(cfg))
         return (f'<div id="{self.id}" class="guile-map"'
-                f' data-guile-map="{cfg_json}" data-guile-preserve="1"'
+                f' data-guile-map="{cfg_json}"'
                 f' style="{self._style}">'
                 f'<div class="guile-map-canvas"'
                 f' style="height:{self._height}px"></div></div>')
 
+
+
+
+# ── Modal dialog ────────────────────────────────────────────────────────────
+
+class _Modal(_Container):
+    """
+    Blocking modal dialog. Renders a full-screen overlay with a centred card.
+    Use as a context manager — put any guile widgets inside, including buttons.
+
+    When visible=False the modal is not rendered (zero DOM footprint).
+    Always supply on_close= so the backdrop click and ✕ button work.
+
+        confirm = gui.state(False)
+
+        with gui.modal("Delete sample?",
+                       visible=confirm.value,
+                       on_close=lambda: confirm.set(False)):
+            gui.text("This cannot be undone.")
+            with gui.row(gap=8, justify="flex-end"):
+                gui.button("Cancel", on_click=lambda: confirm.set(False))
+                gui.button("Delete", variant="danger", on_click=do_delete)
+    """
+    def __init__(self, title: str = "", *,
+                 visible: bool = True,
+                 on_close: Optional[Callable] = None,
+                 width: int = 420,
+                 style: str = "",
+                 key: Optional[str] = None):
+        self._title    = title
+        self._visible  = visible
+        self._width    = width
+        self._style    = style
+        self._on_close = on_close
+        super().__init__(css_class="guile-col", inline_style="", key=key)
+        if on_close:
+            _reg(self.id + "-close", lambda: on_close())
+
+    def render(self) -> str:
+        if not self._visible:
+            return f'<div id="{self.id}" style="display:none"></div>'
+
+        inner      = self._render_children()
+        close_js   = (f"window._guile.trigger('{self.id}-close',null)"
+                      if self._on_close else "")
+        close_btn  = (f'<button onclick="{close_js}" '
+                      f'style="background:none;border:none;cursor:pointer;'
+                      f'font-size:18px;color:var(--text-2);padding:0;'
+                      f'line-height:1">✕</button>') if self._on_close else ""
+        title_html = (f'<div style="display:flex;justify-content:space-between;'
+                      f'align-items:center;margin-bottom:16px">'
+                      f'<span style="font-size:16px;font-weight:600">'
+                      f'{_txt(self._title)}</span>{close_btn}</div>') if self._title else ""
+
+        backdrop_onclick = (
+            f' onclick="if(event.target===this){{{close_js}}}"'
+            if close_js else ""
+        )
+        return (
+            f'<div id="{self.id}"'
+            f' style="position:fixed;inset:0;background:rgba(0,0,0,.45);'
+            f'z-index:9998;display:flex;align-items:center;'
+            f'justify-content:center;padding:24px;"'
+            f'{backdrop_onclick}>'
+            f'<div style="background:var(--surface);'
+            f'border-radius:var(--r-lg);padding:24px;'
+            f'width:100%;max-width:{self._width}px;'
+            f'box-shadow:0 20px 60px rgba(0,0,0,.25);{self._style}"'
+            f' onclick="event.stopPropagation()">'
+            f'{title_html}'
+            f'<div class="guile-col" style="gap:12px">{inner}</div>'
+            f'</div></div>'
+        )
 
 # ══════════════════════════════════════════════════════════════════════════
 # SECTION 3 — Theming

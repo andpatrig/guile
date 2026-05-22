@@ -191,6 +191,30 @@ body {
 .guile-slider::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* ── Leaflet map container ──────────────────────────────────────────────── */
+/* Imperative toast injected by gui.notify() — no render cycle */
+.guile-notify {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: var(--r);
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    white-space: nowrap;
+    max-width: 480px;
+    animation: guile-fade-in .15s ease;
+}
+@keyframes guile-fade-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 .guile-map {
     border-radius: var(--r);
     overflow: hidden;
@@ -239,7 +263,8 @@ body {
 _JS = """
 // ── Incremental DOM patcher ───────────────────────────────────────────────
 // Walks old/new DOM trees and surgically patches only what changed.
-// data-guile-preserve — skip children (Leaflet owns that subtree)
+// guile-map elements: attributes are patched (so data-guile-map updates)
+// but children are skipped (Leaflet owns that subtree).
 function _guilePatch(oldNode, newNode) {
     if (oldNode.nodeType === 3) {
         if (oldNode.nodeValue !== newNode.nodeValue)
@@ -247,8 +272,8 @@ function _guilePatch(oldNode, newNode) {
         return;
     }
 
-    var isPreserved = oldNode.getAttribute &&
-                      oldNode.getAttribute('data-guile-preserve');
+    var isPreserved = oldNode.classList &&
+                      oldNode.classList.contains('guile-map');
 
     var isFocused = (oldNode === document.activeElement);
     var savedValue = isFocused ? oldNode.value : undefined;
@@ -290,6 +315,7 @@ function _guilePatch(oldNode, newNode) {
 }
 
 // ── Leaflet map registry ──────────────────────────────────────────────────
+
 var _guileMaps = {};
 
 function _guileSyncMaps() {
@@ -379,6 +405,12 @@ window.addEventListener('pywebviewready', function() {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.ready)
             window.pywebview.api.ready();
     } catch(e) {}
+});
+
+// Sync maps after the initial render completes.
+// _guile.update() handles subsequent renders; this covers the first load.
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(_guileSyncMaps, 100);
 });
 """
 

@@ -76,7 +76,7 @@ def ui():
                     "Load file",
                     file_types=(
                         "CSV Files (*.csv)",
-                        "Excel Files (*.xlsx *.xls)",
+                        "Excel Files (*.xlsx)", "Excel Files (*.xls)",
                         "All files (*.*)",
                     ),
                     on_change=load_file,
