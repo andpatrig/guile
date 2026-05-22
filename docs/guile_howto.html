@@ -78,6 +78,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
     <div class="logo-name">gui<span>le</span></div>
     <div class="logo-sub">how-to guide</div>
   </div>
+  <div class="nav-cat">Getting started</div>
+  <a href="#state-annotated">Annotated example</a>
   <div class="nav-cat">Themes</div>
   <a href="#themes-builtin">Built-in themes</a>
   <a href="#themes-custom">Custom theme</a>
@@ -91,7 +93,6 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
   <a href="#css-inject">Inject &lt;style&gt;</a>
   <a href="#css-vars">Override variables</a>
   <div class="nav-cat">State</div>
-  <a href="#state-annotated">Annotated example</a>
   <a href="#state-cycle">The three methods</a>
   <div class="nav-cat">Functions &amp; logic</div>
   <a href="#callbacks-vs-streamlit">vs Streamlit</a>
@@ -104,7 +105,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
 <p class="page-sub">Themes, layout, styling, and the callback pattern.</p>
 
 <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:40px;max-width:680px">
-<p style="margin-bottom:10px;color:var(--text);font-size:15px;font-weight:500">The core promise</p>
+<p style="margin-bottom:10px;color:var(--text);font-size:15px;font-weight:500">The core premise</p>
 <p style="color:var(--text-2);font-size:14px;line-height:1.75;margin:0">
 Most scientists and engineers already have working Python code —
 functions that load data, run models, compute results.
@@ -115,6 +116,89 @@ the results. The distance between a working script and a shareable
 desktop app is typically twenty to thirty lines of glue code.
 None of those lines touch the code you already wrote.
 </p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="state-annotated">
+<h2>How a guile app is structured</h2>
+
+<p>Every guile app has four parts, always in the same order.
+Hover a section in the code to see what it does.</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;font-family:var(--mono);font-size:12.5px;line-height:1.65;margin:20px 0">
+
+<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 0;overflow:hidden">
+<div style="padding:1px 16px;color:var(--text-2)"><span style="color:#7c6af7">import</span> guile <span style="color:#7c6af7">as</span> gui</div>
+<div style="height:10px"></div>
+<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 1. Pure function ────────────────</div>
+<div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)"><span style="color:#0f6e56">def</span> <span style="color:#0f6e56">to_celsius</span>(f):</div>
+<div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)">    <span style="color:#0f6e56">return</span> (f - 32) * 5 / 9</div>
+<div style="height:10px"></div>
+<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 2. State (module level = global) ─</div>
+<div style="padding:1px 16px;background:rgba(83,74,183,.12);color:var(--text)">fahrenheit = gui.<span style="color:#534AB7">state</span>(32.0)</div>
+<div style="padding:1px 16px;background:rgba(83,74,183,.12);color:var(--text)">celsius &nbsp; = gui.<span style="color:#534AB7">state</span>(<span style="color:#7c6af7">None</span>)</div>
+<div style="height:10px"></div>
+<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 3. Callback ─────────────────────</div>
+<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)"><span style="color:#993C1D">def</span> <span style="color:#993C1D">convert</span>():</div>
+<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">    c = to_celsius(fahrenheit.<span style="color:#993C1D">value</span>)</div>
+<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">    celsius.<span style="color:#993C1D">set</span>(round(c, 1))</div>
+<div style="height:10px"></div>
+<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 4. Layout ───────────────────────</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">@gui.app(<span style="color:#c95f28">"Converter"</span>, width=360)</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)"><span style="color:#185FA5">def</span> <span style="color:#185FA5">ui</span>():</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    gui.number_input(<span style="color:#c95f28">"°F"</span>, value=fahrenheit,</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">        on_change=fahrenheit.<span style="color:#185FA5">set</span>)</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    gui.button(<span style="color:#c95f28">"Convert"</span>, on_click=convert)</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    <span style="color:#185FA5">if</span> celsius.<span style="color:#185FA5">value</span> <span style="color:#185FA5">is not None</span>:</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">        gui.text(celsius.<span style="color:#185FA5">value</span>)</div>
+</div>
+
+<div style="padding:0 0 0 16px;display:flex;flex-direction:column;gap:8px;font-family:var(--sans)">
+
+<div style="background:var(--green-bg, #e6f4ec);border:1px solid rgba(15,110,86,.2);border-radius:var(--r);padding:10px 12px">
+<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#085041;margin-bottom:4px">1 · Pure function</p>
+<p style="font-size:12px;line-height:1.55;color:var(--text-2)">Ordinary Python — no guile inside. Works identically in a notebook, test, or script. This is the code you already have.</p>
+</div>
+
+<div style="background:#EEEDFE;border:1px solid rgba(83,74,183,.25);border-radius:var(--r);padding:10px 12px">
+<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#3C3489;margin-bottom:4px">2 · State — global variables</p>
+<p style="font-size:12px;line-height:1.55;color:#534AB7">Declared at <strong>module level</strong>, outside every function. Callbacks need to read and write them, so they must be in scope everywhere. Defined inside <code style="font-size:11px;background:rgba(83,74,183,.15);padding:1px 4px;border-radius:3px">ui()</code> they would reset on every render.</p>
+</div>
+
+<div style="background:#FAECE7;border:1px solid rgba(153,60,29,.25);border-radius:var(--r);padding:10px 12px">
+<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#712B13;margin-bottom:4px">3 · Callback</p>
+<p style="font-size:12px;line-height:1.55;color:#993C1D">The only place where <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.value</code> is read for logic and <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.set()</code> is called. Calls your pure function, stores the result. Re-render happens automatically.</p>
+</div>
+
+<div style="background:#E6F1FB;border:1px solid rgba(24,95,165,.25);border-radius:var(--r);padding:10px 12px">
+<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#0C447C;margin-bottom:4px">4 · Layout — ui()</p>
+<p style="font-size:12px;line-height:1.55;color:#185FA5">Reads <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.value</code> to display things. Passes <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.set</code> by reference via <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">on_change=state.set</code> — fine and idiomatic. Never <em>calls</em> <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">state.set(x)</code> as a bare statement — that runs on every render and causes a loop.</p>
+</div>
+
+</div>
+</div>
+
+<h3>State variables and their methods</h3>
+
+<p><code>gui.state(x)</code> creates a reactive variable with initial value <code>x</code>.
+Any Python type works — number, string, list, DataFrame, <code>None</code>.</p>
+
+<div class="card" style="margin:12px 0">
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+<thead><tr>
+<th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">Method</th>
+<th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">What it does</th>
+<th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">Where to use it</th>
+</tr></thead>
+<tbody>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">.value</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Read the current value</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)"><code>ui()</code> and callbacks</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">.set(new)</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Replace the value, trigger re-render</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Callbacks; or passed as <code>on_change=x.set</code></td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">.update(fn)</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Set based on current value: <code>.set(fn(.value))</code></td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Callbacks only</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent)">.toggle()</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px">Flip a boolean: <code>True ↔ False</code></td><td style="padding:7px 12px;color:var(--text-2);font-size:13px">Callbacks — for checkbox state</td></tr>
+</tbody>
+</table>
+</div>
+
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -451,135 +535,13 @@ gui.html("&lt;style&gt;:root { --shadow: 0 8px 40px rgba(0,0,0,.18); }&lt;/style
 
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
-<div class="section" id="state-annotated">
-<h2>How a guile app is structured</h2>
-
-<p>Every guile app has four parts, always in the same order.
-Hover a section in the code to see what it does.</p>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;font-family:var(--mono);font-size:12.5px;line-height:1.65;margin:20px 0">
-
-<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 0;overflow:hidden">
-<div style="padding:1px 16px;color:var(--text-2)"><span style="color:#7c6af7">import</span> guile <span style="color:#7c6af7">as</span> gui</div>
-<div style="height:10px"></div>
-<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 1. Pure function ────────────────</div>
-<div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)"><span style="color:#0f6e56">def</span> <span style="color:#0f6e56">to_celsius</span>(f):</div>
-<div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)">    <span style="color:#0f6e56">return</span> (f - 32) * 5 / 9</div>
-<div style="height:10px"></div>
-<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 2. State (module level = global) ─</div>
-<div style="padding:1px 16px;background:rgba(83,74,183,.12);color:var(--text)">fahrenheit = gui.<span style="color:#534AB7">state</span>(32.0)</div>
-<div style="padding:1px 16px;background:rgba(83,74,183,.12);color:var(--text)">celsius &nbsp; = gui.<span style="color:#534AB7">state</span>(<span style="color:#7c6af7">None</span>)</div>
-<div style="height:10px"></div>
-<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 3. Callback ─────────────────────</div>
-<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)"><span style="color:#993C1D">def</span> <span style="color:#993C1D">convert</span>():</div>
-<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">    c = to_celsius(fahrenheit.<span style="color:#993C1D">value</span>)</div>
-<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">    celsius.<span style="color:#993C1D">set</span>(round(c, 1))</div>
-<div style="height:10px"></div>
-<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 4. Layout ───────────────────────</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">@gui.app(<span style="color:#c95f28">"Converter"</span>, width=360)</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)"><span style="color:#185FA5">def</span> <span style="color:#185FA5">ui</span>():</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    gui.number_input(<span style="color:#c95f28">"°F"</span>, value=fahrenheit,</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">        on_change=fahrenheit.<span style="color:#185FA5">set</span>)</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    gui.button(<span style="color:#c95f28">"Convert"</span>, on_click=convert)</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    <span style="color:#185FA5">if</span> celsius.<span style="color:#185FA5">value</span> <span style="color:#185FA5">is not None</span>:</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">        gui.text(celsius.<span style="color:#185FA5">value</span>)</div>
-</div>
-
-<div style="padding:0 0 0 16px;display:flex;flex-direction:column;gap:8px;font-family:var(--sans)">
-
-<div style="background:var(--green-bg, #e6f4ec);border:1px solid rgba(15,110,86,.2);border-radius:var(--r);padding:10px 12px">
-<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#085041;margin-bottom:4px">1 · Pure function</p>
-<p style="font-size:12px;line-height:1.55;color:var(--text-2)">Ordinary Python — no guile inside. Works identically in a notebook, test, or script. This is the code you already have.</p>
-</div>
-
-<div style="background:#EEEDFE;border:1px solid rgba(83,74,183,.25);border-radius:var(--r);padding:10px 12px">
-<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#3C3489;margin-bottom:4px">2 · State — global variables</p>
-<p style="font-size:12px;line-height:1.55;color:#534AB7">Declared at <strong>module level</strong>, outside every function. Callbacks need to read and write them, so they must be in scope everywhere. Defined inside <code style="font-size:11px;background:rgba(83,74,183,.15);padding:1px 4px;border-radius:3px">ui()</code> they would reset on every render.</p>
-</div>
-
-<div style="background:#FAECE7;border:1px solid rgba(153,60,29,.25);border-radius:var(--r);padding:10px 12px">
-<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#712B13;margin-bottom:4px">3 · Callback</p>
-<p style="font-size:12px;line-height:1.55;color:#993C1D">The only place where <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.value</code> is read for logic and <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.set()</code> is called. Calls your pure function, stores the result. Re-render happens automatically.</p>
-</div>
-
-<div style="background:#E6F1FB;border:1px solid rgba(24,95,165,.25);border-radius:var(--r);padding:10px 12px">
-<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#0C447C;margin-bottom:4px">4 · Layout — ui()</p>
-<p style="font-size:12px;line-height:1.55;color:#185FA5">Reads <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.value</code> to display. Never calls <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.set()</code>. Connects widgets to state via <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">value=</code> and <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">on_change=</code>.</p>
-</div>
-
-</div>
-</div>
-
-<h3>State variables and their methods</h3>
-
-<p><code>gui.state(x)</code> creates a reactive variable with initial value <code>x</code>.
-Any Python type works — number, string, list, DataFrame, <code>None</code>.</p>
-
-<div class="card" style="margin:12px 0">
-<table style="width:100%;border-collapse:collapse;font-size:13px">
-<thead><tr>
-<th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">Method</th>
-<th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">What it does</th>
-<th style="text-align:left;padding:6px 12px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);border-bottom:1px solid var(--border)">Where to use it</th>
-</tr></thead>
-<tbody>
-<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">.value</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Read the current value</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)"><code>ui()</code> and callbacks</td></tr>
-<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">.set(new)</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Replace the value, trigger re-render</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Callbacks only</td></tr>
-<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">.update(fn)</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Set based on current value: <code>.set(fn(.value))</code></td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Callbacks only</td></tr>
-<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent)">.toggle()</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px">Flip a boolean: <code>True ↔ False</code></td><td style="padding:7px 12px;color:var(--text-2);font-size:13px">Callbacks — for checkbox state</td></tr>
-</tbody>
-</table>
-</div>
-
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════════ -->
 <div class="section" id="state-cycle">
 <h2>The reactive state cycle</h2>
 
 <p>Everything in guile revolves around three concepts.
 Understanding them means you can build any app.</p>
 
-<svg width="100%" viewBox="0 0 680 340" role="img" style="margin:16px 0 20px">
-<title>Guile reactive state cycle</title>
-<desc>Three boxes in a triangle: gui.state() holds the value at top, ui() reads .value at bottom left, callbacks call .set() at bottom right. Arrows form a cycle.</desc>
-<defs>
-<marker id="arr-s" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</marker>
-</defs>
-<g class="c-purple">
-  <rect x="230" y="30" width="220" height="72" rx="8" stroke-width="0.5"/>
-  <text class="th" x="340" y="60" text-anchor="middle" dominant-baseline="central">gui.state(initial)</text>
-  <text class="ts" x="340" y="83" text-anchor="middle" dominant-baseline="central">holds the current value</text>
-</g>
-<g class="c-teal">
-  <rect x="60" y="220" width="220" height="72" rx="8" stroke-width="0.5"/>
-  <text class="th" x="170" y="250" text-anchor="middle" dominant-baseline="central">ui()</text>
-  <text class="ts" x="170" y="273" text-anchor="middle" dominant-baseline="central">reads .value, displays widgets</text>
-</g>
-<g class="c-coral">
-  <rect x="400" y="220" width="220" height="72" rx="8" stroke-width="0.5"/>
-  <text class="th" x="510" y="250" text-anchor="middle" dominant-baseline="central">your callback</text>
-  <text class="ts" x="510" y="273" text-anchor="middle" dominant-baseline="central">calls .set() or .update()</text>
-</g>
-<path d="M270 102 L195 218" fill="none" stroke="var(--border-2)" stroke-width="1" marker-end="url(#arr-s)"/>
-<text class="ts" x="212" y="168" text-anchor="middle">re-renders</text>
-<text class="ts" x="212" y="183" text-anchor="middle">when changed</text>
-<path d="M280 264 L398 264" fill="none" stroke="var(--border-2)" stroke-width="1" marker-end="url(#arr-s)"/>
-<text class="ts" x="340" y="254" text-anchor="middle">user interaction</text>
-<text class="ts" x="340" y="278" text-anchor="middle">fires on_click / on_change</text>
-<path d="M468 218 L392 104" fill="none" stroke="var(--border-2)" stroke-width="1" marker-end="url(#arr-s)"/>
-<text class="ts" x="452" y="168" text-anchor="middle">.set(new_value)</text>
-<text class="ts" x="452" y="183" text-anchor="middle">triggers cycle again</text>
-<text class="ts" x="340" y="118" text-anchor="middle" style="font-family:var(--mono)">count = gui.state(0)</text>
-<rect x="248" y="136" width="64" height="22" rx="11" fill="none" stroke="var(--border)" stroke-width="0.5"/>
-<text class="ts" x="280" y="147" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono)">.value</text>
-<rect x="320" y="136" width="44" height="22" rx="11" fill="none" stroke="var(--border)" stroke-width="0.5"/>
-<text class="ts" x="342" y="147" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono)">.set()</text>
-<rect x="372" y="136" width="68" height="22" rx="11" fill="none" stroke="var(--border)" stroke-width="0.5"/>
-<text class="ts" x="406" y="147" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono)">.update()</text>
-</svg>
+
 
 <h3>The three methods</h3>
 
@@ -627,9 +589,11 @@ def ui():
             gui.button("Reset", variant="ghost", on_click=reset)</pre>
 
 <div class="note">
-<strong>The only rule:</strong> <code>.set()</code> and <code>.update()</code> belong
-in callbacks. <code>.value</code> belongs in <code>ui()</code>.
-Keep those two roles separate and the app will always behave correctly.
+<strong>The rule:</strong> never <em>call</em> <code>state.set(x)</code>
+as a bare statement inside <code>ui()</code> — it fires on every render
+and causes an infinite loop. Passing it as a reference via
+<code>on_change=state.set</code> is fine — it only fires
+when the user interacts with the widget.
 </div>
 </div>
 
@@ -692,20 +656,30 @@ widget would display correctly but the state would never update, and
 <h3>State declarations are your defaults</h3>
 
 <p>The <code>gui.state()</code> lines at the top of your script are the
-single source of truth for starting values. You never need to repeat a
-default inside a widget call — the widget reads its current value from
-state and displays that.</p>
+single source of truth for starting values.</p>
 
-<pre>station = gui.state("Manhattan")   # "Manhattan" is the default
+<p>The <code>value=state</code> argument on a widget may look redundant,
+but it serves a different purpose — it <em>binds</em> the widget to the
+state object so they stay in sync. Without it, the widget manages its
+own internal value and your callbacks have no way to read it.</p>
 
-# In ui() — no default needed here, the widget reads from state
-gui.select(["Manhattan", "Ashland Bottoms"], "Station",
-           value=station, on_change=station.set, key="station")</pre>
+<pre># Pattern A — widget owns its state (simple cases)
+# No pre-declared state needed. Read the value back via f.value inside ui().
+f = gui.number_input("°F", value=32.0)
 
-<p>To reset to the default from a button, just call
-<code>station.set("Manhattan")</code> in a callback. The state
-declarations at the top are the one place you look to see all
-starting values for the app.</p>
+# Pattern B — external state, widget bound to it (most real apps)
+# Callbacks defined outside ui() can read fahrenheit.value and call fahrenheit.set().
+fahrenheit = gui.state(32.0)
+gui.number_input("°F", value=fahrenheit, on_change=fahrenheit.set)</pre>
+
+<p>Use Pattern A when the value is only needed inside <code>ui()</code>.
+Use Pattern B whenever a callback needs to read or update the value —
+which is most of the time. The <code>32.0</code> in <code>gui.state(32.0)</code>
+sets the starting value; <code>value=fahrenheit</code> connects the widget to
+that state going forward. They are not saying the same thing twice.</p>
+
+<p>To reset to the default from a button, call
+<code>station.set("Manhattan")</code> in a callback.</p>
 
 <h3>What is <code>key=</code> for?</h3>
 

@@ -865,10 +865,17 @@ class _MultiSelect(_Leaf):
             f'{_txt(l)}</option>'
             for v, l in self._opts
         )
-        # On change, collect all selected values and send as JSON list
-        js = (f"window._guile.trigger('{self.id}',"
-              f"JSON.stringify(Array.from(this.selectedOptions)"
-              f".map(function(o){{return o.value}})))")
+        # Debounce the Python callback by 300 ms so that Ctrl+clicking multiple
+        # items in quick succession batches into a single state update.
+        # Without debouncing, each click triggers a re-render that replaces the
+        # <select> element before the user can Ctrl+click the next item.
+        timer_var = f"_ms_{self.id.replace('-','_')}"
+        collect   = (f"JSON.stringify(Array.from(this.selectedOptions)"
+                     f".map(function(o){{return o.value}}))")
+        js = (f"clearTimeout(window.{timer_var});"
+              f"window.{timer_var}=setTimeout(function(){{"
+              f"window._guile.trigger('{self.id}',{collect});"
+              f"}},300)")
         dis = " disabled" if self._disabled else ""
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
@@ -1024,11 +1031,13 @@ class _FilePicker(_Leaf):
     def __init__(self, label: str = "Choose file…", *,
                  value: Optional[Union[str, State]] = None,
                  file_types: tuple = (), save: bool = False,
+                 disabled: bool = False,
                  on_change: Optional[Callable] = None,
                  style: str = "", key: Optional[str] = None):
         self._label      = label
         self._file_types = file_types
         self._save       = save
+        self._disabled   = disabled
         self._style      = style
         _key             = _auto_key(key)
         initial          = value.value if isinstance(value, State) else (value or "")
@@ -1042,10 +1051,13 @@ class _FilePicker(_Leaf):
         _file_types = self._file_types
         _state      = self._state
         _on_change  = on_change
+        _disabled   = disabled
 
         def _handler():
             # Runs on a background thread (_Bridge._run → dispatch).
             # _current_window is set by _App via _set_window() — no import needed.
+            if _disabled:
+                return
             try:
                 import webview
                 win = _current_window
@@ -1080,8 +1092,11 @@ class _FilePicker(_Leaf):
         if filename:
             lbl_html += (f' <span style="font-weight:400;opacity:.65;font-size:13px">'
                          f'({_txt(filename)})</span>')
+        dis_attr  = ' disabled' if self._disabled else ""
+        dis_style = (self._style + ";opacity:.45;cursor:not-allowed"
+                     if self._disabled else self._style)
         return (f'<button id="{self.id}" class="guile-btn guile-btn-secondary"'
-                f' style="{self._style}" onclick="{js}">📁 {lbl_html}</button>')
+                f' style="{dis_style}" onclick="{js}"{dis_attr}>📁 {lbl_html}</button>')
 
 
 # ── Data widget ────────────────────────────────────────────────────────────

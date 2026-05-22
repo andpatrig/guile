@@ -289,13 +289,15 @@ def datetime_input(label: str = "", *, value: Optional[Union[str, State]] = None
 def file_picker(label: str = "Choose file…", *,
                 value: Optional[Union[str, State]] = None,
                 file_types: tuple = (), save: bool = False,
+                disabled: bool = False,
                 on_change: Optional[Callable] = None,
                 style: str = "", key: Optional[str] = None) -> _FilePicker:
     """OS native file dialog button. Returns .value (str) with the selected path.
     on_change is called with the selected path string after the dialog closes.
     """
     return _FilePicker(label, value=value, file_types=file_types,
-                       save=save, on_change=on_change, style=style, key=key)
+                       save=save, disabled=disabled,
+                       on_change=on_change, style=style, key=key)
 
 
 # ── Data ───────────────────────────────────────────────────────────────────
