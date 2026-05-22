@@ -132,7 +132,7 @@ Hover a section in the code to see what it does.</p>
 <div style="height:10px"></div>
 <div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 1. Pure function ────────────────</div>
 <div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)"><span style="color:#0f6e56">def</span> <span style="color:#0f6e56">to_celsius</span>(f):</div>
-<div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)">    <span style="color:#0f6e56">return</span> (f - 32) * 5 / 9</div>
+<div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#0f6e56">return</span> (f - 32) * 5 / 9</div>
 <div style="height:10px"></div>
 <div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 2. State (module level = global) ─</div>
 <div style="padding:1px 16px;background:rgba(83,74,183,.12);color:var(--text)">fahrenheit = gui.<span style="color:#534AB7">state</span>(32.0)</div>
@@ -140,17 +140,17 @@ Hover a section in the code to see what it does.</p>
 <div style="height:10px"></div>
 <div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 3. Callback ─────────────────────</div>
 <div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)"><span style="color:#993C1D">def</span> <span style="color:#993C1D">convert</span>():</div>
-<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">    c = to_celsius(fahrenheit.<span style="color:#993C1D">value</span>)</div>
-<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">    celsius.<span style="color:#993C1D">set</span>(round(c, 1))</div>
+<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;c = to_celsius(fahrenheit.<span style="color:#993C1D">value</span>)</div>
+<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;celsius.<span style="color:#993C1D">set</span>(round(c, 1))</div>
 <div style="height:10px"></div>
 <div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 4. Layout ───────────────────────</div>
 <div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">@gui.app(<span style="color:#c95f28">"Converter"</span>, width=360)</div>
 <div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)"><span style="color:#185FA5">def</span> <span style="color:#185FA5">ui</span>():</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    gui.number_input(<span style="color:#c95f28">"°F"</span>, value=fahrenheit,</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">        on_change=fahrenheit.<span style="color:#185FA5">set</span>)</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    gui.button(<span style="color:#c95f28">"Convert"</span>, on_click=convert)</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">    <span style="color:#185FA5">if</span> celsius.<span style="color:#185FA5">value</span> <span style="color:#185FA5">is not None</span>:</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">        gui.text(celsius.<span style="color:#185FA5">value</span>)</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;gui.number_input(<span style="color:#c95f28">"°F"</span>, value=fahrenheit,</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;on_change=fahrenheit.<span style="color:#185FA5">set</span>)</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;gui.button(<span style="color:#c95f28">"Convert"</span>, on_click=convert)</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#185FA5">if</span> celsius.<span style="color:#185FA5">value</span> <span style="color:#185FA5">is not None</span>:</div>
+<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.text(celsius.<span style="color:#185FA5">value</span>)</div>
 </div>
 
 <div style="padding:0 0 0 16px;display:flex;flex-direction:column;gap:8px;font-family:var(--sans)">
