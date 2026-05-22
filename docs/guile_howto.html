@@ -514,21 +514,24 @@ readability convention. You could write <code>key="abc"</code> and
 the app would behave identically. <code>key=</code> can be omitted
 entirely for simple apps — guile assigns one automatically.</p>
 
-<h3>Comparison with Streamlit</h3>
+<h3>Coming from Streamlit</h3>
 
-<pre># Streamlit — checks widget return value inline, re-runs everything
-import streamlit as st
-f = st.number_input("Fahrenheit", value=32.0)
-if st.button("Convert"):
-    st.write(f"{(f - 32) * 5 / 9:.1f} °C")
+<p>In Streamlit, buttons and inputs return values you check inline:</p>
 
-# Guile — state + callback, ui() only displays
-# (see full example above)</pre>
+<pre># Streamlit habit
+run_btn = st.button("Convert")
+if run_btn:
+    do_something()</pre>
 
-<p>Both approaches work for simple apps. The guile pattern scales better
-because your processing functions stay independent of the UI framework —
-they can be reused in notebooks, tests, or other scripts without any
-changes.</p>
+<p>In guile, widgets don't return True/False — they fire a callback.
+The equivalent is:</p>
+
+<pre># Guile equivalent
+gui.button("Convert", on_click=do_something)</pre>
+
+<p>That's the main habit to unlearn. Everything else — keeping your
+functions pure, separating logic from display — works the same way
+in both frameworks.</p>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
