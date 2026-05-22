@@ -800,6 +800,88 @@ class _Select(_Leaf):
                 f'{opts}</select></div>')
 
 
+class _MultiSelect(_Leaf):
+    """
+    Multi-select dropdown. Returns .value (list[str]), .set(), .update().
+
+    Renders as a <select multiple> sized to show up to `rows` options at once.
+    The user holds Ctrl/Cmd to select multiple items.
+
+        crops = gui.multiselect(
+            ["Maize", "Wheat", "Soybean", "Cotton"],
+            "Crop types", value=["Maize"], key="crops"
+        )
+        gui.text(f"Selected: {', '.join(crops.value)}")
+    """
+    def __init__(self, options: Any, label: str = "", *,
+                 value: Optional[Union[list, "State"]] = None,
+                 rows: int = 4,
+                 disabled: bool = False,
+                 on_change: Optional[Callable] = None,
+                 style: str = "",
+                 key: Optional[str] = None):
+        self._label    = label
+        self._rows     = rows
+        self._disabled = disabled
+        self._style    = style
+
+        # Normalize options to list of (value, label) pairs
+        if isinstance(options, dict):
+            self._opts = list(options.items())
+        elif options and isinstance(options[0], (list, tuple)):
+            self._opts = [(str(v), str(l)) for v, l in options]
+        else:
+            self._opts = [(str(o), str(o)) for o in options]
+
+        _key    = _auto_key(key)
+        initial = (value.value if isinstance(value, State)
+                   else (list(value) if value is not None else []))
+        self._state = (value if isinstance(value, State)
+                       else _get_or_create_state(_key, initial))
+        super().__init__(key)
+
+        def _handler(v):
+            # JS sends selected values as a JSON-encoded list: '["a","b"]'
+            import json
+            try:
+                selected = json.loads(v) if v else []
+            except (ValueError, TypeError):
+                selected = [v] if v else []
+            self._state.set(selected)
+            if on_change:
+                on_change(selected)
+
+        _reg(self.id, _handler)
+
+    @property
+    def value(self) -> list: return self._state.value
+    def set(self, v: list):   self._state.set(list(v))
+    def update(self, fn):     self._state.update(fn)
+
+    def render(self) -> str:
+        selected = set(str(s) for s in (self._state.value or []))
+        opts = "".join(
+            f'<option value="{_esc(v)}"{" selected" if v in selected else ""}>'
+            f'{_txt(l)}</option>'
+            for v, l in self._opts
+        )
+        # On change, collect all selected values and send as JSON list
+        js = (f"window._guile.trigger('{self.id}',"
+              f"JSON.stringify(Array.from(this.selectedOptions)"
+              f".map(function(o){{return o.value}})))")
+        dis = " disabled" if self._disabled else ""
+        lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
+               f'{_txt(self._label)}</span>') if self._label else ""
+        hint = (f'<span style="font-size:11px;color:var(--text-2);margin-top:2px">'
+                f'Hold Ctrl / Cmd to select multiple</span>')
+        return (f'<div id="{self.id}" class="guile-field" style="{self._style}">'
+                f'{lbl}'
+                f'<select class="guile-select" multiple size="{self._rows}"'
+                f' onchange="{js}"{dis}>{opts}</select>'
+                f'{hint}'
+                f'</div>')
+
+
 class _Slider(_Leaf):
     """Range slider. Returns .value (float), .set(), .update()."""
     def __init__(self, label: str = "", *, min: float = 0, max: float = 100,
@@ -964,10 +1046,58 @@ class _Table(_Leaf):
     Simple data table. Pass a list of dicts.
     Use columns= to select or reorder which keys are shown.
     """
-    def __init__(self, data: list, *, columns: Optional[list] = None,
+    @staticmethod
+    def _normalise(data: Any) -> list:
+        """
+        Convert common data structures to list[dict] for rendering.
+
+        Accepted inputs:
+          list[dict]        — native format, returned as-is
+          pandas DataFrame  — converted via to_dict("records")
+          numpy 2-D array   — rows become dicts keyed "0", "1", "2" …
+          numpy 1-D array   — single column keyed "value"
+          list[list]        — rows become dicts keyed by column index
+          list[scalar]      — single column keyed "value"
+        """
+        if data is None:
+            return []
+
+        # pandas DataFrame
+        try:
+            import pandas as _pd
+            if isinstance(data, _pd.DataFrame):
+                return data.to_dict("records")
+        except ImportError:
+            pass
+
+        # numpy array
+        try:
+            import numpy as _np
+            if isinstance(data, _np.ndarray):
+                if data.ndim == 1:
+                    return [{"value": v} for v in data.tolist()]
+                if data.ndim == 2:
+                    return [{str(j): row[j] for j in range(len(row))}
+                            for row in data.tolist()]
+        except ImportError:
+            pass
+
+        # list[list] or list[tuple]
+        if data and isinstance(data[0], (list, tuple)):
+            return [{str(j): row[j] for j in range(len(row))}
+                    for row in data]
+
+        # list[scalar] — single-column table
+        if data and not isinstance(data[0], dict):
+            return [{"value": v} for v in data]
+
+        # Already list[dict]
+        return list(data)
+
+    def __init__(self, data: Any, *, columns: Optional[list] = None,
                  max_rows: int = 2000,
                  style: str = "", key: Optional[str] = None):
-        self._data     = data or []
+        self._data     = self._normalise(data)
         self._columns  = columns or (list(self._data[0].keys()) if self._data else [])
         self._max_rows = max_rows
         self._style    = style

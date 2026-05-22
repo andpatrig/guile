@@ -6,27 +6,55 @@ build-backend = "setuptools.build_meta"
 name = "guile"
 version = "0.1.0"
 authors = [
-  { name="Andres Patrignani", email="andrespatrignani@ksu.edu" },
+  { name = "Andres Patrignani", email = "andrespatrignani@ksu.edu" },
 ]
-description = "A lightweight framework for creating desktop apps in Python."
+description = "A lightweight Python framework for building native desktop apps."
 readme = "README.md"
-requires-python = ">=3.8"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = ["gui", "desktop", "app", "pywebview", "reactive"]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Topic :: Software Development :: User Interfaces",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
 ]
+
+# pywebview is the native window engine.
+# matplotlib is included because gui.figure() requires it and most users
+# of a desktop GUI framework will want plotting capability out of the box.
+# numpy and pandas are optional — only needed for scientific apps.
 dependencies = [
     "pywebview>=5.0",
-    "matplotlib>=3.5"
+    "matplotlib>=3.5",
 ]
 
+[project.optional-dependencies]
+science = [
+    "numpy>=1.21",
+    "pandas>=1.3",
+]
+dev = [
+    "build",
+    "twine",
+]
 
 [project.urls]
-"Homepage" = "https://github.com"
-"Bug Tracker" = "https://github.com/issues"
+"Homepage"    = "https://andpatrig.github.io/guile"
+"Repository"  = "https://github.com/andpatrig/guile"
+"Bug Tracker" = "https://github.com/andpatrig/guile/issues"
+"Changelog"   = "https://github.com/andpatrig/guile/releases"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where   = ["."]
 include = ["guile*"]
 
+# Ensure py.typed and _template.py are included in the wheel
+[tool.setuptools.package-data]
+guile = ["py.typed", "_template.py"]

@@ -40,7 +40,7 @@ from .ui import (
     # Display
     _Text, _Title, _Badge, _Spacer, _Divider, _ProgressBar, _Html,
     # Inputs
-    _Button, _Input, _NumberInput, _TextArea, _Checkbox, _Select, _Slider,
+    _Button, _Input, _NumberInput, _TextArea, _Checkbox, _Select, _MultiSelect, _Slider,
     _DateInput, _FilePicker,
     # Media
     _Figure, _Map, Marker,
@@ -222,6 +222,37 @@ def select(options: Any, label: str = "", *,
     return _Select(options, label, value=value, disabled=disabled,
                    on_change=on_change, style=style, key=key)
 
+def multiselect(options: Any, label: str = "", *,
+                value: Optional[Union[list, State]] = None,
+                rows: int = 4,
+                disabled: bool = False,
+                on_change: Optional[Callable] = None,
+                style: str = "",
+                key: Optional[str] = None) -> _MultiSelect:
+    """
+    Multi-select dropdown. Returns .value (list[str]), .set(), .update().
+
+    The user holds Ctrl / Cmd to select multiple items.
+
+        crops = gui.multiselect(
+            ["Maize", "Wheat", "Soybean", "Cotton"],
+            "Crop types", value=["Maize"], key="crops"
+        )
+        gui.text(f"Selected: {', '.join(crops.value)}")
+
+    Arguments:
+        options   — list[str] | list[(value, label)] | dict
+        label     — label shown above the list
+        value     — initial selection as a list of value strings, or a State[list]
+        rows      — number of visible rows (default 4)
+        disabled  — read-only appearance
+        on_change — called with the new list[str] on every change
+    """
+    return _MultiSelect(options, label, value=value, rows=rows,
+                        disabled=disabled, on_change=on_change,
+                        style=style, key=key)
+
+
 def slider(label: str = "", *, min: float = 0, max: float = 100,
            step: float = 1, value: Optional[Union[float, State]] = None,
            on_change: Optional[Callable] = None,
@@ -251,11 +282,17 @@ def file_picker(label: str = "Choose file…", *,
 
 # ── Data ───────────────────────────────────────────────────────────────────
 
-def table(data: list, *, columns: Optional[list] = None,
+def table(data: Any, *, columns: Optional[list] = None,
           max_rows: int = 2000,
           style: str = "", key: Optional[str] = None) -> _Table:
     """
-    Simple data table. Pass a list of dicts.
+    Data table. Accepts common Python data structures directly:
+
+        gui.table(df)                      # pandas DataFrame
+        gui.table(arr)                     # numpy 2-D array
+        gui.table(records)                 # list of dicts (native)
+        gui.table(rows)                    # list of lists
+
     columns= selects/reorders which keys to show.
     max_rows= caps rendering (default 2000) with a notice row when clipped.
     """
