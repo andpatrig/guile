@@ -237,6 +237,17 @@ class _Bridge:
             target=self._run, args=(cid, value), daemon=True
         ).start()
 
+    def silent_update(self, cid: str, value=None):
+        """
+        Called by JS to update state without triggering a re-render.
+        Used by multiselect onchange: state is updated immediately on
+        every click so it's always current, but the DOM is only replaced
+        on onblur (via the normal handle() path) after the user finishes.
+        """
+        threading.Thread(
+            target=_dispatch, args=(cid, value), daemon=True
+        ).start()
+
     def _run(self, cid: str, value):
         """Dispatch the event and re-render. Runs on a background thread."""
         _dispatch(cid, value)

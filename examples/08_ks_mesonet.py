@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 # Custom function
 def get_ks_mesonet(station, start_date, end_date, variables, interval='day'):
     """Function that requests weather data from the Kansas Mesonet."""
+    print(variables)
     fmt = '%Y%m%d%H%M%S'
     start_date = pd.to_datetime(start_date).strftime(fmt)
     end_date = pd.to_datetime(end_date).strftime(fmt)
@@ -39,23 +40,24 @@ def save(path):
         data.value.to_csv(path, index=False)
         
 # Layout
-@gui.app("Kansas Mesonet Data Explorer", width=800, height=400)
+@gui.app("Kansas Mesonet Data", width=600, height=400)
 def ui():
-    with gui.row():
-        with gui.col():
+    gui.title("Kansas Mesonet Data Download")
+    with gui.row(gap=5):
+        with gui.col(padding=20):
             gui.select(label='Station', options=['Manhattan','Ashland Bottoms'], on_change=station.set, key='station')
             gui.date_input("Start date", value=start_date, on_change=start_date.set, key="from")
-            gui.date_input("End date", on_change=end_date.set, key="to")
-            gui.multiselect(["TEMP2MAVG","SRAVG"], on_change=variables.set, key='variables')
-            gui.select(label='Interval', options=[('day','Daily'),('hourly','Hourly')], on_change=interval.set, key='interval')
+            gui.date_input("End date", value=end_date, on_change=end_date.set, key="to")
+            gui.multiselect(["TEMP2MAVG","SR","PRECIP"], value=variables, on_change=variables.set, key='variables')
+            gui.select(label='Interval', options=[('day','Daily'),('hourly','Hourly')], value=interval, on_change=interval.set, key='interval')
             gui.button("Request", on_click=run)
 
-        with gui.col():
+        with gui.col(padding=20):
             if data.value is None:
                 gui.text('No data yet')
             else:
                 gui.file_picker("Save CSV", save=True, file_types=("CSV Files (*.csv)",), on_change=save,  disabled=data.value is None, key="save")
-                with gui.scroll():
+                with gui.scroll(max_height=300):
                     gui.table(data.value)
 
 

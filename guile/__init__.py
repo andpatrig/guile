@@ -92,9 +92,24 @@ def card(*, gap: int = 12, padding: Union[int, str] = 20,
     """Raised surface. Use as `with gui.card():`. margin= adds outer spacing."""
     return Card(gap=gap, padding=padding, margin=margin, style=style, key=key)
 
-def scroll(*, style: str = "", key: Optional[str] = None) -> Scroll:
-    """Scrollable container. Use as `with gui.scroll():`"""
-    return Scroll(style=style, key=key)
+def scroll(*, max_height: Optional[int] = 400,
+           style: str = "", key: Optional[str] = None) -> Scroll:
+    """
+    Scrollable container. Use as `with gui.scroll():`.
+
+    max_height= (default 400) sets the point at which the container starts
+    scrolling. Pass max_height=None to let the parent's height constrain it.
+
+        with gui.scroll():                    # scrolls after 400px
+            gui.table(data)
+
+        with gui.scroll(max_height=600):      # scrolls after 600px
+            gui.table(data)
+
+        with gui.scroll(max_height=None):     # fills parent, parent must have fixed height
+            gui.table(data)
+    """
+    return Scroll(max_height=max_height, style=style, key=key)
 
 def spacer(h: Optional[int] = None, w_: Optional[int] = None,
            fill: bool = False, key: Optional[str] = None) -> _Spacer:

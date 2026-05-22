@@ -678,6 +678,21 @@ which is most of the time. The <code>32.0</code> in <code>gui.state(32.0)</code>
 sets the starting value; <code>value=fahrenheit</code> connects the widget to
 that state going forward. They are not saying the same thing twice.</p>
 
+<p><strong style="font-weight:500">Always use <code>value=</code> and <code>on_change=</code> together.</strong>
+Writing <code>on_change=state.set</code> without <code>value=state</code> is
+a common mistake. It works on the first render, but as soon as any state
+changes and <code>ui()</code> re-runs, the widget is recreated without reading
+from state — so it resets to its initial appearance, silently discarding
+whatever the user selected. The symptom is a widget that appears to lose
+its value or selection on every interaction.</p>
+
+<pre># ✗ Incomplete — widget resets on every re-render
+gui.multiselect(["A","B","C"], on_change=variables.set, key="vars")
+
+# ✓ Correct — widget reads state on render, writes state on interaction
+gui.multiselect(["A","B","C"], value=variables,
+                on_change=variables.set, key="vars")</pre>
+
 <p>To reset to the default from a button, call
 <code>station.set("Manhattan")</code> in a callback.</p>
 

@@ -359,6 +359,15 @@ window._guile = {
         } else {
             console.error('[guile] handle not available — api=' + hasApi);
         }
+    },
+    // silent: update Python state without triggering a re-render.
+    // Used by multiselect onchange so variables.value stays current
+    // while the user is mid-selection, without replacing the DOM element.
+    silent: function(cid, value) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.silent_update) {
+            window.pywebview.api.silent_update(cid,
+                value === undefined ? null : value);
+        }
     }
 };
 

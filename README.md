@@ -104,4 +104,15 @@ See `ARCHITECTURE.md` for a deeper explanation of how the files connect.
 
 ---
 
+
+## Versions
+
+v0.1.0 (AP 22-May-2026)
+First release including docs, reference, and 27 widgets. AP on 22 May 2026
+
+v0.2.0 (AP 22-May-2026)
+Added max_height argument to gui.scroll() widget
+Replaced onchange for onblur in gui.multiselect() widget
+
+
 MIT License

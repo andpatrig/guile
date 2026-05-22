@@ -329,10 +329,18 @@ class Card(_Container):
 
 
 class Scroll(_Container):
-    """Scrollable container. Use as `with gui.scroll():`."""
-    def __init__(self, *, style: str = "", key: Optional[str] = None):
+    """
+    Scrollable container. Use as `with gui.scroll():`.
+
+    max_height= sets the maximum height before the container starts scrolling.
+    Defaults to 400px. Pass max_height=None to let the container expand freely
+    (only useful when the parent has a fixed height that constrains it).
+    """
+    def __init__(self, *, max_height: Optional[int] = 400,
+                 style: str = "", key: Optional[str] = None):
+        h = f"max-height:{max_height}px;" if max_height is not None else ""
         super().__init__(css_class="guile-col guile-fill guile-scroll",
-                         inline_style=style, key=key)
+                         inline_style=h + style, key=key)
 
 
 # ── Leaf base ──────────────────────────────────────────────────────────────
@@ -865,17 +873,24 @@ class _MultiSelect(_Leaf):
             f'{_txt(l)}</option>'
             for v, l in self._opts
         )
-        # Debounce the Python callback by 300 ms so that Ctrl+clicking multiple
-        # items in quick succession batches into a single state update.
-        # Without debouncing, each click triggers a re-render that replaces the
-        # <select> element before the user can Ctrl+click the next item.
-        timer_var = f"_ms_{self.id.replace('-','_')}"
-        collect   = (f"JSON.stringify(Array.from(this.selectedOptions)"
-                     f".map(function(o){{return o.value}}))")
-        js = (f"clearTimeout(window.{timer_var});"
-              f"window.{timer_var}=setTimeout(function(){{"
-              f"window._guile.trigger('{self.id}',{collect});"
-              f"}},300)")
+        # Strategy: decouple state update from re-render.
+        #
+        # onchange fires on every click (including mid-Ctrl+click sequence).
+        #   → Immediately sends selected values to Python via a "silent" path
+        #     that updates state but suppresses re-render.
+        #   → This keeps variables.value always current.
+        #
+        # onblur fires when the user moves focus away from the <select>.
+        #   → Triggers a full re-render via the normal trigger path.
+        #   → DOM is only replaced after the user has finished selecting.
+        #
+        # This is reliable regardless of interaction speed.
+        collect = (f"JSON.stringify(Array.from(this.selectedOptions)"
+                   f".map(function(o){{return o.value}}))")
+        # silent update on every change — state updated, no re-render
+        js_change = f"window._guile.silent('{self.id}',{collect})"
+        # full trigger on blur — state already current, just re-renders
+        js_blur   = f"window._guile.trigger('{self.id}',{collect})"
         dis = " disabled" if self._disabled else ""
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
@@ -884,7 +899,7 @@ class _MultiSelect(_Leaf):
         return (f'<div id="{self.id}" class="guile-field" style="{self._style}">'
                 f'{lbl}'
                 f'<select class="guile-select" multiple size="{self._rows}"'
-                f' onchange="{js}"{dis}>{opts}</select>'
+                f' onchange="{js_change}" onblur="{js_blur}"{dis}>{opts}</select>'
                 f'{hint}'
                 f'</div>')
 
