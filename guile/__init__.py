@@ -403,20 +403,25 @@ def notify(message: str, *,
         f"font-size:16px;line-height:1;color:{fg};"
         "padding:0;margin-left:8px;opacity:.7"
     )
-    close_btn = f'<button onclick="this.parentNode.remove()" style="{close_style}">&#x2715;</button>'
-    inner     = f"<span>{msg}</span>{close_btn}"
-    card_css  = f"background:{bg};color:{fg};border:1.5px solid {fg};"
+    close_btn = (
+        '<button onclick="this.parentNode.remove()"'
+        f' style="{close_style}">&#x2715;</button>'
+    )
+    inner    = f"<span>{msg}</span>{close_btn}"
+    card_css = f"background:{bg};color:{fg};border:1.5px solid {fg};"
 
-    js = ";".join([
-        "(function()",
-        "{var e=document.createElement('div')",
-        "e.className='guile-notify'",
-        f"e.style.cssText={repr(card_css)}",
-        f"e.innerHTML={repr(inner)}",
-        "document.body.appendChild(e)",
-        f"setTimeout(function(){{if(e.parentNode)e.remove();}},{ms})",
-        "})()"
-    ])
+    # Build JS as a single concatenated string — no join(), no list,
+    # so semicolons land correctly inside the function body.
+    js = (
+        "(function(){"
+        "var e=document.createElement('div');"
+        "e.className='guile-notify';"
+        f"e.style.cssText={repr(card_css)};"
+        f"e.innerHTML={repr(inner)};"
+        "document.body.appendChild(e);"
+        f"setTimeout(function(){{if(e.parentNode)e.remove();}},{ms});"
+        "})();"
+    )
     app._window.evaluate_js(js)
 
 
