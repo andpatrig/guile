@@ -6,29 +6,25 @@ A lightweight Python framework for building desktop apps.
 
 ## Philosophy
 
-Guile started as a personal tool for building lab and research apps — the kind of quick internal dashboards, data explorers, and parameter tools that are too specific to justify a full web stack, but too interactive for a script. The goal was always to stay out of the way: write Python top to bottom, get a native window with a clean interface, nothing more.
-
-Inspired by the early design of the Julia language — which set out to take the best of Python, R, and MATLAB rather than compromise between them — guile tries to do the same for Python GUIs. In that spirit: guile has the syntax of Streamlit, the single-process simplicity of Tkinter, and the visual polish of a modern web app, without requiring you to write HTML, CSS, or JavaScript.
+Guile started as a personal tool for building lab and research apps — the kind of quick internal dashboards, data explorers, and parameter tools that are too specific to justify a full web stack, but too interactive for a script. The goal was always to stay out of the way: write Python top to bottom, get a window with a clean interface, nothing more.
 
 It is not trying to compete with NiceGUI, PyQt, or Dash. It is the right tool for a simple lab, company, or personal project — and deliberately nothing more.
 
-**A few specific choices that shape how guile feels:**
+A few specific choices that shape how guile feels:
 
-- **No full-page refresh.** When state changes, only the parts of the UI that actually changed are updated. Text stays in inputs, sliders don't jump, focus is never lost. This is different from Streamlit, which re-executes the whole script and redraws the page on every interaction.
-
-- **No nesting hell.** Layout is written top to bottom using `with` blocks, not by nesting constructors inside constructors. `with gui.card():` followed by indented widget calls reads the same way the finished UI looks — no inside-out tree building, no closing parentheses to track.
-
-- **No server.** The app runs as a single Python process and opens a native OS window. There is no local HTTP server, no port to bind, no browser tab to manage. This also means packaging with PyInstaller produces a self-contained executable with no runtime dependencies for the end user.
+- **No full-page refresh.** When state changes, only the parts of the UI that actually changed are updated. Text stays in inputs, sliders don't jump, focus is never lost.
+- **No nesting hell.** Layout is written top to bottom using `with` blocks. `with gui.card():` followed by indented widget calls reads the same way the finished UI looks.
+- **No server.** The app runs as a single Python process and opens a window. There is no local HTTP server, no port to bind, no browser tab to manage.
 
 ---
 
 ## Install
 
 ```bash
-pip install pywebview
+pip install guile
 ```
 
-Copy the `guile/` folder into your project. No further setup.
+Requires `pywebview`. On Windows, WebView2 ships with Windows 10/11 — nothing extra to install.
 
 ---
 
@@ -82,7 +78,7 @@ def ui():
 
 | Package | Purpose |
 |---------|---------|
-| `pywebview` | Native window |
+| `pywebview` | Window |
 | `matplotlib` | Only if you use `gui.figure()` |
 | `numpy` | Only if your app uses it |
 
@@ -100,26 +96,18 @@ Everything else is Python standard library.
 | `_template.py` | Embedded HTML/CSS/JS |
 | `__init__.py` | Public API (`gui.*`) |
 
-See `ARCHITECTURE.md` for a deeper explanation of how the files connect.
-
 ---
 
+## Changelog
 
-## Versions
+**v0.4.0** — Added tabs. Fixed `datetime-local` input to display in 24-hour format.
 
-v0.1.0
-First release including docs, reference, and 27 widgets. AP on 22 May 2026
+**v0.3.0** — Added `notify` and `modal` widgets.
 
-v0.2.0
-Added max_height argument to gui.scroll() widget
-Replaced onchange for onblur in gui.multiselect() widget
+**v0.2.0** — Added `max_height` to `gui.scroll()`. Fixed `multiselect` change event.
 
-v0.3.0
-Added notify and modal widgets
-Created new examples and improved existing examples
+**v0.1.0** — First release. 27 widgets.
 
-v0.4.0
-Added tabs
-Fixed the datetime-local input to display in 24-hour format by setting lang="en-GB"
+---
 
 MIT License
