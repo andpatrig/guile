@@ -18,12 +18,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import matplotlib
 matplotlib.use("Agg")
 
-import guile2 as gui
-from guile2.ui import (
+import guile as gui
+from guile.ui import (
     Column, _reset_render, _commit_callbacks,
     _live_callbacks, dispatch, _state_store,
 )
-from guile2._app import _App
+from guile._app import _App
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ def load_example(path):
     Also patches _App.run and _App._fallback_browser so no window
     or HTTP server is ever started during testing.
     """
-    from guile2._app import _App
+    from guile._app import _App
     orig_app     = gui.app
     orig_run     = _App.run
     orig_browser = _App._fallback_browser
@@ -197,14 +197,14 @@ def check_for_set_in_ui(path):
 
 # ── Run everything ─────────────────────────────────────────────────────────
 
-EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "guile2", "examples")
+EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "guile", "examples")
 
 EXAMPLES = [
     "01_counter.py",
     "02_todo.py",
     "03_settings.py",
-    "06_soil_water.py",
-    "07_fao56_dual_kc.py",
+    "06_soils_lab.py",
+    "08_soil_water_retention.py",
 ]
 
 passed = failed = 0
