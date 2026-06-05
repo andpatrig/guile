@@ -1,5 +1,5 @@
 """
-examples/06_soil_water.py — Soil water retention curve explorer.
+examples/08_soil_water_retention.py — Soil water retention curve explorer.
 
 Demonstrates:
   - Dropdown that initialises sliders with soil-specific defaults

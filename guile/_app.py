@@ -85,7 +85,7 @@ class _App:
             import webview
         except ImportError:
             print("[guile] pywebview not installed — opening in browser instead.")
-            print("[guile] Install for a native window:  pip install pywebview")
+            print("[guile] Install for desktop window:  pip install pywebview")
             self._fallback_browser()
             return
 

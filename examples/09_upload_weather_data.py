@@ -1,5 +1,5 @@
 """
-examples/08_dynamic_table.py — Load a DataFrame, display it, download it.
+examples/09_upload_weather_data.py — Load a DataFrame, display it, download it.
 
 The pattern:
   - df = gui.state(None)        — None means no data yet
