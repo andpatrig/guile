@@ -452,9 +452,9 @@ class _Badge(_Leaf):
 
 
 class _Spacer(_Leaf):
-    def __init__(self, h: Optional[int] = None, w: Optional[int] = None,
+    def __init__(self, h: Optional[int] = None, w_: Optional[int] = None,
                  fill: bool = False, key: Optional[str] = None):
-        self._h = h; self._w = w; self._fill = fill
+        self._h = h; self._w = w_; self._fill = fill
         super().__init__(key)
 
     def render(self) -> str:
@@ -1050,7 +1050,7 @@ class _DateTimeInput(_Leaf):
         self._style    = style
         _key           = _auto_key(key)
         initial        = value.value if isinstance(value, State) else (value or "")
-        self._state    = value if isinstance(value, State)                          else _get_or_create_state(_key, initial)
+        self._state    = value if isinstance(value, State) else _get_or_create_state(_key, initial)
         super().__init__(key)
         def _handler(v):
             self._state.set(v)
@@ -1676,8 +1676,8 @@ def _compute_theme_css(primary, bg, surface, surface_2,
 
     # Lighter shadow for light backgrounds, heavier for dark ones
     is_dark  = int(bg.lstrip("#")[:2], 16) < 100
-    sh_alpha = "(.3),0 4px 14px rgba(0,0,0,.4)" if is_dark                else "(.06),0 4px 14px rgba(0,0,0,.08)"
-
+    sh_alpha = "(.3),0 4px 14px rgba(0,0,0,.4)" if is_dark else "(.06),0 4px 14px rgba(0,0,0,.08)"
+    
     return (
         f"--primary:{primary};--primary-h:{primary_h};"
         f"--primary-light:{primary_light};"

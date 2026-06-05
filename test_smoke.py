@@ -13,7 +13,8 @@ What it tests:
 """
 
 import sys, os, io, traceback, importlib.util, types
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_here = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _here)
 
 import matplotlib
 matplotlib.use("Agg")
@@ -197,7 +198,7 @@ def check_for_set_in_ui(path):
 
 # ── Run everything ─────────────────────────────────────────────────────────
 
-EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "guile", "examples")
+EXAMPLES_DIR = os.path.join(_here, "examples")
 
 EXAMPLES = [
     "01_counter.py",

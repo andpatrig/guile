@@ -359,6 +359,20 @@ pre.code .id    { color: var(--text); }
 .install.copied .ip-copy .label-copy { display: none; }
 .install.copied .ip-copy .label-copied { display: inline; }
 
+
+.code-copy-btn {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  color: var(--text-3); padding: 3px 8px;
+  border: 1px solid var(--border); border-radius: 4px;
+  cursor: pointer; transition: color .12s, border-color .12s;
+}
+.code-copy-btn:hover { color: var(--accent-txt); border-color: var(--accent-txt); }
+.code-copy-btn .code-copied-label { display: none; }
+.code-copy-btn.copied { color: var(--green); border-color: var(--green); }
+.code-copy-btn.copied .code-copy-label { display: none; }
+.code-copy-btn.copied .code-copied-label { display: inline; }
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
@@ -389,7 +403,7 @@ pre.code .id    { color: var(--text); }
 <section class="hero" id="top">
   <div class="hero-inner">
     <div class="hero-stack">
-      <div class="eyebrow"><span class="dot"></span> v0.4.2 · MIT · Python ≥ 3.9</div>
+      <div class="eyebrow"><span class="dot"></span> v0.4.3 · MIT · Python ≥ 3.9</div>
       <div class="hero-wordmark">
         <span class="wordmark"><span class="gui">gui</span>le</span>
       </div>
@@ -398,7 +412,7 @@ pre.code .id    { color: var(--text); }
       </h1>
       <p class="hero-sub">
         A lightweight framework for the kind of internal dashboards, data explorers, and parameter
-        tools you need at work or at home. Write Python, get a native window —
+        tools you need at work or at home. Write Python, get a desktop window —
         no full-page re-execution on refresh, no nesting hell, no server.
       </p>
       <div class="cta-row">
@@ -456,7 +470,10 @@ pre.code .id    { color: var(--text); }
         <div class="win-bar">
           <div class="win-dots"><i></i><i></i><i></i></div>
           <div class="win-title">counter.py</div>
-          <div class="win-tabs"><span class="win-tab active">py</span></div>
+          <button class="code-copy-btn" id="code-copy-btn" aria-label="Copy code">
+            <span class="code-copy-label">COPY</span>
+            <span class="code-copied-label">COPIED</span>
+          </button>
         </div>
 <pre class="code"><code><span class="kw">import</span> <span class="id">guile</span> <span class="kw">as</span> <span class="id">gui</span>
 
@@ -464,21 +481,22 @@ pre.code .id    { color: var(--text); }
 
 <span class="punct">@</span><span class="id">gui</span><span class="punct">.</span><span class="fn">app</span><span class="punct">(</span><span class="str">"Counter"</span><span class="punct">,</span> <span class="id">width</span><span class="punct">=</span><span class="num">400</span><span class="punct">,</span> <span class="id">height</span><span class="punct">=</span><span class="num">300</span><span class="punct">)</span>
 <span class="kw">def</span> <span class="fn">ui</span><span class="punct">():</span>
-    <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">card</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">14</span><span class="punct">):</span>
-        <span class="id">gui</span><span class="punct">.</span><span class="fn">title</span><span class="punct">(</span><span class="str">"Counter"</span><span class="punct">)</span>
-        <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">row</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">16</span><span class="punct">):</span>
-            <span class="id">gui</span><span class="punct">.</span><span class="fn">button</span><span class="punct">(</span><span class="str">"−"</span><span class="punct">,</span> <span class="id">variant</span><span class="punct">=</span><span class="str">"secondary"</span><span class="punct">,</span>
-                       <span class="id">on_click</span><span class="punct">=</span><span class="kw">lambda</span><span class="punct">:</span> <span class="id">count</span><span class="punct">.</span><span class="fn">update</span><span class="punct">(</span><span class="kw">lambda</span> <span class="id">x</span><span class="punct">:</span> <span class="id">x</span><span class="punct"> - </span><span class="num">1</span><span class="punct">))</span>
-            <span class="id">gui</span><span class="punct">.</span><span class="fn">text</span><span class="punct">(</span><span class="id">count</span><span class="punct">,</span> <span class="id">size</span><span class="punct">=</span><span class="str">"2xl"</span><span class="punct">,</span> <span class="id">bold</span><span class="punct">=</span><span class="kw">True</span><span class="punct">)</span>
-            <span class="id">gui</span><span class="punct">.</span><span class="fn">button</span><span class="punct">(</span><span class="str">"+"</span><span class="punct">,</span>
-                       <span class="id">on_click</span><span class="punct">=</span><span class="kw">lambda</span><span class="punct">:</span> <span class="id">count</span><span class="punct">.</span><span class="fn">update</span><span class="punct">(</span><span class="kw">lambda</span> <span class="id">x</span><span class="punct">:</span> <span class="id">x</span><span class="punct"> + </span><span class="num">1</span><span class="punct">))</span>
+    <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">col</span><span class="punct">(</span><span class="id">align</span><span class="punct">=</span><span class="str">"center"</span><span class="punct">,</span> <span class="id">justify</span><span class="punct">=</span><span class="str">"center"</span><span class="punct">,</span> <span class="id">style</span><span class="punct">=</span><span class="str">"height:100vh"</span><span class="punct">):</span>
+        <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">card</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">14</span><span class="punct">):</span>
+            <span class="id">gui</span><span class="punct">.</span><span class="fn">title</span><span class="punct">(</span><span class="str">"Counter"</span><span class="punct">)</span>
+            <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">row</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">16</span><span class="punct">):</span>
+                <span class="id">gui</span><span class="punct">.</span><span class="fn">button</span><span class="punct">(</span><span class="str">"−"</span><span class="punct">,</span> <span class="id">variant</span><span class="punct">=</span><span class="str">"secondary"</span><span class="punct">,</span>
+                           <span class="id">on_click</span><span class="punct">=</span><span class="kw">lambda</span><span class="punct">:</span> <span class="id">count</span><span class="punct">.</span><span class="fn">update</span><span class="punct">(</span><span class="kw">lambda</span> <span class="id">x</span><span class="punct">:</span> <span class="id">x</span><span class="punct"> - </span><span class="num">1</span><span class="punct">))</span>
+                <span class="id">gui</span><span class="punct">.</span><span class="fn">text</span><span class="punct">(</span><span class="id">count</span><span class="punct">,</span> <span class="id">size</span><span class="punct">=</span><span class="str">"2xl"</span><span class="punct">,</span> <span class="id">bold</span><span class="punct">=</span><span class="kw">True</span><span class="punct">)</span>
+                <span class="id">gui</span><span class="punct">.</span><span class="fn">button</span><span class="punct">(</span><span class="str">"+"</span><span class="punct">,</span>
+                           <span class="id">on_click</span><span class="punct">=</span><span class="kw">lambda</span><span class="punct">:</span> <span class="id">count</span><span class="punct">.</span><span class="fn">update</span><span class="punct">(</span><span class="kw">lambda</span> <span class="id">x</span><span class="punct">:</span> <span class="id">x</span><span class="punct"> + </span><span class="num">1</span><span class="punct">))</span>
 </code></pre>
       </div>
       <div class="preview-window">
         <div class="win-bar">
           <div class="win-dots"><i></i><i></i><i></i></div>
           <div class="win-title">Counter — preview</div>
-          <div class="win-tabs"><span class="win-tab">native window</span></div>
+          <div class="win-tabs"><span class="win-tab">desktop window</span></div>
         </div>
         <div class="preview-body">
           <div class="fake-card">
@@ -494,7 +512,7 @@ pre.code .id    { color: var(--text); }
       </div>
     </div>
     <div class="qs-ships">
-      <span class="qs-ships-label">v0.1 ships with</span>
+      <span class="qs-ships-label">ships with</span>
       <span class="qs-ships-chip">4 built-in themes</span>
       <span class="qs-ships-chip">CSS grid layouts</span>
       <span class="qs-ships-chip">25+ widgets</span>
@@ -519,6 +537,21 @@ pre.code .id    { color: var(--text); }
     pill.addEventListener('click', copy);
     pill.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copy(); }
+    });
+  })();
+
+
+  // ── Code window: click to copy ────────────────────────────────────────
+  (function () {
+    const btn = document.getElementById('code-copy-btn');
+    if (!btn) return;
+    const code = document.querySelector('pre.code code').textContent;
+    let timer = null;
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(code); } catch (e) {}
+      btn.classList.add('copied');
+      clearTimeout(timer);
+      timer = setTimeout(() => btn.classList.remove('copied'), 1400);
     });
   })();
 

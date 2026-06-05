@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "guile"
-version = "0.4.2"
+version = "0.4.3"
 authors = [
   { name = "Andres Patrignani", email = "andrespatrignani@ksu.edu" },
 ]
-description = "A lightweight Python framework for building native desktop apps."
+description = "A lightweight Python framework for building desktop apps."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
@@ -26,7 +26,7 @@ classifiers = [
     "Intended Audience :: Developers",
 ]
 
-# pywebview is the native window engine.
+# pywebview manages the desktop window (WKWebView on Mac, WebView2 on Windows).
 # matplotlib is included because gui.figure() requires it and most users
 # of a desktop GUI framework will want plotting capability out of the box.
 # numpy and pandas are optional — only needed for scientific apps.
