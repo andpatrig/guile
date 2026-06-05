@@ -65,12 +65,17 @@ def ui():
 
 | File | What it shows |
 |------|--------------|
-| `01_counter.py` | State, buttons, badges |
-| `02_todo.py` | Lists, dynamic rendering, checkboxes |
-| `03_settings.py` | Sliders, selects, form layout |
-| `04_geo_data.py` | Matplotlib figure + Leaflet map |
-| `05_data_tools.py` | Table, date picker, file picker |
-| `06_soil_water.py` | Sliders driving a live chart |
+| `01_counter.py`             | State, buttons, badges                |
+| `02_todo.py`                | Lists, dynamic rendering, checkboxes  |
+| `03_settings.py`            | Sliders, selects, form layout         |
+| `04_mesonet_map.py`         | Leaflet map with markers              |
+| `05_weather_explorer.py`    | Table, date picker, file picker       |
+| `06_soils_lab.py`           | Lab data entry form                   |
+| `07_ks_mesonet.py`          | Live mesonet station data             |
+| `08_soil_water_retention.py`| Sliders driving a live chart          |
+| `09_upload_weather_data.py` | File picker, DataFrame, table         |
+| `10_canopeo.py`             | Image analysis                        |
+| `11_map_draw.py`            | Leaflet with draw tools               |
 
 ---
 
