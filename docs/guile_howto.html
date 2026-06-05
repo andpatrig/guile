@@ -98,6 +98,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
   <a href="#callbacks-vs-streamlit">vs Streamlit</a>
   <a href="#callbacks-pure">Keep functions pure</a>
   <a href="#callbacks-args">Passing arguments</a>
+  <div class="nav-cat">Patterns</div>
+  <a href="#pattern-tabs">Tabs</a>
 </nav>
 
 <main>
@@ -861,21 +863,79 @@ def ui():
 important here — it gives each button a stable DOM ID so the patcher
 can tell them apart when the list changes length.</p>
 </div>
-</main>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="pattern-tabs">
+<h2>Tabs</h2>
+
+<p><code>gui.tabs()</code> renders a tab strip and returns the active label
+as a plain string. It manages its own internal state — no
+<code>gui.state()</code> declaration at module level is needed. The active
+panel is a plain Python <code>if/elif</code> block on that string.</p>
+
+<pre>import guile as gui
+
+@gui.app("Dashboard", width=560, height=420)
+def ui():
+    with gui.col(padding=20, gap=14):
+        gui.title("Dashboard")
+
+        # gui.tabs() renders the strip and returns the active label.
+        # key= is required so the active tab survives re-renders.
+        tab = gui.tabs(["Overview", "Data", "Info"], key="main-tabs")
+
+        # Each panel is a plain if/elif block — only the active panel
+        # is rendered; the others don't exist in the DOM at all.
+        if tab == "Overview":
+            with gui.card(gap=8):
+                gui.text("Summary statistics here.")
+
+        elif tab == "Data":
+            with gui.card(padding=0, style="overflow-y:auto;max-height:280px"):
+                gui.table(records)
+
+        elif tab == "Info":
+            with gui.card(gap=6):
+                gui.text("Built with guile.", muted=True, size="sm")</pre>
+
+<div class="note">
+  Unlike a hidden-div approach, only the active panel is rendered at all.
+  Inactive panels cost nothing — no DOM nodes, no layout, no memory.
 </div>
 
-<script>
-// Active nav on scroll
-const io = new IntersectionObserver(entries => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-      const a = document.querySelector(`nav a[href="#${e.target.id}"]`);
-      if (a) { a.classList.add('active'); a.scrollIntoView({block:'nearest'}); }
-    }
-  });
-}, {rootMargin:'-10% 0px -80% 0px'});
-document.querySelectorAll('.section').forEach(el => io.observe(el));
-</script>
-</body>
-</html>
+<h3>Programmatic tab switching</h3>
+
+<p>When a callback needs to switch the active tab — for example, jumping
+to the Data tab automatically after a file loads — bind to an external
+<code>State</code> using <code>value=</code> and <code>on_change=</code>,
+the same pattern every other input widget uses:</p>
+
+<pre>import guile as gui
+
+active = gui.state("Overview")   # module level — controls the active tab
+
+def load_file(path):
+    records.set(load(path))
+    active.set("Data")           # jump to Data tab on load
+
+@gui.app("Dashboard", width=560, height=420)
+def ui():
+    with gui.col(padding=20, gap=14):
+        with gui.row(gap=8, align="center"):
+            gui.file_picker("Load CSV", on_change=load_file, key="fp")
+
+        # Pass the external State via value= and on_change= so the
+        # strip stays in sync with both user clicks and active.set().
+        gui.tabs(["Overview", "Data", "Info"],
+                 value=active, on_change=active.set, key="main-tabs")
+
+        if active.value == "Overview":
+            ...
+        elif active.value == "Data":
+            gui.table(records.value)</pre>
+
+<p>When using an external state, read <code>active.value</code> in the
+panel conditions (not the return value of <code>gui.tabs()</code>, which
+is only the initial value in that render).</p>
+</div>
+</main>

@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+guile/__init__.py
+guile/_app.py
+guile/_nodes.py
+guile/_template.py
+guile/py.typed
+guile/state.py
+guile/ui.py
+guile.egg-info/PKG-INFO
+guile.egg-info/SOURCES.txt
+guile.egg-info/dependency_links.txt
+guile.egg-info/requires.txt
+guile.egg-info/top_level.txt
+tests/test_smoke.py

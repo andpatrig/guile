@@ -1,3 +1,35 @@
+Metadata-Version: 2.4
+Name: guile
+Version: 0.3.1
+Summary: A lightweight Python framework for building native desktop apps.
+Author-email: Andres Patrignani <andrespatrignani@ksu.edu>
+License: MIT
+Project-URL: Homepage, https://andpatrig.github.io/guile
+Project-URL: Repository, https://github.com/andpatrig/guile
+Project-URL: Bug Tracker, https://github.com/andpatrig/guile/issues
+Project-URL: Changelog, https://github.com/andpatrig/guile/releases
+Keywords: gui,desktop,app,pywebview,reactive
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Software Development :: User Interfaces
+Classifier: Intended Audience :: Science/Research
+Classifier: Intended Audience :: Developers
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pywebview>=5.0
+Requires-Dist: matplotlib>=3.5
+Provides-Extra: science
+Requires-Dist: numpy>=1.21; extra == "science"
+Requires-Dist: pandas>=1.3; extra == "science"
+Provides-Extra: dev
+Requires-Dist: build; extra == "dev"
+Requires-Dist: twine; extra == "dev"
+
 # gui**le**
 
 A lightweight Python framework for building desktop apps.
@@ -118,8 +150,5 @@ v0.3.0
 Added notify and modal widgets
 Created new examples and improved existing examples
 
-v0.4.0
-Added tabs
-Fixed the datetime-local input to display in 24-hour format by setting lang="en-GB"
 
 MIT License

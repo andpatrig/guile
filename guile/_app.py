@@ -56,15 +56,30 @@ class _App:
         self._build     = None   # the ui() function supplied by the user
         self._window    = None   # pywebview window object
         self._ready     = False  # True after the page finishes loading
-        self._use_leaflet = False  # set to True by gui.leaflet()
-        self._rendering   = False  # True while a render is in progress
-        self._needs_render = False  # True if a render arrived while busy
+        self._use_leaflet      = False  # set to True by gui.leaflet()
+        self._use_leaflet_draw = False  # set to True by gui.leaflet(draw=...)
+        self._rendering        = False  # True while a render is in progress
+        self._needs_render     = False  # True if a render arrived while busy
 
     def run(self, build_fn: Callable):
         """Start the app. Blocks until the window is closed."""
         self._build = build_fn
         _App._current = self
         _reg_listener(self._rerender)  # re-render on every State change
+
+        # ── Silent probe ──────────────────────────────────────────────────
+        # Run ui() once before the window is created so that flag-setting
+        # side effects (e.g. _use_leaflet, _use_leaflet_draw) are captured
+        # before get_html() decides which <script>/<link> tags to include.
+        # Errors are suppressed — the real render will surface them later.
+        try:
+            _reset_render()
+            root = Column(fill=True)
+            root.__enter__()
+            self._build()
+            root.__exit__(None, None, None)
+        except Exception:
+            pass
 
         try:
             import webview
@@ -77,7 +92,9 @@ class _App:
         api = _Bridge(self)
         self._window = webview.create_window(
             title=self.title,
-            html=get_html(self.title, use_leaflet=self._use_leaflet),
+            html=get_html(self.title,
+                          use_leaflet=self._use_leaflet,
+                          use_leaflet_draw=self._use_leaflet_draw),
             js_api=api,
             width=self.width,
             height=self.height,
@@ -172,7 +189,8 @@ class _App:
             def do_GET(self):
                 if self.path == "/":
                     body = get_html(app_ref.title,
-                                    use_leaflet=app_ref._use_leaflet).encode()
+                                    use_leaflet=app_ref._use_leaflet,
+                                    use_leaflet_draw=app_ref._use_leaflet_draw).encode()
                 else:
                     _reset_render()
                     root = Column(fill=True)

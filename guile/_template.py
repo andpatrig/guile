@@ -190,6 +190,24 @@ body {
 }
 .guile-slider::-webkit-slider-thumb:active { transform: scale(1.15); }
 
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+.guile-tabs { width: 100%; }
+.guile-tab-strip {
+    display: flex; border-bottom: 1px solid var(--border);
+    overflow-x: auto; overflow-y: hidden;
+}
+.guile-tab-btn {
+    flex-shrink: 0; padding: 9px 18px;
+    font-size: 14px; font-weight: 500; font-family: inherit;
+    background: none; border: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    color: var(--text-2); cursor: pointer; white-space: nowrap; outline: none;
+    transition: color var(--t), border-color var(--t), background var(--t);
+}
+.guile-tab-btn:hover:not(.guile-tab-active) { color: var(--text); background: var(--surface-2); }
+.guile-tab-active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.guile-tab-btn:focus-visible { box-shadow: inset 0 0 0 2px rgba(99,102,241,.3); }
+
 /* ── Leaflet map container ──────────────────────────────────────────────── */
 /* Imperative toast injected by gui.notify() — no render cycle */
 .guile-notify {
@@ -318,6 +336,106 @@ function _guilePatch(oldNode, newNode) {
 
 var _guileMaps = {};
 
+// ── Attach / update map-level event listeners ─────────────────────────────
+// Called on first creation AND whenever cfgJson changes.
+// Compares stored cids to new ones; re-wires only when they differ
+// so duplicate listeners never accumulate.
+function _guileAttachMapEvents(entry, cfg) {
+    var map = entry.map;
+
+    // ── Map background click ──────────────────────────────────────────────
+    var newClickCid = cfg.on_click_cid || null;
+    if (entry.onClickCid !== newClickCid) {
+        map.off('click');
+        entry.onClickCid = newClickCid;
+        if (newClickCid) {
+            (function(cid) {
+                map.on('click', function(e) {
+                    _guile.trigger(cid, {lat: e.latlng.lat, lng: e.latlng.lng});
+                });
+            })(newClickCid);
+        }
+    }
+
+    // ── Pan / zoom end (debounced 150 ms) ────────────────────────────────
+    var newMoveCid = cfg.on_move_cid || null;
+    if (entry.onMoveCid !== newMoveCid) {
+        map.off('moveend');
+        entry.onMoveCid = newMoveCid;
+        if (newMoveCid) {
+            (function(cid) {
+                var _moveTimer = null;
+                map.on('moveend', function() {
+                    clearTimeout(_moveTimer);
+                    _moveTimer = setTimeout(function() {
+                        var c = map.getCenter();
+                        _guile.trigger(cid, {
+                            center: [c.lat, c.lng],
+                            zoom:   map.getZoom()
+                        });
+                    }, 150);
+                });
+            })(newMoveCid);
+        }
+    }
+
+    // ── Draw tools (Leaflet.draw plugin) ─────────────────────────────────
+    // Only set up once per map instance; tools don't change after creation.
+    var drawTools = cfg.draw || [];
+    if (drawTools.length > 0 && !entry.drawControl
+            && typeof L.Control.Draw !== 'undefined') {
+        var drawnItems = new L.FeatureGroup().addTo(map);
+        entry.drawnItems = drawnItems;
+
+        // Build per-tool options: tool enabled = {}, disabled = false
+        var toolOpts = {};
+        ['rectangle', 'polygon', 'polyline', 'circle', 'marker'].forEach(function(t) {
+            toolOpts[t] = drawTools.indexOf(t) >= 0 ? {} : false;
+        });
+        toolOpts.circlemarker = false; // always off (rarely useful)
+
+        var drawControl = new L.Control.Draw({
+            draw:   toolOpts,
+            edit:   { featureGroup: drawnItems }
+        });
+        map.addControl(drawControl);
+        entry.drawControl = drawControl;
+
+        // Wire draw:created → Python callback
+        var shapeCid = cfg.on_shape_cid || null;
+        if (shapeCid) {
+            (function(cid, items) {
+                map.on('draw:created', function(e) {
+                    var type  = e.layerType;
+                    var layer = e.layer;
+                    var coords;
+
+                    if (type === 'rectangle' || type === 'polygon'
+                            || type === 'polyline') {
+                        var lls = layer.getLatLngs();
+                        // polygon/rectangle: [[pt,...]], polyline: [pt,...]
+                        var pts = (lls.length === 1 && Array.isArray(lls[0]))
+                                  ? lls[0] : lls;
+                        coords = pts.map(function(ll) {
+                            return [ll.lat, ll.lng];
+                        });
+                    } else if (type === 'circle') {
+                        var c = layer.getLatLng();
+                        coords = {lat: c.lat, lng: c.lng,
+                                  radius: layer.getRadius()};
+                    } else { // marker, circlemarker
+                        var c = layer.getLatLng();
+                        coords = {lat: c.lat, lng: c.lng};
+                    }
+
+                    items.addLayer(layer); // keep drawn shape on the map
+                    _guile.trigger(cid, {type: type, coords: coords});
+                });
+            })(shapeCid, drawnItems);
+        }
+    }
+}
+
 function _guileSyncMaps() {
     if (typeof L === 'undefined') return;
     document.querySelectorAll('[data-guile-map]').forEach(function(el) {
@@ -333,12 +451,19 @@ function _guileSyncMaps() {
                 attribution: '© OpenStreetMap contributors', maxZoom: 19
             }).addTo(map);
             var lg = L.layerGroup().addTo(map);
-            _guileMaps[id] = { map: map, layerGroup: lg, cfgJson: cfgJson };
+            var entry = {
+                map: map, layerGroup: lg, cfgJson: cfgJson,
+                onClickCid: null, onMoveCid: null,
+                drawControl: null, drawnItems: null
+            };
+            _guileMaps[id] = entry;
+            _guileAttachMapEvents(entry, cfg);
             _guileApplyMarkers(lg, cfg.markers || []);
         } else if (_guileMaps[id].cfgJson !== cfgJson) {
             var entry = _guileMaps[id];
             entry.map.setView(cfg.center, cfg.zoom);
             entry.layerGroup.clearLayers();
+            _guileAttachMapEvents(entry, cfg);
             _guileApplyMarkers(entry.layerGroup, cfg.markers || []);
             entry.cfgJson = cfgJson;
         }
@@ -350,6 +475,15 @@ function _guileApplyMarkers(lg, markers) {
         var marker = L.marker(m.latlng);
         if (m.popup)   marker.bindPopup(m.popup);
         if (m.tooltip) marker.bindTooltip(m.tooltip);
+        // Wire marker click if a Python callback was registered.
+        if (m.cid) {
+            (function(cid) {
+                marker.on('click', function(e) {
+                    L.DomEvent.stopPropagation(e); // don't also fire map click
+                    _guile.trigger(cid, null);
+                });
+            })(m.cid);
+        }
         marker.addTo(lg);
     });
 }
@@ -414,25 +548,28 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 """
 
-_LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-_LEAFLET_JS  = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+_LEAFLET_CSS      = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+_LEAFLET_JS       = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+_LEAFLET_DRAW_CSS = "https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+_LEAFLET_DRAW_JS  = "https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"
 
 
-def get_html(title: str, use_leaflet: bool = False) -> str:
+def get_html(title: str, use_leaflet: bool = False,
+             use_leaflet_draw: bool = False) -> str:
     """Return the full base HTML page for the WebView window."""
     safe_title = title.replace("<", "&lt;").replace(">", "&gt;")
 
-    leaflet_head = (
-        f'<link rel="stylesheet" href="{_LEAFLET_CSS}">'
-        if use_leaflet else ""
-    )
-    leaflet_js = (
-        f'<script src="{_LEAFLET_JS}"></script>'
-        if use_leaflet else ""
-    )
+    leaflet_head = ""
+    leaflet_js   = ""
+    if use_leaflet:
+        leaflet_head = f'<link rel="stylesheet" href="{_LEAFLET_CSS}">'
+        leaflet_js   = f'<script src="{_LEAFLET_JS}"></script>'
+        if use_leaflet_draw:
+            leaflet_head += f'\n<link rel="stylesheet" href="{_LEAFLET_DRAW_CSS}">'
+            leaflet_js   += f'\n<script src="{_LEAFLET_DRAW_JS}"></script>'
 
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">

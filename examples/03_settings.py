@@ -8,7 +8,7 @@ Run:
     python examples/03_settings.py
 """
 
-import sys, os
+import sys, os, random
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import guile as gui
@@ -24,6 +24,11 @@ note_text   = gui.state("")
 priority    = gui.state(3.0)
 start_date  = gui.state("")
 
+# ── File I/O state ─────────────────────────────────────────────────────────
+file_text   = gui.state("")
+file_path   = gui.state("")
+file_status = gui.state("")
+
 COLOR_MAP = {
     "Indigo": "#6366f1",
     "Rose":   "#f43f5e",
@@ -31,8 +36,53 @@ COLOR_MAP = {
     "Amber":  "#f59e0b",
 }
 
+# ── Sample table data (wide + tall → forces both scroll axes) ──────────────
+# Generated once at import time so the table is stable across re-renders.
+random.seed(42)
+_STATIONS = ["Manhattan", "Hays", "Colby", "Garden City", "Dodge City",
+             "Liberal", "Hutchinson", "Salina", "Abilene", "Emporia"]
+TABLE_DATA = [
+    {
+        "Station":        _STATIONS[i % len(_STATIONS)],
+        "Date":           f"2024-06-{i + 1:02d}",
+        "Temp Max (°C)":  round(20 + random.uniform(-4, 14), 1),
+        "Temp Min (°C)":  round(10 + random.uniform(-4, 9),  1),
+        "Wind (m/s)":     round(random.uniform(0, 12),        1),
+        "Gust (m/s)":     round(random.uniform(5, 18),        1),
+        "Rain (mm)":      round(random.uniform(0, 30),        1),
+        "Humidity (%)":   round(random.uniform(30, 95),       1),
+        "Pressure (hPa)": round(1000 + random.uniform(-20, 20), 1),
+        "Solar (W/m²)":   int(random.uniform(80, 820)),
+        "ET₀ (mm)":       round(random.uniform(0, 8),         2),
+    }
+    for i in range(30)
+]
+
+# ── File I/O callbacks ─────────────────────────────────────────────────────
+def open_file(path):
+    if not path:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            file_text.set(f.read())
+        file_path.set(path)
+        file_status.set(f"Opened  {os.path.basename(path)}")
+    except Exception as e:
+        file_status.set(f"Error: {e}")
+
+def save_file(path):
+    if not path:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(file_text.value)
+        file_status.set(f"Saved  {os.path.basename(path)}")
+    except Exception as e:
+        file_status.set(f"Save error: {e}")
+
+
 # ── App ────────────────────────────────────────────────────────────────────
-@gui.app("Widget Showcase", width=560, height=900)
+@gui.app("Widget Showcase", width=560, height=1200)
 def ui():
     gui.theme(theme_name.value)
 
@@ -41,7 +91,7 @@ def ui():
         gui.text("Each card shows a widget and its live output.",
                  muted=True, size="sm")
 
-        # ── select → changes the app theme live
+        # ── select → changes the app theme live ────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.select()", bold=True, size="sm", muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
@@ -54,7 +104,7 @@ def ui():
                 bold=True, style="color:var(--primary)"
             )
 
-        # ── slider → live font size preview
+        # ── slider → live font size preview ────────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.slider()", bold=True, size="sm", muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
@@ -65,7 +115,7 @@ def ui():
                 style=f"font-size:{font_size.value:.0f}px"
             )
 
-        # ── number_input → opacity bar
+        # ── number_input → opacity bar ──────────────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.number_input()", bold=True, size="sm", muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
@@ -79,7 +129,7 @@ def ui():
                 f'transition:opacity .2s"></div>'
             )
 
-        # ── checkbox → live toggle
+        # ── checkbox → live toggle ──────────────────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.checkbox()", bold=True, size="sm", muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
@@ -90,7 +140,7 @@ def ui():
             else:
                 gui.badge("Access denied", variant="danger")
 
-        # ── select with color preview
+        # ── select with color preview ───────────────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.select()  — colour picker", bold=True, size="sm",
                      muted=True,
@@ -108,7 +158,7 @@ def ui():
                 f'</div>'
             )
 
-        # ── multiselect → tag cloud
+        # ── multiselect → tag cloud ─────────────────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.multiselect()", bold=True, size="sm", muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
@@ -129,7 +179,7 @@ def ui():
             else:
                 gui.text("No skills selected", muted=True, size="sm")
 
-        # ── textarea → character count
+        # ── textarea → character count ──────────────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.textarea()", bold=True, size="sm", muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
@@ -139,7 +189,7 @@ def ui():
             gui.text(f"{n} character{'s' if n != 1 else ''}",
                      muted=True, size="sm")
 
-        # ── date_input → days from today
+        # ── date_input → days from today ────────────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.date_input()", bold=True, size="sm", muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
@@ -160,7 +210,7 @@ def ui():
                 except ValueError:
                     pass
 
-        # ── progress bar
+        # ── progress bar ────────────────────────────────────────────────────
         with gui.card(gap=10):
             gui.text("gui.progress()", bold=True, size="sm", muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
@@ -169,3 +219,109 @@ def ui():
             gui.progress(priority.value, max=100)
             gui.text(f"{priority.value:.0f}%", bold=True,
                      style="color:var(--primary)")
+
+        # ── tabs ─────────────────────────────────────────────────────────────
+        # gui.tabs() manages its own state — no module-level gui.state() needed.
+        # Returns the active label as a plain string; use it in if/elif.
+        with gui.card(gap=12):
+            gui.text("gui.tabs()", bold=True, size="sm", muted=True,
+                     style="text-transform:uppercase;letter-spacing:.06em")
+
+            tab = gui.tabs(["Overview", "Stats", "Info"], key="showcase-tabs")
+
+            if tab == "Overview":
+                gui.text("Current widget values", bold=True)
+                gui.text(f"Theme: {theme_name.value}  ·  "
+                         f"Font: {font_size.value:.0f}px  ·  "
+                         f"Opacity: {opacity.value:.0f}%", size="sm")
+                gui.text(f"Agreed: {agree.value}  ·  "
+                         f"Colour: {color_mode.value}  ·  "
+                         f"Tags: {len(tags.value)}", size="sm")
+
+            elif tab == "Stats":
+                with gui.row(gap=12):
+                    for label, val in [
+                        ("Font",    f"{font_size.value:.0f}px"),
+                        ("Opacity", f"{opacity.value:.0f}%"),
+                        ("Tags",    str(len(tags.value))),
+                        ("Note",    f"{len(note_text.value)} ch"),
+                    ]:
+                        with gui.card(gap=4, padding=12,
+                                      style="flex:1;text-align:center;"
+                                            "background:var(--surface-2)"):
+                            gui.text(val, bold=True, size="lg",
+                                     style="color:var(--primary)")
+                            gui.text(label, muted=True, size="sm")
+
+            elif tab == "Info":
+                gui.text(
+                    "gui.tabs() returns the active label as a plain string. "
+                    "Use it directly in if/elif — no .value needed.",
+                    size="sm",
+                )
+                gui.text(
+                    'tab = gui.tabs(["A","B","C"], key="t")\nif tab == "A": ...',
+                    size="sm", mono=True, style="color:var(--primary)",
+                )
+
+        # ── table with both scroll axes ────────────────────────────────────
+        # Horizontal scroll: the guile-table-wrap already has overflow-x:auto.
+        # Vertical scroll:   constrain the card height with overflow-y:auto.
+        # Together they give a spreadsheet-like viewport on both axes.
+        with gui.card(gap=10):
+            gui.text("gui.table()  — horizontal + vertical scroll",
+                     bold=True, size="sm", muted=True,
+                     style="text-transform:uppercase;letter-spacing:.06em")
+            gui.text(
+                f"{len(TABLE_DATA)} rows × {len(TABLE_DATA[0])} columns  "
+                f"— scroll right for more columns, down for more rows.",
+                size="sm", muted=True,
+            )
+
+            # padding=0 so the table borders meet the card edges cleanly.
+            # overflow-y:auto + max-height gives the vertical scroll viewport.
+            # overflow-x:auto is already on .guile-table-wrap in the CSS.
+            with gui.card(padding=0,
+                          style="overflow-y:auto;max-height:240px"):
+                gui.table(TABLE_DATA)
+
+        # ── file picker — read and save ────────────────────────────────────
+        # gui.file_picker() opens the OS native dialog.
+        # save=True switches to a save dialog.
+        # The on_change callback receives the chosen path as a string.
+        # Reading / writing the actual file is plain Python — guile stays
+        # out of the way of your I/O logic.
+        with gui.card(gap=12):
+            gui.text("gui.file_picker()  — read & save",
+                     bold=True, size="sm", muted=True,
+                     style="text-transform:uppercase;letter-spacing:.06em")
+
+            with gui.row(gap=8, align="center"):
+                gui.file_picker(
+                    "Open file",
+                    file_types=("Text files (*.txt)", "All files (*.*)"),
+                    on_change=open_file,
+                    key="fp-open",
+                )
+                gui.file_picker(
+                    "Save as…",
+                    save=True,
+                    file_types=("Text files (*.txt)", "All files (*.*)"),
+                    disabled=not file_text.value,
+                    on_change=save_file,
+                    key="fp-save",
+                )
+
+            if file_status.value:
+                gui.text(file_status.value, muted=True, size="sm")
+
+            # The textarea is always visible so the user can type freely
+            # and save without opening a file first.
+            gui.textarea(
+                "Content",
+                placeholder="Open a file above, or type here and save…",
+                value=file_text,
+                on_change=file_text.set,
+                rows=6,
+                key="fp-text",
+            )

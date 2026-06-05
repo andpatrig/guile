@@ -1151,6 +1151,61 @@ class _FilePicker(_Leaf):
                 f' style="{dis_style}" onclick="{js}"{dis_attr}>📁 {lbl_html}</button>')
 
 
+class _Tabs(_Leaf):
+    """
+    Tab strip navigation. Manages its own internal state — no gui.state()
+    declaration needed. Returns .value (str), the active tab label.
+    Always supply key= so the active tab survives re-renders.
+
+        tab = gui.tabs(["Overview", "Data", "Info"], key="t")
+        if tab == "Overview":
+            ...
+        elif tab == "Data":
+            gui.table(records)
+
+    For programmatic switching, bind to an external State:
+
+        active = gui.state("Overview")
+        gui.tabs(["Overview", "Data"], value=active,
+                 on_change=active.set, key="t")
+        # from a callback: active.set("Data")
+    """
+    def __init__(self, labels: list, *,
+                 value: Optional[Union[str, State]] = None,
+                 on_change: Optional[Callable] = None,
+                 style: str = "", key: Optional[str] = None):
+        self._labels = [str(l) for l in labels]
+        self._style  = style
+        _key         = _auto_key(key)
+        initial      = (value.value if isinstance(value, State)
+                        else (value if value is not None
+                              else (self._labels[0] if self._labels else "")))
+        self._state  = (value if isinstance(value, State)
+                        else _get_or_create_state(_key, initial))
+        super().__init__(key)
+        def _handler(v):
+            self._state.set(v)
+            if on_change: on_change(v)
+        _reg(self.id, _handler)
+
+    @property
+    def value(self) -> str: return self._state.value
+    def set(self, v: str):   self._state.set(str(v))
+    def update(self, fn):    self._state.update(fn)
+
+    def render(self) -> str:
+        active = self._state.value
+        buttons = "".join(
+            f'<button class="guile-tab-btn{" guile-tab-active" if l == active else ""}"'
+            f' onclick="window._guile.trigger(\'{self.id}\',\'{_esc(l)}\')">'
+            f'{_txt(l)}</button>'
+            for l in self._labels
+        )
+        return (f'<div id="{self.id}" class="guile-tabs" style="{self._style}">'
+                f'<div class="guile-tab-strip">{buttons}</div>'
+                f'</div>')
+
+
 # ── Data widget ────────────────────────────────────────────────────────────
 
 class _Table(_Leaf):
@@ -1356,16 +1411,22 @@ class Marker:
     """
     A map marker for gui.leaflet().
         Marker((lat, lon), popup="Hello", tooltip="hover text")
+        Marker((lat, lon), on_click=lambda: ...)
     """
     def __init__(self, latlng: tuple, popup: Optional[str] = None,
-                 tooltip: Optional[str] = None):
+                 tooltip: Optional[str] = None,
+                 on_click: Optional[Callable] = None):
         self.latlng  = latlng
         self.popup   = popup
         self.tooltip = tooltip
+        self._cid    = None
+        if on_click:
+            self._cid = _next_id()
+            _reg(self._cid, on_click)
 
     def to_dict(self) -> dict:
         return {"latlng": list(self.latlng), "popup": self.popup,
-                "tooltip": self.tooltip}
+                "tooltip": self.tooltip, "cid": self._cid}
 
 
 class _Map(_Leaf):
@@ -1373,24 +1434,85 @@ class _Map(_Leaf):
     Interactive Leaflet map. Requires internet for tile loading.
     User pan/zoom is preserved across re-renders.
     Always supply key= so the map instance persists correctly.
+
+    Callbacks:
+        on_click(lat, lon)        — user clicks the map background
+        on_move(center, zoom)     — pan/zoom ends; center=(lat,lon), zoom=int
+        on_shape(type, coords)    — shape drawn via draw tools;
+                                    type: "rectangle"|"polygon"|"polyline"|
+                                          "circle"|"marker"
+                                    coords: list of [lat,lon] pairs for
+                                            polygon/rectangle/polyline;
+                                            {"lat","lng","radius"} for circle;
+                                            {"lat","lng"} for marker
+        Marker(..., on_click=fn)  — user clicks a specific marker
+
+    Draw tools:
+        draw=["rectangle","polygon"]  — enable specific tools
+        draw=True                     — enable all tools
+        draw=False / draw=[]          — no tools (default)
     """
+    _DRAW_ALL = ["rectangle", "polygon", "polyline", "circle", "marker"]
+
     def __init__(self, *, center: tuple = (0.0, 0.0), zoom: int = 10,
                  height: int = 380, markers: Optional[list] = None,
+                 on_click: Optional[Callable] = None,
+                 on_move:  Optional[Callable] = None,
+                 on_shape: Optional[Callable] = None,
+                 draw: Any = False,
                  style: str = "", key: Optional[str] = None):
-        self._center  = center
-        self._zoom    = zoom
-        self._height  = height
-        self._markers = markers or []
-        self._style   = style
+        self._center   = center
+        self._zoom     = zoom
+        self._height   = height
+        self._markers  = markers or []
+        self._on_click = on_click
+        self._on_move  = on_move
+        self._on_shape = on_shape
+        self._style    = style
+
+        # Normalise draw tools
+        if draw is True:
+            self._draw = self._DRAW_ALL[:]
+        elif not draw:
+            self._draw = []
+        else:
+            self._draw = [t for t in draw if t in self._DRAW_ALL]
+
         super().__init__(key)
+
+        # Use stable suffixed cids derived from self.id (stable because key= is set).
+        if on_click:
+            self._on_click_cid = self.id + "-click"
+            _reg(self._on_click_cid,
+                 lambda v: on_click(v["lat"], v["lng"]))
+        else:
+            self._on_click_cid = None
+
+        if on_move:
+            self._on_move_cid = self.id + "-move"
+            _reg(self._on_move_cid,
+                 lambda v: on_move(tuple(v["center"]), int(v["zoom"])))
+        else:
+            self._on_move_cid = None
+
+        if on_shape:
+            self._on_shape_cid = self.id + "-shape"
+            _reg(self._on_shape_cid,
+                 lambda v: on_shape(v["type"], v["coords"]))
+        else:
+            self._on_shape_cid = None
 
     def render(self) -> str:
         import json
         cfg = {
-            "center":  list(self._center),
-            "zoom":    self._zoom,
-            "markers": [m.to_dict() if isinstance(m, Marker) else m
-                        for m in self._markers],
+            "center":       list(self._center),
+            "zoom":         self._zoom,
+            "markers":      [m.to_dict() if isinstance(m, Marker) else m
+                             for m in self._markers],
+            "on_click_cid": self._on_click_cid,
+            "on_move_cid":  self._on_move_cid,
+            "on_shape_cid": self._on_shape_cid,
+            "draw":         self._draw,
         }
         cfg_json = _esc(json.dumps(cfg))
         return (f'<div id="{self.id}" class="guile-map"'

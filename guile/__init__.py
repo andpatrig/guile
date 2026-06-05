@@ -41,7 +41,7 @@ from .ui import (
     _Text, _Title, _Badge, _Spacer, _Divider, _ProgressBar, _Html,
     # Inputs
     _Button, _Input, _NumberInput, _TextArea, _Checkbox, _Select, _MultiSelect, _Slider,
-    _DateInput, _DateTimeInput, _FilePicker,
+    _DateInput, _DateTimeInput, _FilePicker, _Tabs,
     # Media
     _Figure, _Map, Marker,
     # Data
@@ -317,6 +317,40 @@ def file_picker(label: str = "Choose file…", *,
                        on_change=on_change, style=style, key=key)
 
 
+def tabs(labels: list, *, value: Optional[Union[str, State]] = None,
+         on_change: Optional[Callable] = None,
+         style: str = "", key: Optional[str] = None) -> str:
+    """
+    Tab strip. Returns the active tab label as a plain string.
+    Manages its own internal state — no gui.state() declaration needed.
+    Always provide key= so the active tab survives re-renders.
+
+    Basic usage:
+
+        tab = gui.tabs(["Overview", "Data", "Info"], key="main")
+
+        if tab == "Overview":
+            gui.text("Summary content")
+        elif tab == "Data":
+            gui.table(records)
+        elif tab == "Info":
+            gui.text("About this app")
+
+    Programmatic switching — bind to an external State so a callback
+    can change the active tab:
+
+        active = gui.state("Overview")
+        gui.tabs(["Overview", "Data"], value=active,
+                 on_change=active.set, key="main")
+
+        def after_load(path):
+            records.set(load(path))
+            active.set("Data")   # jump to Data tab on load
+    """
+    return _Tabs(labels, value=value, on_change=on_change,
+                 style=style, key=key).value
+
+
 # ── Data ───────────────────────────────────────────────────────────────────
 
 def table(data: Any, *, columns: Optional[list] = None,
@@ -349,12 +383,44 @@ def figure(fig, *, dpi: int = 96, width: str = "100%",
 
 def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
             height: int = 380, markers: Optional[list] = None,
+            on_click:  Optional[Callable] = None,
+            on_move:   Optional[Callable] = None,
+            on_shape:  Optional[Callable] = None,
+            draw: Any = False,
             style: str = "", key: Optional[str] = None) -> _Map:
-    """Embed an interactive Leaflet map (OpenStreetMap tiles). Requires internet."""
+    """
+    Embed an interactive Leaflet map (OpenStreetMap tiles). Requires internet.
+
+    Callbacks:
+        on_click(lat, lon)      — fires when the user clicks the map background
+        on_move(center, zoom)   — fires after pan/zoom ends;
+                                  center=(lat, lon) tuple, zoom=int
+        on_shape(type, coords)  — fires when a shape is drawn (requires draw=);
+                                  type: "rectangle"|"polygon"|"polyline"|
+                                        "circle"|"marker"
+                                  coords: [[lat,lon], ...] for polygon/rect/polyline;
+                                          {"lat","lng","radius"} for circle;
+                                          {"lat","lng"} for marker
+
+    Draw tools:
+        draw=["rectangle","polygon"]  — show specific drawing tools
+        draw=True                     — show all tools (rectangle, polygon,
+                                        polyline, circle, marker)
+        draw=False                    — no tools (default)
+
+    Per-marker callbacks:
+        gui.Marker((lat, lon), on_click=fn)
+
+    Always supply key= when using any callback so the element ID is stable
+    across renders — callback cids are derived from that ID.
+    """
     if _App._current:
         _App._current._use_leaflet = True
+        if draw:
+            _App._current._use_leaflet_draw = True
     return _Map(center=center, zoom=zoom, height=height,
-                markers=markers, style=style, key=key)
+                markers=markers, on_click=on_click, on_move=on_move,
+                on_shape=on_shape, draw=draw, style=style, key=key)
 
 
 
