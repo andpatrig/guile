@@ -254,16 +254,19 @@ None of those lines touch the code you already wrote.
     <div class="doc-card p3-card">
       <p style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#712B13;margin:0 0 4px 0">3 · Callback</p>
       <p style="font-size:12px;line-height:1.55;color:#993C1D;margin:0">Responds to user actions. Reads state through <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.value</code>, calls your existing functions, stores results with <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.set()</code>, then Guile automatically re-renders the UI.</p>
+      <p style="padding-top:5px; font-size:12px;color:var(--text-2);font-style:italic;line-height:1.5">💡 In this particular example, the callback aggregates the computation of Celsius and the water phase. Use custom callbacks like this whenever multiple states or UI updates must happen together from a single user action.</p>
+
     </div>
-    
+
     <div class="doc-card p4-card">
       <p style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0C447C;margin:0 0 4px 0">4 · Layout</p>
       <p style="font-size:12px;line-height:1.55;color:#185FA5;margin:0">Reads <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.value</code> to display state and passes callbacks by reference (for example, <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">on_change=fahrenheit.set</code>). Never call <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.set()</code> directly inside <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">ui()</code>, or it will run on every render and create a render loop.</p>
+      <p style="padding-top:5px; font-size:12px;color:var(--text-2);font-style:italic;line-height:1.5">💡 you group structural elements using <code style="font-size:11px;color: #0f6e56;font-weight:bold;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">with:</code> blocks, such as <code style="font-size:11px;color: #0f6e56;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">with gui.card(gap=10):</code></p>
+
     </div>
     
-    <div style="padding:4px 0;font-size:12px;color:var(--text-2);font-style:italic;line-height:1.5">
-      💡 In this particular example, the callback aggregates the computation of Celsius and the water phase. Use custom callbacks like this whenever multiple states or UI updates must happen together from a single user action.
-    </div>
+
+
   </div>
 </div>
 
