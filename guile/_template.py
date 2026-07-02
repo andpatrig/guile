@@ -508,6 +508,12 @@ window._guile = {
             _guilePatch(oldEl.children[0], newEl);
         }
         _guileSyncMaps();
+        // Invalidate any map that is now visible — fixes blank maps in tabs.
+        // Leaflet measures the container at init time; if the tab was hidden
+        // it gets 0x0 and never recovers until invalidateSize() is called.
+        Object.values(_guileMaps).forEach(function(entry) {
+            entry.map.invalidateSize();
+        });
     },
     trigger: function(cid, value) {
         var hasApi = !!(window.pywebview && window.pywebview.api);

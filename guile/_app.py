@@ -47,11 +47,13 @@ class _App:
     _current: Optional["_App"] = None
 
     def __init__(self, title: str, *, width: int = 800, height: int = 600,
-                 resizable: bool = False, debug: bool = False):
+                 resizable: bool = False, center: bool = False,
+                 debug: bool = False):
         self.title      = title
         self.width      = width
         self.height     = height
         self.resizable  = resizable
+        self.center     = center
         self.debug      = debug
         self._build     = None   # the ui() function supplied by the user
         self._window    = None   # pywebview window object
@@ -61,20 +63,33 @@ class _App:
         self._rendering        = False  # True while a render is in progress
         self._needs_render     = False  # True if a render arrived while busy
 
+    def _make_root(self) -> Column:
+        """
+        Build the root container that wraps the user's ui().
+
+        With center=True the root fills the window and centres its children
+        on both axes — the same effect as wrapping everything in
+        gui.col(align="center", justify="center", style="min-height:100vh"),
+        but without the boilerplate. Handy for small single-card apps.
+        """
+        if self.center:
+            return Column(fill=True, align="center", justify="center",
+                          style="min-height:100vh")
+        return Column(fill=True)
+
     def run(self, build_fn: Callable):
         """Start the app. Blocks until the window is closed."""
         self._build = build_fn
         _App._current = self
         _reg_listener(self._rerender)  # re-render on every State change
 
-        # ── Silent probe ──────────────────────────────────────────────────
-        # Run ui() once before the window is created so that flag-setting
-        # side effects (e.g. _use_leaflet, _use_leaflet_draw) are captured
-        # before get_html() decides which <script>/<link> tags to include.
-        # Errors are suppressed — the real render will surface them later.
+        # Run ui() once before the window exists so flag-setting side effects
+        # (e.g. gui.leaflet() → _use_leaflet) are captured before get_html()
+        # decides which <script>/<link> tags to include. Errors are swallowed;
+        # the real render surfaces them later.
         try:
             _reset_render()
-            root = Column(fill=True)
+            root = self._make_root()
             root.__enter__()
             self._build()
             root.__exit__(None, None, None)
@@ -129,16 +144,12 @@ class _App:
 
     def _render(self):
         """
-        Run ui(), serialize to HTML, push to the browser via evaluate_js.
+        Run ui(), serialize to HTML, and push it to the browser via evaluate_js.
 
-        Uses a loop (not recursion) to handle renders that arrive while
-        a render is in progress. The loop runs at most twice — once for
-        the current render, and once if _needs_render was set during it.
-
-        Important: ui() must not call state.set() unconditionally.
-        Doing so fires _rerender() during a render, sets _needs_render,
-        and the follow-up render repeats the same set(), looping forever.
-        Use on_change= or on_click= callbacks instead.
+        A render that arrives mid-render sets _needs_render instead of
+        recursing; the loop then runs at most once more. Note: ui() must not
+        call state.set() unconditionally — that would fire _rerender() during
+        a render and loop forever. Use on_change=/on_click= callbacks instead.
         """
         if not self._build or not self._window or not self._ready:
             return
@@ -150,7 +161,7 @@ class _App:
             self._needs_render = False
             try:
                 _reset_render()
-                root = Column(fill=True)
+                root = self._make_root()
                 root.__enter__()
                 self._build()
                 root.__exit__(None, None, None)
@@ -162,9 +173,8 @@ class _App:
                 traceback.print_exc()
             finally:
                 self._rendering = False
-            # If a state change arrived while we were rendering, run
-            # one more render. But if that render also sets state, stop —
-            # two renders is enough to stabilise and avoids infinite loops.
+            # One follow-up render is enough to absorb a state change that
+            # arrived mid-render; a second would risk an infinite loop.
             if self._needs_render:
                 self._needs_render = False
             else:
@@ -193,7 +203,7 @@ class _App:
                                     use_leaflet_draw=app_ref._use_leaflet_draw).encode()
                 else:
                     _reset_render()
-                    root = Column(fill=True)
+                    root = app_ref._make_root()
                     root.__enter__()
                     app_ref._build()
                     root.__exit__(None, None, None)

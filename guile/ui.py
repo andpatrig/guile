@@ -62,20 +62,12 @@ def _attach(node: "Node"):
 
 # ── ID counter + callback registry ────────────────────────────────────────
 #
-# Why two dicts?
-#
-# The problem: every render pass calls _reset_render() which clears
-# _callbacks, then rebuilds it as each widget is constructed. But clicks
-# can arrive from the WebView at any moment — including mid-render, when
-# _callbacks is half-built or empty.
-#
-# The solution: _callbacks is the scratch pad built during each render.
-# _live_callbacks is a committed snapshot from the last *completed* render.
-# dispatch() always reads from _live_callbacks, so clicks always find their
-# handler — even if a new render is currently in progress.
-#
-# Both dicts are mutated in place (never reassigned) so all importers
-# always hold a reference to the same live object.
+# Clicks can arrive from the WebView mid-render, when the callback table is
+# half-built. So we keep two: _callbacks is the scratch pad rebuilt during each
+# render; _live_callbacks is the committed snapshot from the last completed
+# render. dispatch() always reads _live_callbacks, so a click always finds its
+# handler. Both are mutated in place (never reassigned) so importers keep a
+# reference to the same live object.
 
 _id_counter:    int  = 0
 _callbacks:       dict = {}  # scratch — rebuilt every render
@@ -112,17 +104,10 @@ def _reg(cid: str, fn: Callable):
 
 def dispatch_silent(cid: str, value: Any = None):
     """
-    Call the handler for cid but bypass State._fire() so no re-render occurs.
-    The handler must call state.set_silent() instead of state.set().
-    Used by multiselect onchange to keep state current mid-selection.
+    Call cid's silent handler, if any, without triggering a re-render.
+    The handler updates state via set_silent(). Used by multiselect onchange
+    to keep .value current while the user is mid-selection.
     """
-    fn = _live_callbacks.get(cid)
-    if not fn:
-        return
-    # Temporarily patch set → set_silent on all State objects touched
-    # by routing through a wrapper that intercepts the final .set() call.
-    # Simpler: store the value directly via a dedicated silent handler
-    # registered alongside the normal handler.
     silent_fn = _silent_callbacks.get(cid)
     if silent_fn:
         try:
@@ -136,14 +121,9 @@ def dispatch(cid: str, value: Any = None):
     """
     Call the live handler for cid. Used by _Bridge in _app.py.
 
-    Two handler shapes exist:
-      - Input widgets (slider, text, select, checkbox): handler(value)
-      - Buttons and file picker: handler()  — zero arguments
-
-    Strategy: if value is not None, try handler(value) first.
-    If that raises TypeError (zero-arg handler), fall back to handler().
-    If value is None, try handler() first; if that raises TypeError
-    (one-arg handler that requires a value), skip — nothing useful to pass.
+    Handlers come in two shapes: input widgets take one arg, handler(value);
+    buttons and the file picker take none, handler(). We try the shape that
+    matches whether a value arrived and fall back on TypeError.
     """
     fn = _live_callbacks.get(cid)
     if not fn:
@@ -245,15 +225,13 @@ _auto_key_counter: int = 0
 
 def _auto_key(key: Optional[str]) -> str:
     """
-    Return key if provided, otherwise assign the next counter value.
+    Return key if given, otherwise the next counter value.
 
-    The counter is reset at the start of every render pass and increments
-    once per stateful widget. Because ui() executes the same widgets in
-    the same order on every render, counter position N always maps to the
-    same widget — making the key stable without any file or line introspection.
-
-    Use explicit key= inside loops or conditionals where the widget set
-    can vary between renders.
+    The counter resets each render and increments once per stateful widget.
+    Since ui() runs the same widgets in the same order every render, position
+    N always maps to the same widget — a stable key with no line introspection.
+    Pass an explicit key= inside loops or conditionals, where the widget set
+    can change between renders.
     """
     global _auto_key_counter
     _auto_key_counter += 1
@@ -502,8 +480,6 @@ class _Html(_Leaf):
 
 # ── Theme helper ───────────────────────────────────────────────────────────
 
-# Built-in themes.  Each is a minimal dict of the six core variables;
-# derived shades (--primary-h, --primary-light, etc.) are computed automatically.
 class _Theme(_Leaf):
     """
     Injects a <style> block that overrides the design token CSS variables.

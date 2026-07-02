@@ -104,6 +104,7 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.5.0** — Added center=True to app window. Improved code structure in how-to page.
 
 **v0.4.0** — Added tabs. Fixed `datetime-local` input to display in 24-hour format.
 

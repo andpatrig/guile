@@ -5,20 +5,18 @@ Quick start:
 
     import guile as gui
 
-    count = gui.state(0)
+    def to_celsius(f):
+        return round((f - 32) * 5 / 9, 1)
 
-    @gui.app("Counter", width=400, height=300)
+    fahrenheit = gui.state(32.0)
+
+    @gui.app("Converter", width=360, height=300, center=True)
     def ui():
-        with gui.col(align="center", justify="center", style="height:100vh"):
-            with gui.card(gap=14):
-                gui.title("Counter")
-                with gui.row(gap=16, align="center", justify="center"):
-                    gui.button("−", variant="secondary",
-                               on_click=lambda: count.update(lambda x: x - 1))
-                    gui.text(count, size="2xl", bold=True,
-                             style="min-width:64px;text-align:center")
-                    gui.button("+",
-                               on_click=lambda: count.update(lambda x: x + 1))
+        with gui.card(gap=16):
+            gui.title("Temperature converter")
+            gui.slider("°F", value=fahrenheit, on_change=fahrenheit.set,
+                       min=0, max=212)
+            gui.text(f"{to_celsius(fahrenheit.value)} °C", size="2xl", bold=True)
 
 Five source files:
     state.py     — reactive State class
@@ -590,7 +588,7 @@ def theme(
 # ── App decorator ───────────────────────────────────────────────────────────
 
 def app(title_: str = "Guile App", *, width: int = 800, height: int = 600,
-        resizable: bool = False, debug: bool = False):
+        resizable: bool = False, center: bool = False, debug: bool = False):
     """
     Decorator that turns a ui() function into a runnable desktop app.
 
@@ -598,9 +596,17 @@ def app(title_: str = "Guile App", *, width: int = 800, height: int = 600,
         def ui():
             with gui.card():
                 gui.title("Hello, world")
+
+    center=True fills the window and centres your content on both axes, so a
+    small single-card app needs no wrapping gui.col():
+
+        @gui.app("Converter", width=360, height=300, center=True)
+        def ui():
+            with gui.card():
+                gui.title("Hello, world")
     """
     def decorator(fn: Callable):
         _App(title_, width=width, height=height,
-             resizable=resizable, debug=debug).run(fn)
+             resizable=resizable, center=center, debug=debug).run(fn)
         return fn
     return decorator

@@ -11,6 +11,11 @@ Run:
 import sys, os, random
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
 import guile as gui
 
 # ── State ──────────────────────────────────────────────────────────────────
@@ -28,6 +33,12 @@ start_date  = gui.state("")
 file_text   = gui.state("")
 file_path   = gui.state("")
 file_status = gui.state("")
+
+# Two-column demo state
+img_cmap    = gui.state("viridis")
+img_freq    = gui.state(3.0)
+img_noise   = gui.state(0.10)
+map_regions = gui.state(["Northeast","Northwest","Southeast","Southwest"])
 
 COLOR_MAP = {
     "Indigo": "#6366f1",
@@ -58,6 +69,64 @@ TABLE_DATA = [
     for i in range(30)
 ]
 
+# ── KS Mesonet stations ───────────────────────────────────────────────────
+STATIONS = [
+    ("Manhattan",       "Northeast",  39.2086,  -96.5917),
+    ("Konza Prairie",   "Northeast",  39.0884,  -96.5458),
+    ("Ashland Bottoms", "Northeast",  39.1258,  -96.6365),
+    ("Hiawatha",        "Northeast",  39.8424,  -95.4819),
+    ("Colby",           "Northwest",  39.3925, -101.0686),
+    ("Hays",            "Northwest",  38.8495,  -99.3446),
+    ("Hill City",       "Northwest",  39.3741,  -99.8299),
+    ("Cheyenne",        "Northwest",  39.6265, -101.8075),
+    ("Cherokee",        "Southeast",  37.1990,  -94.9809),
+    ("Haysville",       "Southeast",  37.5198,  -97.3121),
+    ("Hutchinson 10SW", "Southeast",  37.9310,  -98.0200),
+    ("Harper",          "Southeast",  37.0648,  -98.0847),
+    ("Garden City",     "Southwest",  37.9973, -100.8151),
+    ("Meade",           "Southwest",  37.1348, -100.3956),
+    ("Lakin",           "Southwest",  37.8937, -101.2326),
+    ("Greensburg",      "Southwest",  37.6028,  -99.2926),
+]
+
+
+# ── Pure functions ─────────────────────────────────────────────────────────
+def make_surface_figure() -> plt.Figure:
+    """2-D sine surface — updates when colormap, frequency or noise changes."""
+    rng  = np.random.default_rng(0)
+    x    = np.linspace(0, 2 * np.pi, 120)
+    X, Y = np.meshgrid(x, x)
+    f    = img_freq.value
+    Z    = (np.sin(f * X) * np.cos(f * Y)
+            + img_noise.value * rng.standard_normal((120, 120)))
+    fig, ax = plt.subplots(figsize=(5.0, 3.6))
+    fig.patch.set_alpha(0)
+    im = ax.imshow(Z, cmap=img_cmap.value, origin="lower",
+                   aspect="auto", interpolation="bilinear")
+    plt.colorbar(im, ax=ax, fraction=0.03, pad=0.02)
+    ax.set_xticks([]); ax.set_yticks([])
+    ax.set_title(
+        f"cmap={img_cmap.value}  ·  freq={f:.1f}  ·  "
+        f"noise={img_noise.value:.2f}",
+        fontsize=9, color="#666"
+    )
+    fig.tight_layout()
+    return fig
+
+
+def make_map_markers():
+    active = set(map_regions.value)
+    return [
+        gui.Marker(
+            (lat, lon),
+            popup=f"<b>{name}</b><br>{region}",
+            tooltip=name,
+        )
+        for name, region, lat, lon in STATIONS
+        if region in active
+    ]
+
+
 # ── File I/O callbacks ─────────────────────────────────────────────────────
 def open_file(path):
     if not path:
@@ -82,7 +151,7 @@ def save_file(path):
 
 
 # ── App ────────────────────────────────────────────────────────────────────
-@gui.app("Widget Showcase", width=560, height=1200)
+@gui.app("Widget Showcase", width=560, height=800)
 def ui():
     gui.theme(theme_name.value)
 
@@ -265,9 +334,8 @@ def ui():
                 )
 
         # ── table with both scroll axes ────────────────────────────────────
-        # Horizontal scroll: the guile-table-wrap already has overflow-x:auto.
-        # Vertical scroll:   constrain the card height with overflow-y:auto.
-        # Together they give a spreadsheet-like viewport on both axes.
+        # The table wrap scrolls horizontally on its own; constraining the
+        # card height with overflow-y gives vertical scroll too.
         with gui.card(gap=10):
             gui.text("gui.table()  — horizontal + vertical scroll",
                      bold=True, size="sm", muted=True,
@@ -278,19 +346,13 @@ def ui():
                 size="sm", muted=True,
             )
 
-            # padding=0 so the table borders meet the card edges cleanly.
-            # overflow-y:auto + max-height gives the vertical scroll viewport.
-            # overflow-x:auto is already on .guile-table-wrap in the CSS.
             with gui.card(padding=0,
                           style="overflow-y:auto;max-height:240px"):
                 gui.table(TABLE_DATA)
 
         # ── file picker — read and save ────────────────────────────────────
-        # gui.file_picker() opens the OS native dialog.
-        # save=True switches to a save dialog.
-        # The on_change callback receives the chosen path as a string.
-        # Reading / writing the actual file is plain Python — guile stays
-        # out of the way of your I/O logic.
+        # on_change receives the chosen path; the actual file I/O below is
+        # plain Python.
         with gui.card(gap=12):
             gui.text("gui.file_picker()  — read & save",
                      bold=True, size="sm", muted=True,
@@ -325,3 +387,28 @@ def ui():
                 rows=6,
                 key="fp-text",
             )
+
+        # ── Two-column layout: controls + live image ────────────────────────
+        with gui.card(gap=12, padding=16):
+            gui.text("gui.figure()  — two-column layout", bold=True,
+                     size="sm", muted=True,
+                     style="text-transform:uppercase;letter-spacing:.06em")
+            with gui.row(gap=16, align="flex-start"):
+                with gui.col(gap=10, style="width:190px;flex-shrink:0"):
+                    gui.select(
+                        ["viridis","plasma","inferno","magma",
+                         "cividis","RdYlGn","coolwarm"],
+                        "Colormap",
+                        value=img_cmap, on_change=img_cmap.set,
+                        key="cmap"
+                    )
+                    gui.slider("Frequency", min=1, max=8, step=0.5,
+                               value=img_freq, on_change=img_freq.set,
+                               key="freq")
+                    gui.slider("Noise", min=0, max=0.5, step=0.05,
+                               value=img_noise, on_change=img_noise.set,
+                               key="noise")
+                with gui.col(style="flex:1"):
+                    gui.figure(make_surface_figure(), dpi=110)
+
+

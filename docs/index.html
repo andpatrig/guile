@@ -273,21 +273,25 @@ pre.code .id    { color: var(--text); }
   min-width: 240px;
 }
 .fake-card .ftitle { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
-.fake-counter-row { display: flex; align-items: center; gap: 14px; }
-.fake-btn {
-  width: 36px; height: 36px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--r); display: grid; place-items: center;
-  font-size: 16px; font-weight: 500; color: var(--text);
-  cursor: pointer; user-select: none; transition: all .12s;
+.fake-slider {
+  width: 200px; height: 4px; -webkit-appearance: none; appearance: none;
+  border-radius: 99px; background: var(--surface-3);
+  outline: none; cursor: pointer; margin: 4px 0;
 }
-.fake-btn:hover { background: var(--surface); border-color: var(--border-2); }
-.fake-btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
-.fake-btn.primary:hover { filter: brightness(0.95); }
-.fake-count {
-  font-size: 28px; font-weight: 600; min-width: 60px; text-align: center;
-  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+.fake-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
 }
+.fake-slider::-moz-range-thumb {
+  width: 18px; height: 18px; border: none; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+}
+.fake-reading {
+  font-size: 32px; font-weight: 600; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.fake-reading span { color: var(--accent); }
 .fake-hint {
   font-family: var(--mono); font-size: 10.5px; color: var(--text-3);
   letter-spacing: .04em;
@@ -403,7 +407,7 @@ pre.code .id    { color: var(--text); }
 <section class="hero" id="top">
   <div class="hero-inner">
     <div class="hero-stack">
-      <div class="eyebrow"><span class="dot"></span> v0.4.3 · MIT · Python ≥ 3.9</div>
+      <div class="eyebrow"><span class="dot"></span> v0.5.0 · MIT · Python ≥ 3.9</div>
       <div class="hero-wordmark">
         <span class="wordmark"><span class="gui">gui</span>le</span>
       </div>
@@ -460,16 +464,16 @@ pre.code .id    { color: var(--text); }
   <div class="section-inner">
     <div class="section-head">
       <div class="section-eyebrow">— Quick start</div>
-      <h2 class="section-title">A counter, end to end.</h2>
+      <h2 class="section-title">A converter, end to end.</h2>
       <p class="section-lede">
-        This is the entire app. Layout is written top-to-bottom using <code class="py-kw">with</code> blocks — indentation matches the finished UI. <code class="inline">gui.state</code> holds the value; the buttons mutate it; the text re-reads it.
+        This is the entire app. A plain Python function does the maths; <code class="inline">gui.state</code> holds the input; the slider updates it and the reading recomputes on every change.
       </p>
     </div>
     <div class="qs-grid">
       <div class="code-window">
         <div class="win-bar">
           <div class="win-dots"><i></i><i></i><i></i></div>
-          <div class="win-title">counter.py</div>
+          <div class="win-title">converter.py</div>
           <button class="code-copy-btn" id="code-copy-btn" aria-label="Copy code">
             <span class="code-copy-label">COPY</span>
             <span class="code-copied-label">COPIED</span>
@@ -477,36 +481,33 @@ pre.code .id    { color: var(--text); }
         </div>
 <pre class="code"><code><span class="kw">import</span> <span class="id">guile</span> <span class="kw">as</span> <span class="id">gui</span>
 
-<span class="id">count</span> <span class="punct">=</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">state</span><span class="punct">(</span><span class="num">0</span><span class="punct">)</span>
+<span class="kw">def</span> <span class="fn">to_celsius</span><span class="punct">(</span><span class="id">f</span><span class="punct">):</span>
+    <span class="kw">return</span> <span class="fn">round</span><span class="punct">((</span><span class="id">f</span> <span class="punct">-</span> <span class="num">32</span><span class="punct">)</span> <span class="punct">*</span> <span class="num">5</span> <span class="punct">/</span> <span class="num">9</span><span class="punct">,</span> <span class="num">1</span><span class="punct">)</span>
 
-<span class="punct">@</span><span class="id">gui</span><span class="punct">.</span><span class="fn">app</span><span class="punct">(</span><span class="str">"Counter"</span><span class="punct">,</span> <span class="id">width</span><span class="punct">=</span><span class="num">400</span><span class="punct">,</span> <span class="id">height</span><span class="punct">=</span><span class="num">300</span><span class="punct">)</span>
+<span class="id">fahrenheit</span> <span class="punct">=</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">state</span><span class="punct">(</span><span class="num">32.0</span><span class="punct">)</span>
+
+<span class="punct">@</span><span class="id">gui</span><span class="punct">.</span><span class="fn">app</span><span class="punct">(</span><span class="str">&quot;Converter&quot;</span><span class="punct">,</span> <span class="id">width</span><span class="punct">=</span><span class="num">360</span><span class="punct">,</span> <span class="id">height</span><span class="punct">=</span><span class="num">300</span><span class="punct">,</span> <span class="id">center</span><span class="punct">=</span><span class="kw">True</span><span class="punct">)</span>
 <span class="kw">def</span> <span class="fn">ui</span><span class="punct">():</span>
-    <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">col</span><span class="punct">(</span><span class="id">align</span><span class="punct">=</span><span class="str">"center"</span><span class="punct">,</span> <span class="id">justify</span><span class="punct">=</span><span class="str">"center"</span><span class="punct">,</span> <span class="id">style</span><span class="punct">=</span><span class="str">"height:100vh"</span><span class="punct">):</span>
-        <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">card</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">14</span><span class="punct">):</span>
-            <span class="id">gui</span><span class="punct">.</span><span class="fn">title</span><span class="punct">(</span><span class="str">"Counter"</span><span class="punct">)</span>
-            <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">row</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">16</span><span class="punct">):</span>
-                <span class="id">gui</span><span class="punct">.</span><span class="fn">button</span><span class="punct">(</span><span class="str">"−"</span><span class="punct">,</span> <span class="id">variant</span><span class="punct">=</span><span class="str">"secondary"</span><span class="punct">,</span>
-                           <span class="id">on_click</span><span class="punct">=</span><span class="kw">lambda</span><span class="punct">:</span> <span class="id">count</span><span class="punct">.</span><span class="fn">update</span><span class="punct">(</span><span class="kw">lambda</span> <span class="id">x</span><span class="punct">:</span> <span class="id">x</span><span class="punct"> - </span><span class="num">1</span><span class="punct">))</span>
-                <span class="id">gui</span><span class="punct">.</span><span class="fn">text</span><span class="punct">(</span><span class="id">count</span><span class="punct">,</span> <span class="id">size</span><span class="punct">=</span><span class="str">"2xl"</span><span class="punct">,</span> <span class="id">bold</span><span class="punct">=</span><span class="kw">True</span><span class="punct">)</span>
-                <span class="id">gui</span><span class="punct">.</span><span class="fn">button</span><span class="punct">(</span><span class="str">"+"</span><span class="punct">,</span>
-                           <span class="id">on_click</span><span class="punct">=</span><span class="kw">lambda</span><span class="punct">:</span> <span class="id">count</span><span class="punct">.</span><span class="fn">update</span><span class="punct">(</span><span class="kw">lambda</span> <span class="id">x</span><span class="punct">:</span> <span class="id">x</span><span class="punct"> + </span><span class="num">1</span><span class="punct">))</span>
-</code></pre>
+    <span class="kw">with</span> <span class="id">gui</span><span class="punct">.</span><span class="fn">card</span><span class="punct">(</span><span class="id">gap</span><span class="punct">=</span><span class="num">16</span><span class="punct">):</span>
+        <span class="id">gui</span><span class="punct">.</span><span class="fn">title</span><span class="punct">(</span><span class="str">&quot;Temperature converter&quot;</span><span class="punct">)</span>
+        <span class="id">gui</span><span class="punct">.</span><span class="fn">slider</span><span class="punct">(</span><span class="str">&quot;°F&quot;</span><span class="punct">,</span> <span class="id">value</span><span class="punct">=</span><span class="id">fahrenheit</span><span class="punct">,</span>
+                   <span class="id">on_change</span><span class="punct">=</span><span class="id">fahrenheit</span><span class="punct">.</span><span class="id">set</span><span class="punct">,</span> <span class="id">min</span><span class="punct">=</span><span class="num">0</span><span class="punct">,</span> <span class="id">max</span><span class="punct">=</span><span class="num">212</span><span class="punct">)</span>
+        <span class="id">gui</span><span class="punct">.</span><span class="fn">text</span><span class="punct">(</span><span class="str">f&quot;{to_celsius(fahrenheit.value)} °C&quot;</span><span class="punct">,</span>
+                 <span class="id">size</span><span class="punct">=</span><span class="str">&quot;2xl&quot;</span><span class="punct">,</span> <span class="id">bold</span><span class="punct">=</span><span class="kw">True</span><span class="punct">)</span></code></pre>
       </div>
       <div class="preview-window">
         <div class="win-bar">
           <div class="win-dots"><i></i><i></i><i></i></div>
-          <div class="win-title">Counter — preview</div>
+          <div class="win-title">Converter — preview</div>
           <div class="win-tabs"><span class="win-tab">desktop window</span></div>
         </div>
         <div class="preview-body">
           <div class="fake-card">
-            <div class="ftitle">Counter</div>
-            <div class="fake-counter-row">
-              <button class="fake-btn" id="counter-dec" aria-label="decrement">−</button>
-              <div class="fake-count" id="counter-value">7</div>
-              <button class="fake-btn primary" id="counter-inc" aria-label="increment">+</button>
-            </div>
-            <div class="fake-hint" id="counter-hint">try the buttons</div>
+            <div class="ftitle">Temperature converter</div>
+            <input type="range" class="fake-slider" id="conv-slider"
+                   min="0" max="212" value="32" aria-label="Fahrenheit">
+            <div class="fake-reading"><span id="conv-celsius">0</span> °C</div>
+            <div class="fake-hint" id="conv-hint">drag the slider</div>
           </div>
         </div>
       </div>
@@ -555,20 +556,20 @@ pre.code .id    { color: var(--text); }
     });
   })();
 
-  // ── Counter preview ───────────────────────────────────────────────────
+  // ── Converter preview ─────────────────────────────────────────────────
   (function () {
-    const valueEl = document.getElementById('counter-value');
-    const hintEl  = document.getElementById('counter-hint');
-    const dec     = document.getElementById('counter-dec');
-    const inc     = document.getElementById('counter-inc');
-    if (!valueEl || !dec || !inc) return;
-    let n = 7;
-    const render = () => {
-      valueEl.textContent = n;
-      hintEl.textContent  = (n === 7) ? 'try the buttons' : ('count: ' + n);
+    const slider = document.getElementById('conv-slider');
+    const out    = document.getElementById('conv-celsius');
+    const hint   = document.getElementById('conv-hint');
+    if (!slider || !out) return;
+    const toC = f => Math.round((f - 32) * 5 / 9 * 10) / 10;
+    const render = (touched) => {
+      const f = Number(slider.value);
+      out.textContent = toC(f);
+      if (touched) hint.textContent = f + ' °F';
     };
-    dec.addEventListener('click', () => { n -= 1; render(); });
-    inc.addEventListener('click', () => { n += 1; render(); });
+    slider.addEventListener('input', () => render(true));
+    render(false);
   })();
 </script>
 

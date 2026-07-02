@@ -1,17 +1,9 @@
 """
-examples/01_counter.py — Counter in the new context-manager style.
+examples/01_counter.py — A counter built with context managers.
 
-Compare to v1:
-    # v1 — nesting hell
-    Column(Card(Title("Counter"), Row(Button("−"), Text(count), Button("+"))))
-
-    # v2 — top to bottom, like reading a document
-    with gui.card():
-        gui.title("Counter")
-        with gui.row(gap=12, align="center"):
-            gui.button("−", ...)
-            gui.text(count, size="2xl")
-            gui.button("+", ...)
+Layout is written top to bottom: each `with` block opens a container and
+everything indented inside it becomes a child. The buttons mutate one piece
+of state; the text re-reads it on every render.
 """
 
 import sys, os
@@ -23,9 +15,6 @@ count = gui.state(0)
 
 @gui.app("Counter", width=380, height=300)
 def ui():
-    # The whole page is built top-to-bottom.
-    # with gui.card() opens a raised container; everything indented is inside it.
-
     with gui.col(align="center", justify="center", style="height:100vh"):
         with gui.card(gap=14):
             with gui.row(justify="space-between", align="center"):

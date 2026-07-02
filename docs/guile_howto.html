@@ -94,6 +94,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
   <a href="#themes-custom">Custom theme</a>
   <a href="#themes-vars">CSS variables</a>
   <div class="nav-cat">Layout</div>
+  <a href="#layout-center">Centering</a>
   <a href="#layout-cols">Unequal columns</a>
   <a href="#layout-grid">CSS grid</a>
   <a href="#layout-sidebar">Sidebar layout</a>
@@ -133,61 +134,139 @@ None of those lines touch the code you already wrote.
 <div class="section" id="state-annotated">
 <h2>How a guile app is structured</h2>
 
-<p>Every guile app has four parts, always in the same order.
-Hover a section in the code to see what it does.</p>
+<style>
+  /* ── RESPONSIVE GRID & LAYOUT ── */
+  .guile-tutorial-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+    font-family: var(--sans);
+    margin: 20px 0;
+  }
+  
+  .guile-code-panel {
+    background: var(--surface-2, #fafafa);
+    border: 1px solid var(--border, #e0e0e0);
+    border-radius: var(--r-lg, 8px);
+    padding: 16px 0;
+    overflow-x: auto;
+    font-family: var(--mono, monospace);
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+  
+  .guile-doc-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;font-family:var(--mono);font-size:12.5px;line-height:1.65;margin:20px 0">
+  /* ── ROW HOVER & ACCENT BASE STYLES ── */
+  .code-row {
+    padding: 1px 16px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  .doc-card {
+    border-radius: var(--r, 6px);
+    padding: 10px 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
 
-<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 0;overflow:hidden">
-<div style="padding:1px 16px;color:var(--text-2)"><span style="color:#7c6af7">import</span> guile <span style="color:#7c6af7">as</span> gui</div>
-<div style="height:10px"></div>
-<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 1. Pure function ────────────────</div>
-<div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)"><span style="color:#0f6e56">def</span> <span style="color:#0f6e56">to_celsius</span>(f):</div>
-<div style="padding:1px 16px;background:rgba(15,110,86,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#0f6e56">return</span> (f - 32) * 5 / 9</div>
-<div style="height:10px"></div>
-<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 2. State (module level = global) ─</div>
-<div style="padding:1px 16px;background:rgba(83,74,183,.12);color:var(--text)">fahrenheit = gui.<span style="color:#534AB7">state</span>(32.0)</div>
-<div style="padding:1px 16px;background:rgba(83,74,183,.12);color:var(--text)">celsius &nbsp; = gui.<span style="color:#534AB7">state</span>(<span style="color:#7c6af7">None</span>)</div>
-<div style="height:10px"></div>
-<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 3. Callback ─────────────────────</div>
-<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)"><span style="color:#993C1D">def</span> <span style="color:#993C1D">convert</span>():</div>
-<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;c = to_celsius(fahrenheit.<span style="color:#993C1D">value</span>)</div>
-<div style="padding:1px 16px;background:rgba(153,60,29,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;celsius.<span style="color:#993C1D">set</span>(round(c, 1))</div>
-<div style="height:10px"></div>
-<div style="padding:1px 16px;color:var(--text-2);font-style:italic"># ── 4. Layout ───────────────────────</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">@gui.app(<span style="color:#c95f28">"Converter"</span>, width=360)</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)"><span style="color:#185FA5">def</span> <span style="color:#185FA5">ui</span>():</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;gui.number_input(<span style="color:#c95f28">"°F"</span>, value=fahrenheit,</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;on_change=fahrenheit.<span style="color:#185FA5">set</span>)</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;gui.button(<span style="color:#c95f28">"Convert"</span>, on_click=convert)</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#185FA5">if</span> celsius.<span style="color:#185FA5">value</span> <span style="color:#185FA5">is not None</span>:</div>
-<div style="padding:1px 16px;background:rgba(24,95,165,.12);color:var(--text)">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.text(celsius.<span style="color:#185FA5">value</span>)</div>
+  /* ── PART 1: EXISTING CODE STYLES ── */
+  .p1-bg { background: rgba(15,110,86,.05); color: var(--text); }
+  .guile-tutorial-grid:has(.p1:hover) .p1-bg { background: rgba(15,110,86,.15); }
+  .p1-card { background: var(--green-bg,#e6f4ec); border: 1px solid rgba(15,110,86,.15); }
+  .guile-tutorial-grid:has(.p1:hover) .p1-card { border-color: rgba(15,110,86,.6); transform: translateX(2px); }
+
+  /* ── PART 2: STATE STYLES ── */
+  .p2-bg { background: rgba(83,74,183,.05); color: var(--text); }
+  .guile-tutorial-grid:has(.p2:hover) .p2-bg { background: rgba(83,74,183,.15); }
+  .p2-card { background: #EEEDFE; border: 1px solid rgba(83,74,183,.15); }
+  .guile-tutorial-grid:has(.p2:hover) .p2-card { border-color: rgba(83,74,183,.6); transform: translateX(2px); }
+
+  /* ── PART 3: CALLBACK STYLES ── */
+  .p3-bg { background: rgba(153,60,29,.05); color: var(--text); }
+  .guile-tutorial-grid:has(.p3:hover) .p3-bg { background: rgba(153,60,29,.15); }
+  .p3-card { background: #FAECE7; border: 1px solid rgba(153,60,29,.15); }
+  .guile-tutorial-grid:has(.p3:hover) .p3-card { border-color: rgba(153,60,29,.6); transform: translateX(2px); }
+
+  /* ── PART 4: LAYOUT STYLES ── */
+  .p4-bg { background: rgba(24,95,165,.05); color: var(--text); }
+  .guile-tutorial-grid:has(.p4:hover) .p4-bg { background: rgba(24,95,165,.15); }
+  .p4-card { background: #E6F1FB; border: 1px solid rgba(24,95,165,.15); }
+  .guile-tutorial-grid:has(.p4:hover) .p4-card { border-color: rgba(24,95,165,.6); transform: translateX(2px); }
+</style>
+
+<p>Every guile app has four parts, always in the same order. Hover any section in the code to highlight its documentation card.</p>
+
+<div class="guile-tutorial-grid">
+  <!-- LEFT PANEL: CODE SOURCE -->
+  <div class="guile-code-panel">
+    <div class="code-row" style="color:var(--text-2)"><span style="color:#7c6af7">import</span> guile <span style="color:#7c6af7">as</span> gui</div>
+    <div style="height:10px"></div>
+    
+    <div class="code-row" style="color:var(--text-2);font-style:italic"># ── 1. Your existing code ───────────</div>
+    <div class="code-row p1 p1-bg"><span style="color:#0f6e56">def</span> <span style="color:#0f6e56">to_celsius</span>(f):</div>
+    <div class="code-row p1 p1-bg">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#0f6e56">return</span> round((f - 32) * 5/9, 1)</div>
+    <div class="code-row p1 p1-bg"><span style="color:#0f6e56">def</span> <span style="color:#0f6e56">water_phase</span>(c):</div>
+    <div class="code-row p1 p1-bg">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#0f6e56">if</span> c &lt;= 0: <span style="color:#0f6e56">return</span> <span style="color:#c95f28">"Solid"</span></div>
+    <div class="code-row p1 p1-bg">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#0f6e56">if</span> c &lt; 100: <span style="color:#0f6e56">return</span> <span style="color:#c95f28">"Liquid"</span></div>
+    <div class="code-row p1 p1-bg">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#0f6e56">return</span> <span style="color:#c95f28">"Gas"</span></div>
+    <div style="height:10px"></div>
+    
+    <div class="code-row" style="color:var(--text-2);font-style:italic"># ── 2. State ───────────────────────</div>
+    <div class="code-row p2 p2-bg">fahrenheit = gui.<span style="color:#534AB7">state</span>(32)</div>
+    <div class="code-row p2 p2-bg">celsius = gui.<span style="color:#534AB7">state</span>(<span style="color:#7c6af7">None</span>)</div>
+    <div class="code-row p2 p2-bg">phase = gui.<span style="color:#534AB7">state</span>(<span style="color:#c95f28">""</span>)</div>
+    <div style="height:10px"></div>
+    
+    <div class="code-row" style="color:var(--text-2);font-style:italic"># ── 3. Callback ────────────────────</div>
+    <div class="code-row p3 p3-bg"><span style="color:#993C1D">def</span> <span style="color:#993C1D">analyze</span>():</div>
+    <div class="code-row p3 p3-bg">&nbsp;&nbsp;&nbsp;&nbsp;c = to_celsius(fahrenheit.<span style="color:#993C1D">value</span>)</div>
+    <div class="code-row p3 p3-bg">&nbsp;&nbsp;&nbsp;&nbsp;celsius.<span style="color:#993C1D">set</span>(c)</div>
+    <div class="code-row p3 p3-bg">&nbsp;&nbsp;&nbsp;&nbsp;phase.<span style="color:#993C1D">set</span>(water_phase(c))</div>
+    <div style="height:10px"></div>
+    
+    <div class="code-row" style="color:var(--text-2);font-style:italic"># ── 4. Layout ──────────────────────</div>
+    <div class="code-row p4 p4-bg">@gui.app(<span style="color:#c95f28">"Water"</span>, width=360)</div>
+    <div class="code-row p4 p4-bg"><span style="color:#185FA5">def</span> <span style="color:#185FA5">ui</span>():</div>
+    <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;gui.slider(<span style="color:#c95f28">"°F"</span>, 20, 230,</div>
+    <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=fahrenheit,</div>
+    <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;on_change=fahrenheit.<span style="color:#185FA5">set</span>)</div>
+    <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;gui.button(<span style="color:#c95f28">"Convert"</span>, on_click=analyze)</div>
+    <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#185FA5">if</span> celsius.<span style="color:#185FA5">value</span> <span style="color:#185FA5">is not None</span>:</div>
+    <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.text(f<span style="color:#c95f28">"{celsius.value} °C"</span>)</div>
+    <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.text(phase.<span style="color:#185FA5">value</span>)</div>
+  </div>
+
+  <!-- RIGHT PANEL: ANNOTATIONS -->
+  <div class="guile-doc-panel">
+    <div class="doc-card p1-card">
+      <p style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#085041;margin:0 0 4px 0">1 · Your existing code</p>
+      <p style="font-size:12px;line-height:1.55;color:var(--text-2);margin:0">Ordinary Python. These are the functions you already have. Guile doesn't change them.</p>
+    </div>
+    
+    <div class="doc-card p2-card">
+      <p style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#3C3489;margin:0 0 4px 0">2 · State</p>
+      <p style="font-size:12px;line-height:1.55;color:#534AB7;margin:0">Shared values that the UI and callbacks read and update. Declare them once at <strong>module level</strong>, outside every function. If created inside <code style="font-size:11px;background:rgba(83,74,183,.15);padding:1px 4px;border-radius:3px">ui()</code>, they would be recreated on every render.</p>
+    </div>
+    
+    <div class="doc-card p3-card">
+      <p style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#712B13;margin:0 0 4px 0">3 · Callback</p>
+      <p style="font-size:12px;line-height:1.55;color:#993C1D;margin:0">Responds to user actions. Reads state through <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.value</code>, calls your existing functions, stores results with <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.set()</code>, then Guile automatically re-renders the UI.</p>
+    </div>
+    
+    <div class="doc-card p4-card">
+      <p style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0C447C;margin:0 0 4px 0">4 · Layout</p>
+      <p style="font-size:12px;line-height:1.55;color:#185FA5;margin:0">Reads <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.value</code> to display state and passes callbacks by reference (for example, <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">on_change=fahrenheit.set</code>). Never call <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.set()</code> directly inside <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">ui()</code>, or it will run on every render and create a render loop.</p>
+    </div>
+    
+    <div style="padding:4px 0;font-size:12px;color:var(--text-2);font-style:italic;line-height:1.5">
+      💡 In this particular example, the callback aggregates the computation of Celsius and the water phase. Use custom callbacks like this whenever multiple states or UI updates must happen together from a single user action.
+    </div>
+  </div>
 </div>
 
-<div style="padding:0 0 0 16px;display:flex;flex-direction:column;gap:8px;font-family:var(--sans)">
-
-<div style="background:var(--green-bg, #e6f4ec);border:1px solid rgba(15,110,86,.2);border-radius:var(--r);padding:10px 12px">
-<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#085041;margin-bottom:4px">1 · Pure function</p>
-<p style="font-size:12px;line-height:1.55;color:var(--text-2)">Ordinary Python — no guile inside. Works identically in a notebook, test, or script. This is the code you already have.</p>
-</div>
-
-<div style="background:#EEEDFE;border:1px solid rgba(83,74,183,.25);border-radius:var(--r);padding:10px 12px">
-<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#3C3489;margin-bottom:4px">2 · State — global variables</p>
-<p style="font-size:12px;line-height:1.55;color:#534AB7">Declared at <strong>module level</strong>, outside every function. Callbacks need to read and write them, so they must be in scope everywhere. Defined inside <code style="font-size:11px;background:rgba(83,74,183,.15);padding:1px 4px;border-radius:3px">ui()</code> they would reset on every render.</p>
-</div>
-
-<div style="background:#FAECE7;border:1px solid rgba(153,60,29,.25);border-radius:var(--r);padding:10px 12px">
-<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#712B13;margin-bottom:4px">3 · Callback</p>
-<p style="font-size:12px;line-height:1.55;color:#993C1D">The only place where <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.value</code> is read for logic and <code style="font-size:11px;background:rgba(153,60,29,.12);padding:1px 4px;border-radius:3px">.set()</code> is called. Calls your pure function, stores the result. Re-render happens automatically.</p>
-</div>
-
-<div style="background:#E6F1FB;border:1px solid rgba(24,95,165,.25);border-radius:var(--r);padding:10px 12px">
-<p style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#0C447C;margin-bottom:4px">4 · Layout — ui()</p>
-<p style="font-size:12px;line-height:1.55;color:#185FA5">Reads <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.value</code> to display things. Passes <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.set</code> by reference via <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">on_change=state.set</code> — fine and idiomatic. Never <em>calls</em> <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">state.set(x)</code> as a bare statement — that runs on every render and causes a loop.</p>
-</div>
-
-</div>
-</div>
 
 <h3>State variables and their methods</h3>
 
@@ -222,18 +301,18 @@ It injects a <code>&lt;style&gt;</code> block that overrides the CSS variables b
 <h3>Available presets</h3>
 
 <div class="theme-row">
-  <div class="swatch" style="background:#f2f2f7;color:#1a1916;border-color:#d1d1d6">light<br><small style="opacity:.5">#6366f1</small></div>
-  <div class="swatch" style="background:#0f0f11;color:#f0eff8;border-color:#2a2a30">dark<br><small style="opacity:.5">#818cf8</small></div>
-  <div class="swatch" style="background:#0a0a0f;color:#00f5a0;border-color:#1a2a1a">neon<br><small style="opacity:.5">#00f5a0</small></div>
-  <div class="swatch" style="background:#0c1929;color:#e0f2fe;border-color:#1a3045">ocean<br><small style="opacity:.5">#38bdf8</small></div>
-  <div class="swatch" style="background:#fff1f3;color:#1c0a0d;border-color:#ffd0d8">rose<br><small style="opacity:.5">#f43f5e</small></div>
-  <div class="swatch" style="background:#faf7f0;color:#1c1208;border-color:#e5ddc8">sand<br><small style="opacity:.5">#b45309</small></div>
+  <div class="swatch" style="background:#f2f2f7;color:#1c1c1e;border-color:#d1d1d6">light<br><small style="opacity:.5">#6366f1</small></div>
+  <div class="swatch" style="background:#1c1c1e;color:#f5f5f7;border-color:#48484a">dark<br><small style="opacity:.5">#818cf8</small></div>
+  <div class="swatch" style="background:#0f172a;color:#f1f5f9;border-color:#334155">neon<br><small style="opacity:.5">#22d3ee</small></div>
+  <div class="swatch" style="background:#fff1f2;color:#1c1917;border-color:#fecdd3">rose<br><small style="opacity:.5">#f43f5e</small></div>
+  <div class="swatch" style="background:#f0fdf4;color:#14532d;border-color:#bbf7d0">forest<br><small style="opacity:.5">#16a34a</small></div>
+  <div class="swatch" style="background:#f8fafc;color:#0f172a;border-color:#e2e8f0">slate<br><small style="opacity:.5">#64748b</small></div>
 </div>
 
 <div class="label">Example</div>
 <pre>@gui.app("My App", width=480, height=400)
 def ui():
-    gui.theme("ocean")          # apply theme first
+    gui.theme("forest")         # apply theme first
 
     with gui.card():
         gui.title("Hello")
@@ -241,8 +320,8 @@ def ui():
 
 <div class="label">List all presets in Python</div>
 <pre>import guile as gui
-print(list(gui._THEMES.keys()))
-# ['light', 'dark', 'neon', 'ocean', 'rose', 'sand']</pre>
+print(list(gui.THEMES.keys()))
+# ['light', 'dark', 'neon', 'rose', 'forest', 'slate']</pre>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -252,9 +331,9 @@ print(list(gui._THEMES.keys()))
 <p>Start from a preset and override individual values, or build a theme entirely from scratch.</p>
 
 <h3>Override part of a preset</h3>
-<pre>gui.theme("ocean", primary="#ff6b6b")     # ocean colours, red accent
+<pre>gui.theme("forest", primary="#ff6b6b")    # forest colours, red accent
 gui.theme("light", radius=2)              # light theme, sharp corners
-gui.theme("sand",  font="Georgia, serif") # sand but serif font</pre>
+gui.theme("dark",  surface="#242430")     # dark theme, custom card colour</pre>
 
 <h3>Fully custom</h3>
 <pre>gui.theme(
@@ -262,12 +341,14 @@ gui.theme("sand",  font="Georgia, serif") # sand but serif font</pre>
     bg      = "#f0f9ff",   # very light blue background
     surface = "#ffffff",   # white cards
     text    = "#0c1a2e",   # near-black text
+    border  = "#c7dced",   # subtle blue-grey borders
     radius  = 8,           # px, also accepts "8px"
-    font    = "-apple-system, BlinkMacSystemFont, sans-serif",
 )</pre>
 
-<p>All derived colours — hover shade, tint, secondary text, borders — are
-computed automatically from the six values above. You never need to set them manually.</p>
+<p>Every value you don't pass falls back to the preset (or <code>light</code>
+when you build from scratch). All the rest — hover shades, tints, and the
+danger / success / warning colours — are derived automatically. You never
+need to set them manually.</p>
 
 <h3>Switch themes at runtime</h3>
 <p>Because <code>gui.theme()</code> is called inside <code>ui()</code>, it re-runs on every render.
@@ -280,7 +361,7 @@ def ui():
 
     with gui.card():
         gui.select(
-            ["light","dark","ocean","neon","rose","sand"],
+            ["light","dark","neon","rose","forest","slate"],
             "Theme", value=theme_name, key="theme-sel"
         )</pre>
 </div>
@@ -289,7 +370,7 @@ def ui():
 <div class="section" id="themes-vars">
 <h2>CSS variables reference</h2>
 
-<p>These are the six variables <code>gui.theme()</code> accepts. All other colours are derived from them.</p>
+<p>These are the eight arguments <code>gui.theme()</code> accepts. All other colours are derived from them.</p>
 
 <div class="card">
 <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -303,9 +384,11 @@ def ui():
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">primary</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--primary</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#6366f1</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Buttons, sliders, focus rings, links</td></tr>
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">bg</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--bg</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#f2f2f7</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Window / page background</td></tr>
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">surface</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--surface</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#ffffff</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Card and input background</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">surface_2</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--surface-2</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#f5f5f7</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Hover rows, tints, secondary surfaces</td></tr>
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">text</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--text</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#1c1c1e</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Primary text colour</td></tr>
-<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">radius</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--r</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">10px</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Border radius of cards and inputs</td></tr>
-<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent)">font</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2)">--font / font-family</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px">system-ui</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px">Body and widget font stack</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">text_2</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--text-2</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#6e6e73</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Secondary / muted text</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">border</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--border</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#d1d1d6</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Borders, dividers, input outlines</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent)">radius</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2)">--r</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px">10px</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px">Border radius of cards and inputs</td></tr>
 </tbody>
 </table>
 </div>
@@ -315,6 +398,37 @@ You can still override any of them directly via <code>gui.html("&lt;style&gt;:ro
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="layout-center">
+<h2>Centering a small app</h2>
+
+<p>To drop a single card in the middle of the window, you can wrap everything
+in a full-height, centred column:</p>
+
+<pre>@gui.app("Converter", width=360, height=300)
+def ui():
+    with gui.col(align="center", justify="center", style="height:100vh"):
+        with gui.card(gap=16):
+            gui.title("Temperature converter")
+            gui.slider("°F", value=fahrenheit,
+                       on_change=fahrenheit.set, min=0, max=212)</pre>
+
+<p>For simple apps that wrapper is pure boilerplate, so <code>@gui.app()</code>
+takes a <code>center=True</code> shortcut that does the same thing — it fills
+the window and centres its contents on both axes:</p>
+
+<pre>@gui.app("Converter", width=360, height=300, center=True)
+def ui():
+    with gui.card(gap=16):
+        gui.title("Temperature converter")
+        gui.slider("°F", value=fahrenheit,
+                   on_change=fahrenheit.set, min=0, max=212)</pre>
+
+<div class="note">Reach for <code>center=True</code> on small, single-card
+apps. Once you have a real layout — a sidebar, a scrolling list, several
+stacked sections — drop it and arrange things with <code>gui.col()</code> /
+<code>gui.row()</code> as usual.</div>
+</div>
+
 <div class="section" id="layout-cols">
 <h2>Unequal columns</h2>
 
