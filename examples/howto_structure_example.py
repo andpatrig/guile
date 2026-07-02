@@ -23,11 +23,12 @@ def analyze():
     phase.set(water_phase(c))
 
 
-# ── 4. Layout ──────────────────────
-@gui.app("Water", height= 300, width=360, center=True)
+# ── 4. Layout ──────────────────────           
+@gui.app("Water", height=300, width=360, center=True)
 def ui():
-    gui.slider(label="°F", min=20, max=230, value=fahrenheit, on_change=fahrenheit.set)
-    gui.button("Convert", on_click=analyze)
-    if celsius.value is not None:
-        gui.text(f"{celsius.value} °C")
-        gui.text(phase.value)
+    with gui.card(gap=10):
+        gui.slider(label="°F", min=20, max=230, value=fahrenheit, on_change=fahrenheit.set)
+        gui.button("Convert", on_click=analyze)
+        if celsius.value is not None:
+            gui.text(f"{celsius.value} °C")
+            gui.text(phase.value)
