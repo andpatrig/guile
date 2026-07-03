@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>guile — cheat sheet</title>
+<style>
+
+:root {
+  --bg:     #f4f4f6;
+  --surf:   #ffffff;
+  --text:   #18181b;
+  --muted:  #52525b;
+  --accent: #5b4fff;
+  --tint:   #eef0ff;
+  --border: #d8d8dd;
+  --mono:   'SF Mono', 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
+  --r:      7px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 26px 36px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Top row ───────────────────────────────────────────────── */
+.top-row {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.title-card { display: flex; flex-direction: column; }
+
+.wordmark {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.wordmark .g { color: var(--accent); }
+
+.title-tag {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.title-desc {
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.title-meta {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.title-meta .row  { display: flex; align-items: baseline; gap: 0px; }
+.title-meta .k    { font-weight: 600; color: var(--text); min-width: 56px; }
+.title-meta code  { font-size: 11.5px; background: var(--tint); padding: 1px 5px; border-radius: 3px; color: var(--accent); }
+.title-meta a     { color: var(--accent); text-decoration: none; font-family: var(--mono); font-size: 10.5px; word-break: break-all; }
+.title-meta a:hover { text-decoration: underline; }
+
+/* ── Grid ──────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* ── Cards ─────────────────────────────────────────────────── */
+.sec {
+  background: var(--surf);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  padding: 13px 15px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.sec-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 9px;
+}
+.span-2 { grid-column: 1 / -1; }
+
+/* ── Code ──────────────────────────────────────────────────── */
+pre {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+  background: var(--tint);
+  border-radius: 5px;
+  padding: 9px 11px;
+  overflow: hidden;
+  white-space: pre;
+}
+code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  background: var(--tint);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--accent);
+}
+
+.kw  { color: #7c3aed; font-weight: 600; }
+.fn  { color: #0369a1; }
+.st  { color: #166534; }
+.cm  { color: #71717a; font-style: italic; }
+.num { color: #b45309; }
+.an  { color: var(--muted); }
+
+/* ── Reference table ───────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 5px 0;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+td:first-child  { padding-right: 14px; }
+td:last-child   { padding-left: 14px; }
+tr:last-child td { border-bottom: none; }
+.dim { color: var(--muted); }
+
+/* ── Skeleton strip ────────────────────────────────────────── */
+.skel-outer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 16px;
+  align-items: stretch;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+}
+.skel-section { padding: 5px 10px; }
+.skel-section + .skel-section { border-top: 2px solid var(--surf); }
+.code-row { white-space: pre; }
+
+.skel-card {
+  padding: 8px 11px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  align-self: stretch;
+  max-width: 180px;
+}
+.skel-card b {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.s1              { background: rgba(15,110,86,.08); }
+.s1 .kw,.s1 .fn  { color: #0f6e56; }
+.s1b             { background: rgba(15,110,86,.08); color: #0f6e56; }
+.s1b b           { color: #085041; }
+
+.s2              { background: rgba(83,74,183,.08); }
+.s2 .fn          { color: #534AB7; }
+.s2b             { background: rgba(83,74,183,.08); color: #534AB7; }
+.s2b b           { color: #3C3489; }
+
+.s3              { background: rgba(153,60,29,.10); }
+.s3 .kw,.s3 .fn  { color: #993C1D; }
+.s3b             { background: rgba(153,60,29,.10); color: #993C1D; }
+.s3b b           { color: #712B13; }
+
+.s4              { background: rgba(24,95,165,.08); }
+.s4 .fn,.s4 .kw  { color: #185FA5; }
+.s4b             { background: rgba(24,95,165,.08); color: #185FA5; }
+.s4b b           { color: #0C447C; }
+
+/* ── Footer ────────────────────────────────────────────────── */
+.footer {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ── Print ─────────────────────────────────────────────────── */
+@media print {
+  @page { size: letter portrait; margin: 0.4in; }
+  body  { background: white; padding: 0; max-width: none; }
+  .grid    { grid-template-columns: repeat(2, 1fr) !important; }
+  .top-row { grid-template-columns: 230px 1fr !important; }
+  .span-2  { grid-column: 1 / -1 !important; }
+  .sec  { border: 1px solid #ccc; border-left: 3px solid #5b4fff; box-shadow: none; }
+  pre   { background: #f5f5ff; }
+  code  { background: #f5f5ff; }
+  .footer { display: none; }
+}
+
+/* Screen-only responsive collapse — never affects print */
+@media screen and (max-width: 1100px) {
+  .grid    { grid-template-columns: 1fr; }
+  .span-2  { grid-column: 1; }
+  .top-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Top row ───────────────────────────────────────────── -->
+<div class="top-row">
+
+  <div class="sec title-card">
+    <div class="wordmark"><span class="g">gui</span>le</div>
+    <div class="title-tag">cheat sheet</div>
+    <div class="title-desc">Build lightweight desktop apps with plain Python.</div>
+    <div class="title-meta">
+      <div class="row"><span class="k">install</span><code>pip install guile</code></div>
+      <div class="row"><span class="k">version</span><span>v0.5.0</span></div>
+      <div class="row"><span class="k">requires</span><span>Python ≥ 3.9</span></div>
+    </div>
+    <div class="title-meta">
+      <div class="row"><span class="k">docs</span><a href="https://andpatrig.github.io/guile/">andpatrig.github.io/guile</a></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-label">The skeleton — every app looks like this</div>
+    <div class="code-row" style="font-family:var(--mono);font-size:12px;line-height:18px;padding:4px 10px 6px;color:var(--muted)"><span class="kw" style="color:#7c3aed">import</span> guile <span class="kw" style="color:#7c3aed">as</span> gui</div>
+    <div class="skel-outer">
+
+      <div class="skel-section s1">
+        <div class="code-row" style="color:var(--muted);font-style:italic"># 1. Your existing code — untouched</div>
+        <div class="code-row"><span class="kw">def</span> <span class="fn">to_celsius</span>(f):</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> round((f - 32) * 5/9, 1)</div>
+        <div class="code-row"><span class="kw">def</span> <span class="fn">water_phase</span>(c):</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> c &lt;= 0:  <span class="kw">return</span> <span class="st">"Solid"</span></div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> c &lt; 100: <span class="kw">return</span> <span class="st">"Liquid"</span></div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> <span class="st">"Gas"</span></div>
+      </div>
+      <div class="skel-card s1b"><b>1 · Existing code</b>Ordinary Python — guile doesn't touch it.</div>
+
+      <div class="skel-section s2">
+        <div class="code-row" style="color:var(--muted);font-style:italic"># 2. State</div>
+        <div class="code-row">fahrenheit = gui.<span class="fn">state</span>(32.0)</div>
+        <div class="code-row">celsius    = gui.<span class="fn">state</span>(<span class="kw">None</span>)</div>
+        <div class="code-row">phase      = gui.<span class="fn">state</span>(<span class="st">""</span>)</div>
+      </div>
+      <div class="skel-card s2b"><b>2 · State</b>Shared values. Declare at module level, outside every function.</div>
+
+      <div class="skel-section s3">
+        <div class="code-row" style="color:var(--muted);font-style:italic"># 3. Callback</div>
+        <div class="code-row"><span class="kw">def</span> <span class="fn">analyze</span>():</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;c = to_celsius(fahrenheit.value)</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;celsius.<span class="fn">set</span>(c)</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;phase.<span class="fn">set</span>(water_phase(c))</div>
+      </div>
+      <div class="skel-card s3b"><b>3 · Callback</b>Reads <code style="font-size:10.5px">.value</code>, calls your code, writes back with <code style="font-size:10.5px">.set()</code>.</div>
+
+      <div class="skel-section s4">
+        <div class="code-row" style="color:var(--muted);font-style:italic"># 4. Layout</div>
+        <div class="code-row"><span class="an">@</span>gui.<span class="fn">app</span>(<span class="st">"Water"</span>, width=360, center=<span class="kw">True</span>)</div>
+        <div class="code-row"><span class="kw">def</span> <span class="fn">ui</span>():</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;gui.<span class="fn">slider</span>(<span class="st">"°F"</span>, min=20, max=230,</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=fahrenheit, on_change=fahrenheit.set)</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;gui.<span class="fn">button</span>(<span class="st">"Analyze"</span>, on_click=analyze)</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> celsius.value <span class="kw">is not None</span>:</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.<span class="fn">text</span>(<span class="st">f"{celsius.value} °C"</span>)</div>
+        <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.<span class="fn">text</span>(phase.value)</div>
+      </div>
+      <div class="skel-card s4b"><b>4 · Layout</b>Re-runs on every state change. Never call <code style="font-size:10.5px">.set()</code> inside <code style="font-size:10.5px">ui()</code>.</div>
+
+    </div>
+  </div>
+
+</div><!-- /top-row -->
+
+
+<!-- ── Main grid ─────────────────────────────────────────── -->
+<div class="grid">
+
+<!-- Things to remember -->
+<div class="sec span-2" style="border-left-color:#f59e0b">
+  <div class="sec-label" style="color:#b45309">Things to remember</div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px 28px;font-size:12.5px;line-height:1.5">
+    <div><strong>Always add <code>key=</code></strong> to inputs inside loops or conditionals — otherwise guile can't tell them apart after a re-render.</div>
+    <div><strong>State lives outside <code>ui()</code></strong> — declare it at module level, or it resets on every render.</div>
+    <div><strong>Don't call <code>.set()</code> unconditionally inside <code>ui()</code></strong> — it triggers another render and loops forever. Use <code>on_change=</code> callbacks instead.</div>
+    <div><strong>Lambda captures loop variables late</strong> — lock in the current value with a default arg: <code>lambda i=i: delete(i)</code></div>
+  </div>
+</div>
+
+<!-- State -->
+<div class="sec">
+  <div class="sec-label">State</div>
+<pre>count  = gui.<span class="fn">state</span>(<span class="num">0</span>)     <span class="cm"># int</span>
+name   = gui.<span class="fn">state</span>(<span class="st">""</span>)    <span class="cm"># str</span>
+items  = gui.<span class="fn">state</span>([])    <span class="cm"># list</span>
+active = gui.<span class="fn">state</span>(<span class="num">True</span>)  <span class="cm"># bool</span>
+
+count.<span class="fn">set</span>(<span class="num">42</span>)                   <span class="cm"># replace</span>
+count.<span class="fn">update</span>(<span class="kw">lambda</span> x: x+<span class="num">1</span>)   <span class="cm"># transform</span>
+count.<span class="fn">toggle</span>()                  <span class="cm"># bool flip</span>
+
+gui.<span class="fn">text</span>(count)              <span class="cm"># State directly — no .value</span>
+gui.<span class="fn">text</span>(<span class="st">f"{count.value} items"</span>)</pre>
+</div>
+
+
+<!-- Layout -->
+<div class="sec">
+  <div class="sec-label">Layout — indentation = nesting</div>
+<pre><span class="kw">with</span> gui.<span class="fn">col</span>(padding=<span class="num">20</span>, gap=<span class="num">12</span>):
+    <span class="kw">with</span> gui.<span class="fn">card</span>():
+        gui.<span class="fn">title</span>(<span class="st">"Hello"</span>)
+        <span class="kw">with</span> gui.<span class="fn">row</span>(gap=<span class="num">8</span>, justify=<span class="st">"flex-end"</span>):
+            gui.<span class="fn">button</span>(<span class="st">"Cancel"</span>, variant=<span class="st">"ghost"</span>)
+            gui.<span class="fn">button</span>(<span class="st">"Save"</span>)
+
+<span class="cm"># gap      space between children (px)</span>
+<span class="cm"># padding  space inside the container</span>
+<span class="cm"># align    cross-axis: "center", "stretch"</span>
+<span class="cm"># justify  main axis:  "flex-end", "space-between"</span></pre>
+</div>
+
+
+<!-- Inputs -->
+<div class="sec">
+  <div class="sec-label">Inputs</div>
+<pre>gui.<span class="fn">button</span>(<span class="st">"Save"</span>, on_click=save)
+gui.<span class="fn">button</span>(<span class="st">"Del"</span>, variant=<span class="st">"danger"</span>, size=<span class="st">"sm"</span>)
+
+name = gui.<span class="fn">input</span>(<span class="st">"Name"</span>, key=<span class="st">"name"</span>)
+gui.<span class="fn">text</span>(<span class="st">f"Hello {name.value}"</span>)
+
+temp = gui.<span class="fn">slider</span>(<span class="st">"°C"</span>, min=<span class="num">0</span>, max=<span class="num">100</span>, key=<span class="st">"temp"</span>)
+ok   = gui.<span class="fn">checkbox</span>(<span class="st">"Agree"</span>, key=<span class="st">"ok"</span>)
+unit = gui.<span class="fn">select</span>([<span class="st">"kg"</span>, <span class="st">"lb"</span>, <span class="st">"g"</span>], <span class="st">"Unit"</span>, key=<span class="st">"unit"</span>)
+
+<span class="cm"># bind to existing state</span>
+gui.<span class="fn">slider</span>(<span class="st">"°F"</span>, value=fahrenheit,
+    on_change=fahrenheit.set, key=<span class="st">"f"</span>)</pre>
+</div>
+
+
+<!-- Patterns -->
+<div class="sec">
+  <div class="sec-label">Patterns</div>
+<pre><span class="cm"># Conditional — plain Python</span>
+<span class="kw">if</span> count.value > <span class="num">0</span>:
+    gui.<span class="fn">badge</span>(<span class="st">"positive"</span>, variant=<span class="st">"success"</span>)
+<span class="kw">else</span>:
+    gui.<span class="fn">badge</span>(<span class="st">"zero"</span>, variant=<span class="st">"neutral"</span>)
+
+<span class="cm"># Loop — key= keeps updates fast</span>
+<span class="kw">for</span> i, item <span class="kw">in</span> <span class="fn">enumerate</span>(items):
+    <span class="kw">with</span> gui.<span class="fn">row</span>(key=<span class="st">f"row-{i}"</span>):
+        gui.<span class="fn">text</span>(item)
+        gui.<span class="fn">button</span>(<span class="st">"✕"</span>, on_click=<span class="kw">lambda</span> i=i: <span class="fn">delete</span>(i),
+                   key=<span class="st">f"del-{i}"</span>)
+
+<span class="cm"># Toast — call from callback, never inside ui()</span>
+gui.<span class="fn">notify</span>(<span class="st">"Saved!"</span>, variant=<span class="st">"success"</span>)</pre>
+</div>
+
+
+<!-- Data & Plots -->
+<div class="sec">
+  <div class="sec-label">Data &amp; Plots</div>
+<pre><span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+
+<span class="cm"># DataFrame, list of dicts, numpy array</span>
+gui.<span class="fn">table</span>(df)
+gui.<span class="fn">table</span>(df, columns=[<span class="st">"date"</span>, <span class="st">"value"</span>])
+
+fig, ax = plt.<span class="fn">subplots</span>()
+ax.<span class="fn">plot</span>(x, y)
+gui.<span class="fn">figure</span>(fig)
+gui.<span class="fn">figure</span>(fig, caption=<span class="st">"Revenue"</span>, dpi=<span class="num">120</span>)</pre>
+</div>
+
+
+<!-- Themes & App options -->
+<div class="sec">
+  <div class="sec-label">Themes &amp; App options</div>
+<pre>gui.<span class="fn">theme</span>(<span class="st">"dark"</span>)            <span class="cm"># call first inside ui()</span>
+gui.<span class="fn">theme</span>(<span class="st">"light"</span>, primary=<span class="st">"#e11d48"</span>)
+<span class="cm"># presets: light dark neon rose forest slate</span>
+
+<span class="an">@</span>gui.<span class="fn">app</span>(<span class="st">"My App"</span>,
+    width=<span class="num">800</span>, height=<span class="num">600</span>,
+    center=<span class="num">True</span>,    <span class="cm"># centre content</span>
+    resizable=<span class="num">True</span>, <span class="cm"># allow resize</span>
+    debug=<span class="num">True</span>)     <span class="cm"># open devtools</span>
+<span class="kw">def</span> <span class="fn">ui</span>(): ...</pre>
+</div>
+
+
+<!-- Widget quick reference -->
+<div class="sec span-2">
+  <div class="sec-label">Widget quick reference</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:18%">widget</th>
+        <th style="width:38%">common options</th>
+        <th>notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>gui.col()</code> <code>gui.row()</code></td>
+        <td><code>gap</code> <code>padding</code> <code>align</code> <code>justify</code> <code>fill</code> <code>scroll</code></td>
+        <td class="dim">use as <code>with</code> block — stack children vertically / horizontally</td>
+      </tr>
+      <tr>
+        <td><code>gui.card()</code></td>
+        <td><code>gap</code> <code>padding</code> <code>margin</code></td>
+        <td class="dim">raised surface; use as <code>with</code> block</td>
+      </tr>
+      <tr>
+        <td><code>gui.title()</code> <code>gui.text()</code></td>
+        <td><code>size</code> <code>bold</code> <code>muted</code> <code>style</code></td>
+        <td class="dim">size: <code>xs sm md lg xl 2xl 3xl</code> — accepts State directly</td>
+      </tr>
+      <tr>
+        <td><code>gui.badge()</code></td>
+        <td><code>label</code> <code>variant</code></td>
+        <td class="dim">variant: <code>primary</code> <code>success</code> <code>danger</code> <code>warning</code> <code>neutral</code></td>
+      </tr>
+      <tr>
+        <td><code>gui.button()</code></td>
+        <td><code>on_click</code> <code>variant</code> <code>size</code> <code>disabled</code></td>
+        <td class="dim">variant: <code>primary</code> <code>secondary</code> <code>ghost</code> <code>danger</code></td>
+      </tr>
+      <tr>
+        <td><code>gui.input()</code></td>
+        <td><code>label</code> <code>placeholder</code> <code>value</code> <code>on_change</code> <code>key</code></td>
+        <td class="dim">returns State[str] — use <code>.value</code> to read</td>
+      </tr>
+      <tr>
+        <td><code>gui.number_input()</code></td>
+        <td><code>value</code> <code>min</code> <code>max</code> <code>step</code> <code>unit</code> <code>on_change</code></td>
+        <td class="dim">returns State[float] — no string conversion needed</td>
+      </tr>
+      <tr>
+        <td><code>gui.slider()</code></td>
+        <td><code>min=0</code> <code>max=100</code> <code>step=1</code> <code>value</code> <code>on_change</code></td>
+        <td class="dim">returns State[float]</td>
+      </tr>
+      <tr>
+        <td><code>gui.checkbox()</code></td>
+        <td><code>label</code> <code>value</code> <code>on_change</code> <code>key</code></td>
+        <td class="dim">returns State[bool]</td>
+      </tr>
+      <tr>
+        <td><code>gui.select()</code></td>
+        <td><code>options</code> <code>label</code> <code>value</code> <code>on_change</code> <code>key</code></td>
+        <td class="dim"><code>list[str]</code> or <code>[(val, label), …]</code> → State[str]</td>
+      </tr>
+      <tr>
+        <td><code>gui.tabs()</code></td>
+        <td><code>labels</code> <code>value</code> <code>on_change</code> <code>key</code></td>
+        <td class="dim">returns active tab as <code>str</code> — always add <code>key=</code></td>
+      </tr>
+      <tr>
+        <td><code>gui.table()</code></td>
+        <td><code>data</code> <code>columns</code> <code>max_rows=2000</code></td>
+        <td class="dim">DataFrame / list of dicts / 2-D list / numpy array</td>
+      </tr>
+      <tr>
+        <td><code>gui.figure()</code></td>
+        <td><code>fig</code> <code>dpi=96</code> <code>width</code> <code>caption</code></td>
+        <td class="dim">any matplotlib Figure</td>
+      </tr>
+      <tr>
+        <td><code>gui.notify()</code></td>
+        <td><code>message</code> <code>variant</code> <code>duration=3.0</code></td>
+        <td class="dim">toast — call from a callback, not inside <code>ui()</code></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+</div><!-- /grid -->
+
+<div class="footer">
+  <span>guile — lightweight Python desktop UI &nbsp;·&nbsp; <strong>pip install guile</strong></span>
+  <span>v0.5.0</span>
+</div>
+
+</body>
+</html>
