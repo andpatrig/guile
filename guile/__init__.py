@@ -54,7 +54,7 @@ from ._app import _App
 
 # ── State ──────────────────────────────────────────────────────────────────
 
-def state(initial: Any, *, key: str = "") -> State:
+def state(initial: Any) -> State:
     """
     Create a reactive value. Setting .value re-renders the UI automatically.
 
@@ -65,7 +65,7 @@ def state(initial: Any, *, key: str = "") -> State:
         count.update(lambda x: x + 1)
         count.toggle()          # bool shorthand
     """
-    return State(initial, key=key)
+    return State(initial)
 
 
 # ── Layout ─────────────────────────────────────────────────────────────────
@@ -165,10 +165,19 @@ def input(label: str = "", *, placeholder: str = "",
           value: Optional[Union[str, State]] = None,
           type: str = "text", disabled: bool = False,
           on_change: Optional[Callable] = None,
+          live: bool = False,
           style: str = "", key: Optional[str] = None) -> _Input:
-    """Text input. Returns .value (str). Always provide key=."""
+    """
+    Text input. Returns .value (str). Always provide key=.
+
+    .value is kept current on every keystroke, but the UI only re-renders
+    (and on_change only fires) when the field commits — Enter or focus
+    leave. Pass live=True to re-render on every keystroke; avoid that next
+    to large tables or figures, where each keystroke re-serializes the page.
+    """
     return _Input(label, placeholder=placeholder, value=value, type=type,
-                  disabled=disabled, on_change=on_change, style=style, key=key)
+                  disabled=disabled, on_change=on_change, live=live,
+                  style=style, key=key)
 
 def number_input(label: str = "", *,
                  value: Optional[Union[float, State]] = None,
@@ -217,10 +226,17 @@ def textarea(label: str = "", *, placeholder: str = "",
              value: Optional[Union[str, State]] = None,
              rows: int = 4, disabled: bool = False,
              on_change: Optional[Callable] = None,
+             live: bool = False,
              style: str = "", key: Optional[str] = None) -> _TextArea:
-    """Multi-line text input. Returns .value (str). Always provide key=."""
+    """
+    Multi-line text input. Returns .value (str). Always provide key=.
+
+    Like gui.input(): .value stays current per keystroke, UI re-renders on
+    commit (focus leave). live=True re-renders on every keystroke.
+    """
     return _TextArea(label, placeholder=placeholder, value=value, rows=rows,
-                     disabled=disabled, on_change=on_change, style=style, key=key)
+                     disabled=disabled, on_change=on_change, live=live,
+                     style=style, key=key)
 
 def checkbox(label: str = "", *, value: Optional[Union[bool, State]] = None,
              disabled: bool = False, on_change: Optional[Callable] = None,
@@ -459,7 +475,10 @@ def notify(message: str, *,
         "neutral": ("#6b7280", "#f3f4f6"),
     }
     fg, bg = COLOURS.get(variant, COLOURS["primary"])
-    msg    = _h.escape(str(message)).replace("'", "\'")
+    # NOTE: no manual quote-escaping needed — the message is embedded
+    # below via repr(), which produces a valid JS string literal.
+    # (The old .replace("'", "\'") was a no-op: "\'" is just "'".)
+    msg    = _h.escape(str(message))
     ms     = int(duration * 1000)
 
     close_style = (

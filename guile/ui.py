@@ -98,20 +98,35 @@ def _next_id(key: Optional[str] = None) -> str:
     _id_counter += 1
     return f"g{_id_counter}"
 
+def _arity(fn: Callable) -> int:
+    """
+    Number of positional parameters fn accepts (0 or 1 in practice).
+
+    Resolved ONCE at registration so dispatch() never has to guess by
+    catching TypeError — which risked re-running a handler whose body
+    raised TypeError itself (silent double execution of side effects).
+    """
+    import inspect
+    try:
+        return len(inspect.signature(fn).parameters)
+    except (TypeError, ValueError):
+        return 1        # uninspectable callables: assume handler(value)
+
 def _reg(cid: str, fn: Callable):
     """Register an event handler for this render pass."""
-    _callbacks[cid] = fn
+    _callbacks[cid] = (fn, _arity(fn))
 
 def dispatch_silent(cid: str, value: Any = None):
     """
     Call cid's silent handler, if any, without triggering a re-render.
-    The handler updates state via set_silent(). Used by multiselect onchange
-    to keep .value current while the user is mid-selection.
+    The handler updates state via set_silent(). Used by multiselect and
+    text inputs to keep .value current while the user is mid-interaction.
     """
-    silent_fn = _silent_callbacks.get(cid)
-    if silent_fn:
+    entry = _silent_callbacks.get(cid)
+    if entry:
+        fn, _ = entry
         try:
-            silent_fn(value)
+            fn(value)
         except Exception:
             import traceback
             traceback.print_exc()
@@ -119,27 +134,22 @@ def dispatch_silent(cid: str, value: Any = None):
 
 def dispatch(cid: str, value: Any = None):
     """
-    Call the live handler for cid. Used by _Bridge in _app.py.
+    Call the live handler for cid exactly once. Used by _Bridge in _app.py.
 
     Handlers come in two shapes: input widgets take one arg, handler(value);
-    buttons and the file picker take none, handler(). We try the shape that
-    matches whether a value arrived and fall back on TypeError.
+    buttons, the file picker and modal close take none, handler(). The shape
+    was recorded at registration time (_reg), so no trial-and-error calling.
+    Exceptions from the handler are printed, never re-dispatched.
     """
-    fn = _live_callbacks.get(cid)
-    if not fn:
+    entry = _live_callbacks.get(cid)
+    if not entry:
         return
+    fn, nargs = entry
     try:
-        if value is not None:
-            try:
-                fn(value)    # input widgets always receive a string value
-                return
-            except TypeError:
-                fn()         # must be a zero-arg on_click — call without value
+        if nargs == 0:
+            fn()
         else:
-            try:
-                fn()         # buttons, file picker — no value
-            except TypeError:
-                pass         # one-arg handler called with None — skip safely
+            fn(value)
     except Exception:
         import traceback
         traceback.print_exc()
@@ -210,7 +220,7 @@ _state_store: dict = {}
 
 def _get_or_create_state(key: str, initial: Any) -> State:
     if key not in _state_store:
-        _state_store[key] = State(initial, key=key)
+        _state_store[key] = State(initial)
     return _state_store[key]
 
 def _clear_state_store():
@@ -558,16 +568,30 @@ class _Button(_Leaf):
 
 
 class _Input(_Leaf):
-    """Single-line text input. Returns .value (str), .set(), .update()."""
+    """
+    Single-line text input. Returns .value (str), .set(), .update().
+
+    Event strategy (same decoupling as multiselect):
+      oninput  → silent path: .value is kept current on every keystroke,
+                 but nothing re-renders. Typing costs no Python render.
+      onchange → full trigger: fires when the field commits (Enter or
+                 focus leave) — one render, on_change called once.
+
+    Pass live=True to re-render on every keystroke instead (useful for
+    live-filtering a small list; avoid next to big tables or figures,
+    where each keystroke would re-serialize the whole page).
+    """
     def __init__(self, label: str = "", *, placeholder: str = "",
                  value: Optional[Union[str, State]] = None,
                  type: str = "text", disabled: bool = False,
                  on_change: Optional[Callable] = None,
+                 live: bool = False,
                  style: str = "", key: Optional[str] = None):
         self._label       = label
         self._placeholder = placeholder
         self._type        = type
         self._disabled    = disabled
+        self._live        = live
         self._style       = style
         _key              = _auto_key(key)
         initial           = value.value if isinstance(value, State) else (value or "")
@@ -578,6 +602,8 @@ class _Input(_Leaf):
             self._state.set(v)
             if on_change: on_change(v)
         _reg(self.id, _handler)
+        if not live:
+            _reg(self.id + "__silent", self._state.set_silent)
 
     @property
     def value(self) -> str: return self._state.value
@@ -585,15 +611,20 @@ class _Input(_Leaf):
     def update(self, fn):    self._state.update(fn)
 
     def render(self) -> str:
-        val = self._state.value
-        js  = f"window._guile.trigger('{self.id}',this.value)"
+        val     = self._state.value
+        trigger = f"window._guile.trigger('{self.id}',this.value)"
+        if self._live:
+            events = f' oninput="{trigger}"'
+        else:
+            silent = f"window._guile.silent('{self.id}',this.value)"
+            events = f' oninput="{silent}" onchange="{trigger}"'
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
         dis = " disabled" if self._disabled else ""
         return (f'<div id="{self.id}" class="guile-field" style="{self._style}">'
                 f'{lbl}<input class="guile-input" type="{self._type}"'
                 f' value="{_esc(val)}" placeholder="{_esc(self._placeholder)}"'
-                f' oninput="{js}"{dis}></div>')
+                f'{events}{dis}></div>')
 
 
 class _NumberInput(_Leaf):
@@ -690,16 +721,22 @@ class _NumberInput(_Leaf):
 
 
 class _TextArea(_Leaf):
-    """Multi-line text input. Returns .value (str), .set(), .update()."""
+    """
+    Multi-line text input. Returns .value (str), .set(), .update().
+    Same event strategy as _Input: silent oninput, render on commit.
+    live=True restores per-keystroke renders.
+    """
     def __init__(self, label: str = "", *, placeholder: str = "",
                  value: Optional[Union[str, State]] = None,
                  rows: int = 4, disabled: bool = False,
                  on_change: Optional[Callable] = None,
+                 live: bool = False,
                  style: str = "", key: Optional[str] = None):
         self._label       = label
         self._placeholder = placeholder
         self._rows        = rows
         self._disabled    = disabled
+        self._live        = live
         self._style       = style
         _key              = _auto_key(key)
         initial           = value.value if isinstance(value, State) else (value or "")
@@ -710,6 +747,8 @@ class _TextArea(_Leaf):
             self._state.set(v)
             if on_change: on_change(v)
         _reg(self.id, _handler)
+        if not live:
+            _reg(self.id + "__silent", self._state.set_silent)
 
     @property
     def value(self) -> str: return self._state.value
@@ -717,15 +756,20 @@ class _TextArea(_Leaf):
     def update(self, fn):    self._state.update(fn)
 
     def render(self) -> str:
-        val = self._state.value
-        js  = f"window._guile.trigger('{self.id}',this.value)"
+        val     = self._state.value
+        trigger = f"window._guile.trigger('{self.id}',this.value)"
+        if self._live:
+            events = f' oninput="{trigger}"'
+        else:
+            silent = f"window._guile.silent('{self.id}',this.value)"
+            events = f' oninput="{silent}" onchange="{trigger}"'
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
         dis = " disabled" if self._disabled else ""
         return (f'<div id="{self.id}" class="guile-field" style="{self._style}">'
                 f'{lbl}<textarea class="guile-textarea" rows="{self._rows}"'
                 f' placeholder="{_esc(self._placeholder)}"'
-                f' oninput="{js}"{dis}>{_txt(val)}</textarea></div>')
+                f'{events}{dis}>{_txt(val)}</textarea></div>')
 
 
 class _Checkbox(_Leaf):
@@ -872,7 +916,7 @@ class _MultiSelect(_Leaf):
             self._state.set_silent(selected)
 
         _reg(self.id, _handler)
-        _callbacks[self.id + '__silent'] = _silent_handler
+        _reg(self.id + '__silent', _silent_handler)
 
     @property
     def value(self) -> list: return self._state.value
@@ -1171,9 +1215,15 @@ class _Tabs(_Leaf):
 
     def render(self) -> str:
         active = self._state.value
+        # The label travels in a data attribute, not inside a JS string
+        # literal: html.escape turns ' into &#x27;, but the HTML parser
+        # decodes it BACK to ' before the onclick JS runs — so a label
+        # like "O'Brien" would be a SyntaxError (and a crafted label,
+        # script injection). dataset.val is immune to both.
         buttons = "".join(
             f'<button class="guile-tab-btn{" guile-tab-active" if l == active else ""}"'
-            f' onclick="window._guile.trigger(\'{self.id}\',\'{_esc(l)}\')">'
+            f' data-cid="{_esc(self.id)}" data-val="{_esc(l)}"'
+            f' onclick="window._guile.trigger(this.dataset.cid,this.dataset.val)">'
             f'{_txt(l)}</button>'
             for l in self._labels
         )

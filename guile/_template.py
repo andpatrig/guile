@@ -516,14 +516,11 @@ window._guile = {
         });
     },
     trigger: function(cid, value) {
-        var hasApi = !!(window.pywebview && window.pywebview.api);
-        var hasHandle = !!(window.pywebview && window.pywebview.api && window.pywebview.api.handle);
-        console.log('[guile] trigger cid=' + cid + ' hasApi=' + hasApi + ' hasHandle=' + hasHandle);
-        if (hasHandle) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.handle) {
             window.pywebview.api.handle(cid,
                 value === undefined ? null : value);
         } else {
-            console.error('[guile] handle not available — api=' + hasApi);
+            console.error('[guile] pywebview api not available');
         }
     },
     // silent: update Python state without triggering a re-render.
@@ -536,16 +533,6 @@ window._guile = {
         }
     }
 };
-
-// Belt-and-suspenders: if pywebviewready fires and the api is available,
-// call ready() to trigger an extra render. Not required — _on_loaded
-// handles the initial render — but helps on some pywebview configurations.
-window.addEventListener('pywebviewready', function() {
-    try {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.ready)
-            window.pywebview.api.ready();
-    } catch(e) {}
-});
 
 // Sync maps after the initial render completes.
 // _guile.update() handles subsequent renders; this covers the first load.

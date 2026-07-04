@@ -47,9 +47,8 @@ class State:
         count.update(lambda x: x + 1)
     """
 
-    def __init__(self, initial: Any, key: str = ""):
+    def __init__(self, initial: Any):
         self._v = initial
-        self._key = key  # for persistence / debugging
 
     @property
     def value(self) -> Any:

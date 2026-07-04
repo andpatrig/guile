@@ -51,7 +51,6 @@ n_param = gui.state(_def["n"])
 def sync_sliders(name):
     """Reset all four slider states when a new soil class is selected."""
     p = SOILS[name]
-    soil_name.set(name)
     theta_r.set(round(p["theta_r"], 3))
     theta_s.set(round(p["theta_s"], 3))
     alpha.set(  round(p["alpha"],   3))

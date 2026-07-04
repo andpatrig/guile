@@ -12,17 +12,31 @@ by the @gui.app() decorator in __init__.py.
 The event flow for a button click:
     1. User clicks → JS calls window._guile.trigger(cid, value)
     2. JS calls window.pywebview.api.handle(cid, value)      [WebView thread]
-    3. _Bridge.handle() spawns a daemon thread and returns immediately
+    3. _Bridge.handle() puts the event on a queue and returns immediately
        (returning quickly is mandatory — blocking the WebView thread
        would deadlock evaluate_js, which also needs that thread)
-    4. Daemon thread: dispatch(cid) → callback → State.set() → _render()
-    5. _render() calls evaluate_js(js) to push new HTML to the browser
-    6. JS patcher updates only the changed DOM nodes
+    4. The single worker thread: dispatch(cid) → callback → State.set()
+    5. State.set() queues a render request; the worker coalesces all
+       pending requests into ONE _render() per drain of the queue
+    6. _render() calls evaluate_js(js) to push new HTML to the browser
+    7. JS patcher updates only the changed DOM nodes
+
+Why one worker thread instead of one thread per event:
+    Everything that touches the render machinery — dispatch, callbacks,
+    State changes, ui() execution, the module-level callback registry in
+    ui.py — runs on this one thread, serially. That removes by design a
+    whole class of races (two events interleaving, _reset_render() firing
+    mid-build on another thread) and makes render batching automatic: a
+    callback that calls .set() five times queues five render requests,
+    which the worker drains into a single render with all final values.
 """
 
 from __future__ import annotations
+import html
 import json
+import queue
 import threading
+import traceback
 from typing import Callable, Optional
 
 from .state import register as _reg_listener, unregister as _unreg_listener
@@ -60,8 +74,15 @@ class _App:
         self._ready     = False  # True after the page finishes loading
         self._use_leaflet      = False  # set to True by gui.leaflet()
         self._use_leaflet_draw = False  # set to True by gui.leaflet(draw=...)
-        self._rendering        = False  # True while a render is in progress
-        self._needs_render     = False  # True if a render arrived while busy
+
+        # The single event queue. Items are tuples:
+        #   ("event",  cid, value)  — user interaction → dispatch(cid, value)
+        #   ("silent", cid, value)  — state update only, no render
+        #   ("render", None, None)  — a State changed, re-render needed
+        # One daemon worker drains it; see _worker_loop().
+        self._queue = queue.Queue()
+        threading.Thread(target=self._worker_loop, daemon=True,
+                         name="guile-worker").start()
 
     def _make_root(self) -> Column:
         """
@@ -79,14 +100,23 @@ class _App:
 
     def run(self, build_fn: Callable):
         """Start the app. Blocks until the window is closed."""
+        try:
+            import webview
+        except ImportError:
+            raise SystemExit(
+                "[guile] pywebview is required but not installed.\n"
+                "        Install it with:  pip install pywebview"
+            )
+
         self._build = build_fn
         _App._current = self
         _reg_listener(self._rerender)  # re-render on every State change
 
         # Run ui() once before the window exists so flag-setting side effects
         # (e.g. gui.leaflet() → _use_leaflet) are captured before get_html()
-        # decides which <script>/<link> tags to include. Errors are swallowed;
-        # the real render surfaces them later.
+        # picks which <script>/<link> tags to include. Any error here is
+        # ignored on purpose: the first real _render() runs ui() again and
+        # reports the error (console + in-window panel).
         try:
             _reset_render()
             root = self._make_root()
@@ -95,14 +125,6 @@ class _App:
             root.__exit__(None, None, None)
         except Exception:
             pass
-
-        try:
-            import webview
-        except ImportError:
-            print("[guile] pywebview not installed — opening in browser instead.")
-            print("[guile] Install for desktop window:  pip install pywebview")
-            self._fallback_browser()
-            return
 
         api = _Bridge(self)
         self._window = webview.create_window(
@@ -126,7 +148,7 @@ class _App:
         """Fires when the HTML page finishes loading. Trigger first render."""
         self._ready = True
         _set_window(self._window)   # give _FilePicker access to the window
-        self._render()
+        self._queue.put(("render", None, None))
 
     def _on_closed(self):
         """Fires when the user closes the window. Clean up."""
@@ -134,111 +156,87 @@ class _App:
         _set_window(None)
         _unreg_listener(self._rerender)
         _clear_state_store()
+        from .ui import _Figure
+        _Figure._cache.clear()   # static-figure cache dies with the window
 
-    # ── Render ────────────────────────────────────────────────────────────
+    # ── Worker loop + render ──────────────────────────────────────────────
 
     def _rerender(self):
-        """Called by State whenever a value changes."""
-        if self._ready:
-            self._render()
+        """
+        Queue a render request. Called on every State change, possibly from
+        another thread; the worker coalesces bursts into a single render.
+        (See the module docstring for why batching is automatic here.)
+        """
+        self._queue.put(("render", None, None))
+
+    def _worker_loop(self):
+        """
+        The only thread that runs dispatch, callbacks, ui(), and evaluate_js.
+        Drains the queue in batches: dispatch every event in arrival order,
+        then render once if anything changed. Serial by design — no locks.
+        """
+        while True:
+            batch = [self._queue.get()]
+            try:
+                while True:                     # drain whatever else is queued
+                    batch.append(self._queue.get_nowait())
+            except queue.Empty:
+                pass
+
+            needs_render = False
+            for kind, cid, value in batch:
+                if kind == "event":
+                    # .set() calls inside the callback queue "render" items
+                    # that land in the next batch and coalesce into one render.
+                    _dispatch(cid, value)
+                elif kind == "silent":
+                    _dispatch_silent(cid, value)
+                elif kind == "render":
+                    needs_render = True
+            if needs_render:
+                self._render()
 
     def _render(self):
         """
-        Run ui(), serialize to HTML, and push it to the browser via evaluate_js.
+        Run ui(), serialize to HTML, and push it to the browser via
+        evaluate_js. Only ever called from the worker thread, so renders
+        are serial by construction — no re-entrancy guard needed.
 
-        A render that arrives mid-render sets _needs_render instead of
-        recursing; the loop then runs at most once more. Note: ui() must not
-        call state.set() unconditionally — that would fire _rerender() during
-        a render and loop forever. Use on_change=/on_click= callbacks instead.
+        Note: ui() must not call state.set() unconditionally — every render
+        would queue another render, looping forever. Use on_change=/on_click=
+        callbacks instead.
         """
         if not self._build or not self._window or not self._ready:
             return
-        if self._rendering:
-            self._needs_render = True
-            return
-        while True:
-            self._rendering    = True
-            self._needs_render = False
-            try:
-                _reset_render()
-                root = self._make_root()
-                root.__enter__()
-                self._build()
-                root.__exit__(None, None, None)
-                _commit_callbacks()
-                js = f"window._guile.update({json.dumps(root.render())})"
-                self._window.evaluate_js(js)
-            except Exception:
-                import traceback
-                traceback.print_exc()
-            finally:
-                self._rendering = False
-            # One follow-up render is enough to absorb a state change that
-            # arrived mid-render; a second would risk an infinite loop.
-            if self._needs_render:
-                self._needs_render = False
-            else:
-                break
+        try:
+            _reset_render()
+            root = self._make_root()
+            root.__enter__()
+            self._build()
+            root.__exit__(None, None, None)
+            _commit_callbacks()
+            js = f"window._guile.update({json.dumps(root.render())})"
+            self._window.evaluate_js(js)
+        except Exception:
+            self._show_error(traceback.format_exc())
 
-    # ── Browser fallback ───────────────────────────────────────────────────
-
-    def _fallback_browser(self):
+    def _show_error(self, tb: str):
         """
-        When pywebview is not installed: serve the app via a local HTTP server
-        and open it in the default browser. Good for development.
+        A ui() error would otherwise leave a blank window. Print the
+        traceback and also render it into the page, so a typo is visible
+        where you're looking instead of only in the terminal.
         """
-        import http.server, webbrowser, socket
-
-        s = socket.socket()
-        s.bind(("", 0))
-        port = s.getsockname()[1]
-        s.close()
-        app_ref = self
-
-        class _Handler(http.server.BaseHTTPRequestHandler):
-            def do_GET(self):
-                if self.path == "/":
-                    body = get_html(app_ref.title,
-                                    use_leaflet=app_ref._use_leaflet,
-                                    use_leaflet_draw=app_ref._use_leaflet_draw).encode()
-                else:
-                    _reset_render()
-                    root = app_ref._make_root()
-                    root.__enter__()
-                    app_ref._build()
-                    root.__exit__(None, None, None)
-                    _commit_callbacks()
-                    body = root.render().encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", len(body))
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(body)
-
-            def do_POST(self):
-                length = int(self.headers.get("Content-Length", 0))
-                data   = json.loads(self.rfile.read(length))
-                _dispatch(data["cid"], data.get("value"))
-                self.send_response(200)
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-
-            def do_OPTIONS(self):
-                self.send_response(200)
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type")
-                self.end_headers()
-
-            def log_message(self, *_):
-                pass
-
-        srv = http.server.HTTPServer(("localhost", port), _Handler)
-        url = f"http://localhost:{port}/"
-        print(f"[guile] dev mode → {url}")
-        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
-        srv.serve_forever()
+        traceback.print_exc()
+        panel = ('<pre style="margin:16px;padding:16px;overflow:auto;'
+                 'font:13px/1.5 monospace;color:#b91c1c;background:#fef2f2;'
+                 'border:1px solid #fecaca;border-radius:8px">'
+                 + html.escape(tb) + '</pre>')
+        try:
+            self._window.evaluate_js(
+                "document.getElementById('guile-app').innerHTML="
+                + json.dumps(panel))
+        except Exception:
+            pass
 
 
 class _Bridge:
@@ -249,7 +247,11 @@ class _Bridge:
     pywebview silently filters underscore methods from the JS API,
     making them unreachable from JavaScript.
 
-    Only public methods here: handle() for events.
+    Public methods: handle() for events, silent_update() for
+    render-free state updates. Both just enqueue and return — all real
+    work happens on the app's single worker thread, which also keeps
+    events and silent updates in arrival order (a multiselect's silent
+    onchange is guaranteed to apply before its onblur render).
     """
 
     def __init__(self, app: _App):
@@ -260,24 +262,13 @@ class _Bridge:
         Called by JS when the user interacts with a widget.
         Must return immediately — doing work here blocks the WebView
         message thread, which would deadlock evaluate_js().
-        All real work happens on a daemon thread.
         """
-        threading.Thread(
-            target=self._run, args=(cid, value), daemon=True
-        ).start()
+        self._app._queue.put(("event", cid, value))
 
     def silent_update(self, cid: str, value=None):
         """
         Called by JS to update state without triggering a re-render.
-        Used by multiselect onchange: state is updated immediately on
-        every click so it's always current, but the DOM is only replaced
-        on onblur (via the normal handle() path) after the user finishes.
+        Used by multiselect (and text inputs) while the user is
+        mid-interaction: state stays current, DOM is left alone.
         """
-        threading.Thread(
-            target=_dispatch_silent, args=(cid, value), daemon=True
-        ).start()
-
-    def _run(self, cid: str, value):
-        """Dispatch the event and re-render. Runs on a background thread."""
-        _dispatch(cid, value)
-        self._app._render()
+        self._app._queue.put(("silent", cid, value))
