@@ -205,12 +205,35 @@ def test_build_error_surfaces_in_window():
     return "error shown, not blank"
 
 
+def test_set_in_ui_is_caught_not_looped():
+    """A .set() inside ui() must not render forever: the loop is broken and a
+    clear error panel is shown instead."""
+    bad = gui.state("x")
+    def build():
+        bad.set("y")                 # the footgun: state change during render
+        gui.text("hi")
+
+    app = make_app(build)
+    with contextlib.redirect_stderr(io.StringIO()):   # swallow the printed tb
+        app._queue.put(("render", None, None))
+        drain(app)
+
+    # No successful render was pushed, and an error panel naming ui() was.
+    assert app._window.render_count() == 0, \
+        f"expected no runaway renders, got {app._window.render_count()}"
+    panels = [c for c in app._window.calls
+              if "innerHTML" in c and "inside ui()" in c]
+    assert panels, "set() in ui() did not surface an error panel"
+    return "loop prevented, error shown"
+
+
 CORE_TESTS = [
     test_batching_one_render,
     test_no_double_dispatch_on_typeerror,
     test_concurrent_events_serialize,
     test_silent_then_render_order,
     test_build_error_surfaces_in_window,
+    test_set_in_ui_is_caught_not_looped,
 ]
 
 

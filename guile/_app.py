@@ -81,8 +81,10 @@ class _App:
         #   ("render", None, None)  — a State changed, re-render needed
         # One daemon worker drains it; see _worker_loop().
         self._queue = queue.Queue()
-        threading.Thread(target=self._worker_loop, daemon=True,
-                         name="guile-worker").start()
+        self._in_render = False   # True while ui() runs inside _render()
+        self._worker = threading.Thread(target=self._worker_loop, daemon=True,
+                                        name="guile-worker")
+        self._worker.start()
 
     def _make_root(self) -> Column:
         """
@@ -166,7 +168,16 @@ class _App:
         Queue a render request. Called on every State change, possibly from
         another thread; the worker coalesces bursts into a single render.
         (See the module docstring for why batching is automatic here.)
+
+        Guard: a .set() made *inside* ui() (i.e. on the worker thread while a
+        render is running) would queue a render that queues another render,
+        forever. We flag it instead of enqueuing; _render() turns the flag
+        into a clear error. The thread check keeps legitimate background-thread
+        .set() calls — which may race with a render — on the normal path.
         """
+        if self._in_render and threading.current_thread() is self._worker:
+            self._loop_guard = True
+            return
         self._queue.put(("render", None, None))
 
     def _worker_loop(self):
@@ -202,9 +213,10 @@ class _App:
         evaluate_js. Only ever called from the worker thread, so renders
         are serial by construction — no re-entrancy guard needed.
 
-        Note: ui() must not call state.set() unconditionally — every render
-        would queue another render, looping forever. Use on_change=/on_click=
-        callbacks instead.
+        Note: ui() should only read state, never change it. A .set()/.update()/
+        .toggle() during a render is caught (see the guard in _rerender and the
+        _loop_guard check below) and surfaced as an error instead of looping.
+        Change state in on_change=/on_click= callbacks instead.
         """
         if not self._build or not self._window or not self._ready:
             return
@@ -212,7 +224,19 @@ class _App:
             _reset_render()
             root = self._make_root()
             root.__enter__()
-            self._build()
+            self._loop_guard = False
+            self._in_render  = True
+            try:
+                self._build()
+            finally:
+                self._in_render = False
+            if self._loop_guard:
+                raise RuntimeError(
+                    "A state value was changed inside ui() — a .set(), "
+                    ".update() or .toggle() ran while the UI was rendering. "
+                    "ui() should only read state and build widgets; move the "
+                    "change into an on_click= or on_change= callback instead."
+                )
             root.__exit__(None, None, None)
             _commit_callbacks()
             js = f"window._guile.update({json.dumps(root.render())})"
