@@ -1353,65 +1353,29 @@ class _Figure(_Leaf):
 
     def _to_base64(self) -> str:
         """
-        Encode the figure to a base64 PNG string.
+        Encode the figure to a base64 PNG using matplotlib's savefig.
 
-        Fast path (persistent figures):
-            If the figure has already been drawn at least once, we grab the
-            raw RGBA pixel buffer directly from the canvas — no savefig, no
-            file-format overhead. This is ~3x faster than savefig and works
-            with any matplotlib Agg backend figure.
-
-        Slow path (first render, or transparent/bbox figures):
-            Falls back to savefig for correctness (handles bbox_inches,
-            transparent backgrounds, and figures that have never been drawn).
+        savefig honors dpi and transparent, and its zlib level produces a
+        markedly smaller PNG than a raw RGBA dump would — which matters
+        because this string is embedded in the page and shipped to the
+        browser on every render.
         """
-        import io, base64, struct, zlib
+        import io, base64
         import matplotlib.pyplot as plt
 
-        # ── Try fast canvas path first ─────────────────────────────────
-        try:
-            canvas = self._fig.canvas
-            # Ensure the canvas has been drawn at least once
-            if not getattr(canvas, '_is_drawn', False):
-                canvas.draw()
-                canvas._is_drawn = True
+        # bbox_inches="tight" trims clipped labels, but it costs an extra
+        # trial render. It's redundant when the figure already manages its
+        # own layout (constrained_layout / tight_layout), so skip it there.
+        # getattr guards matplotlib < 3.6, where the method doesn't exist.
+        layout  = getattr(self._fig, "get_layout_engine", lambda: None)()
+        save_kw = dict(format="png", dpi=self._dpi, transparent=self._transparent)
+        if layout is None:
+            save_kw["bbox_inches"] = "tight"
 
-            w, h = canvas.get_width_height()
-            raw  = bytes(canvas.buffer_rgba())
-
-            # Encode raw RGBA bytes to PNG using only stdlib (no Pillow)
-            def _chunk(tag: bytes, data: bytes) -> bytes:
-                c = tag + data
-                return (struct.pack('>I', len(data)) + c
-                        + struct.pack('>I', zlib.crc32(c) & 0xffffffff))
-
-            rows = b''.join(
-                b'\x00' + raw[y * w * 4:(y + 1) * w * 4]
-                for y in range(h)
-            )
-            png = (
-                b'\x89PNG\r\n\x1a\n'
-                + _chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0))
-                + _chunk(b'IDAT', zlib.compress(rows, 1))   # level 1 = fastest
-                + _chunk(b'IEND', b'')
-            )
-            result = base64.b64encode(png).decode()
-            plt.close(self._fig)
-            return result
-
-        except Exception:
-            # ── Slow path fallback ─────────────────────────────────────
-            buf = io.BytesIO()
-            self._fig.savefig(
-                buf, format="png", dpi=self._dpi, bbox_inches="tight",
-                facecolor="none" if self._transparent
-                          else self._fig.get_facecolor(),
-                transparent=self._transparent,
-            )
-            buf.seek(0)
-            result = base64.b64encode(buf.read()).decode()
-            plt.close(self._fig)
-            return result
+        buf = io.BytesIO()
+        self._fig.savefig(buf, **save_kw)
+        plt.close(self._fig)                 # guile owns the figure once drawn
+        return base64.b64encode(buf.getvalue()).decode()
 
     def render(self) -> str:
         if self._static and self.id in _Figure._cache:
