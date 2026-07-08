@@ -1,11 +1,11 @@
 """
-examples/03_settings.py — Widget showcase.
+examples/settings.py — Widget showcase.
 
 One card per input widget, each showing an immediate visual result
 so the user can see exactly what each widget does.
 
 Run:
-    python examples/03_settings.py
+    python examples/settings.py
 """
 
 import sys, os, random
@@ -38,7 +38,6 @@ file_status = gui.state("")
 img_cmap    = gui.state("viridis")
 img_freq    = gui.state(3.0)
 img_noise   = gui.state(0.10)
-map_regions = gui.state(["Northeast","Northwest","Southeast","Southwest"])
 
 COLOR_MAP = {
     "Indigo": "#6366f1",
@@ -69,27 +68,6 @@ TABLE_DATA = [
     for i in range(30)
 ]
 
-# ── KS Mesonet stations ───────────────────────────────────────────────────
-STATIONS = [
-    ("Manhattan",       "Northeast",  39.2086,  -96.5917),
-    ("Konza Prairie",   "Northeast",  39.0884,  -96.5458),
-    ("Ashland Bottoms", "Northeast",  39.1258,  -96.6365),
-    ("Hiawatha",        "Northeast",  39.8424,  -95.4819),
-    ("Colby",           "Northwest",  39.3925, -101.0686),
-    ("Hays",            "Northwest",  38.8495,  -99.3446),
-    ("Hill City",       "Northwest",  39.3741,  -99.8299),
-    ("Cheyenne",        "Northwest",  39.6265, -101.8075),
-    ("Cherokee",        "Southeast",  37.1990,  -94.9809),
-    ("Haysville",       "Southeast",  37.5198,  -97.3121),
-    ("Hutchinson 10SW", "Southeast",  37.9310,  -98.0200),
-    ("Harper",          "Southeast",  37.0648,  -98.0847),
-    ("Garden City",     "Southwest",  37.9973, -100.8151),
-    ("Meade",           "Southwest",  37.1348, -100.3956),
-    ("Lakin",           "Southwest",  37.8937, -101.2326),
-    ("Greensburg",      "Southwest",  37.6028,  -99.2926),
-]
-
-
 # ── Pure functions ─────────────────────────────────────────────────────────
 def make_surface_figure() -> plt.Figure:
     """2-D sine surface — updates when colormap, frequency or noise changes."""
@@ -112,19 +90,6 @@ def make_surface_figure() -> plt.Figure:
     )
     fig.tight_layout()
     return fig
-
-
-def make_map_markers():
-    active = set(map_regions.value)
-    return [
-        gui.Marker(
-            (lat, lon),
-            popup=f"<b>{name}</b><br>{region}",
-            tooltip=name,
-        )
-        for name, region, lat, lon in STATIONS
-        if region in active
-    ]
 
 
 # ── File I/O callbacks ─────────────────────────────────────────────────────
@@ -211,11 +176,11 @@ def ui():
 
         # ── select with color preview ───────────────────────────────────────
         with gui.card(gap=10):
-            gui.text("gui.select()  — colour picker", bold=True, size="sm",
+            gui.text("gui.select()  — color picker", bold=True, size="sm",
                      muted=True,
                      style="text-transform:uppercase;letter-spacing:.06em")
             gui.select(
-                list(COLOR_MAP.keys()), "Accent colour",
+                list(COLOR_MAP.keys()), "Accent color",
                 value=color_mode, on_change=color_mode.set, key="color"
             )
             hex_val = COLOR_MAP[color_mode.value]
@@ -304,7 +269,7 @@ def ui():
                          f"Font: {font_size.value:.0f}px  ·  "
                          f"Opacity: {opacity.value:.0f}%", size="sm")
                 gui.text(f"Agreed: {agree.value}  ·  "
-                         f"Colour: {color_mode.value}  ·  "
+                         f"Color: {color_mode.value}  ·  "
                          f"Tags: {len(tags.value)}", size="sm")
 
             elif tab == "Stats":
@@ -315,8 +280,8 @@ def ui():
                         ("Tags",    str(len(tags.value))),
                         ("Note",    f"{len(note_text.value)} ch"),
                     ]:
-                        with gui.card(gap=4, padding=12,
-                                      style="flex:1;text-align:center;"
+                        with gui.card(gap=4, padding=12, fill=True,
+                                      style="text-align:center;"
                                             "background:var(--surface-2)"):
                             gui.text(val, bold=True, size="lg",
                                      style="color:var(--primary)")
@@ -408,7 +373,7 @@ def ui():
                     gui.slider("Noise", min=0, max=0.5, step=0.05,
                                value=img_noise, on_change=img_noise.set,
                                key="noise")
-                with gui.col(style="flex:1"):
+                with gui.col(fill=True):
                     gui.figure(make_surface_figure(), dpi=110)
 
 

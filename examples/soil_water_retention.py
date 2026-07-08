@@ -1,5 +1,5 @@
 """
-examples/08_soil_water_retention.py — Soil water retention curve explorer.
+examples/soil_water_retention.py — Soil water retention curve explorer.
 
 Demonstrates:
   - Dropdown that initialises sliders with soil-specific defaults
@@ -12,7 +12,7 @@ The van Genuchten (1980) model:
 
 Run:
     pip install matplotlib numpy
-    python examples/06_soil_water.py
+    python examples/soil_water_retention.py
 """
 
 import sys, os
@@ -68,7 +68,7 @@ def make_figure():
     θ = van_genuchten(h, theta_r.value, theta_s.value,
                       alpha.value, n_param.value)
 
-    fig, ax = plt.subplots(figsize=(5.4, 3.6))
+    fig, ax = plt.subplots(figsize=(5, 4))
     fig.patch.set_alpha(0)
     ax.set_facecolor("#f9f9fb")
 
@@ -90,47 +90,53 @@ def make_figure():
 
 
 # ── UI ────────────────────────────────────────────────────────────────────
-@gui.app("Soil Water Retention", width=640, height=660)
+@gui.app("Soil Water Retention", width=800, height=600)
 def ui():
-    with gui.col(padding=20, gap=16, style="min-height:100vh"):
 
-        gui.title("Soil Water Retention")
-        gui.text("van Genuchten (1980) model  ·  adjust parameters below",
-                 muted=True, size="sm")
+    with gui.col(padding=10, style="min-height:100vh"):
+        with gui.card():
+            gui.title("Soil Water Retention")
+            gui.text("van Genuchten (1980) model  ·  adjust parameters below", muted=True, size="sm")
 
-        # ── Controls
-        with gui.card(gap=14, padding=16):
+        with gui.row(gap=12, align="flex-start"):
 
-            gui.select(
-                SOIL_NAMES,
-                "Soil textural class",
-                value=soil_name,
-                key="soil-sel",
-                on_change=sync_sliders,
-            )
+            # ── Controls — proportional width (2 parts of 5)
+            with gui.col(padding=10, gap=16, style="flex:2"):
 
-            gui.divider()
+                with gui.card(gap=14, padding=16):
 
-            gui.slider("θ_r  — residual water content",
-                       min=0.010, max=0.150, step=0.001,
-                       value=theta_r, key="sl-tr",
-                       on_change=theta_r.set)
+                    gui.select(
+                        SOIL_NAMES,
+                        "Soil textural class",
+                        value=soil_name,
+                        key="soil-sel",
+                        on_change=sync_sliders,
+                    )
 
-            gui.slider("θ_s  — saturated water content",
-                       min=0.200, max=0.650, step=0.001,
-                       value=theta_s, key="sl-ts",
-                       on_change=theta_s.set)
+                    gui.divider()
 
-            gui.slider("α  — inverse air-entry pressure (1/cm)",
-                       min=0.001, max=0.300, step=0.001,
-                       value=alpha, key="sl-al",
-                       on_change=alpha.set)
+                    gui.slider("θ_r  — residual water content",
+                               min=0.010, max=0.150, step=0.001,
+                               value=theta_r, key="sl-tr",
+                               on_change=theta_r.set)
 
-            gui.slider("n  — pore-size distribution index",
-                       min=1.01, max=4.00, step=0.01,
-                       value=n_param, key="sl-n",
-                       on_change=n_param.set)
+                    gui.slider("θ_s  — saturated water content",
+                               min=0.200, max=0.650, step=0.001,
+                               value=theta_s, key="sl-ts",
+                               on_change=theta_s.set)
 
-        # ── Chart
-        with gui.card(padding=14):
-            gui.figure(make_figure(), dpi=110)
+                    gui.slider("α  — inverse air-entry pressure (1/cm)",
+                               min=0.001, max=0.300, step=0.001,
+                               value=alpha, key="sl-al",
+                               on_change=alpha.set)
+
+                    gui.slider("n  — pore-size distribution index",
+                               min=1.01, max=4.00, step=0.01,
+                               value=n_param, key="sl-n",
+                               on_change=n_param.set)
+
+            # ── Chart — proportional width (3 parts of 5)
+            with gui.col(padding=10, gap=12, style="flex:3"):
+
+                with gui.card(padding=14):
+                    gui.figure(make_figure(), dpi=110)

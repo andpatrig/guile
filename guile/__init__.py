@@ -87,10 +87,11 @@ def row(*, gap: int = 8, padding: Union[int, str] = 0,
                fill=fill, wrap=wrap, style=style, key=key)
 
 def card(*, gap: int = 12, padding: Union[int, str] = 20,
-         margin: Union[int, str] = 0,
+         margin: Union[int, str] = 0, fill: bool = False,
          style: str = "", key: Optional[str] = None) -> Card:
     """Raised surface. Use as `with gui.card():`. margin= adds outer spacing."""
-    return Card(gap=gap, padding=padding, margin=margin, style=style, key=key)
+    return Card(gap=gap, padding=padding, margin=margin, fill=fill,
+                style=style, key=key)
 
 def scroll(*, max_height: Optional[int] = 400,
            style: str = "", key: Optional[str] = None) -> Scroll:

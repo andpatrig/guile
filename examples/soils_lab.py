@@ -1,12 +1,12 @@
 """
-examples/06_soils_lab.py — Soils laboratory sample tracker.
+examples/soils_lab.py — Soils laboratory sample tracker.
 
 Log soil samples with a unique ID, county, and measured properties
 (bulk density and pH). View all samples in a scrollable table,
 then download as CSV.
 
 Run:
-    python examples/06_soils_lab.py
+    python examples/soils_lab.py
 """
 
 import sys, os

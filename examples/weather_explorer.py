@@ -1,13 +1,14 @@
 """
-examples/05_weather_explorer.py — Synthetic weather data explorer.
+examples/weather_explorer.py — Synthetic weather data explorer.
 
 Generates a year of daily air temperature and solar radiation data
 using a noisy sine wave. Filter by date range, view the table,
-and see a chart of the selected window.
+and see a chart of the selected window — controls live in a sidebar
+so adjusting them doesn't scroll the chart and table out of view.
 
 Run:
     pip install matplotlib numpy pandas
-    python examples/05_weather_explorer.py
+    python examples/weather_explorer.py
 """
 
 import sys, os
@@ -77,45 +78,49 @@ def make_figure(df):
 
 
 # ── App ────────────────────────────────────────────────────────────────────
-@gui.app("Weather Explorer", width=820, height=700)
+@gui.app("Weather Explorer", width=980, height=680)
 def ui():
     df = filtered_df()
 
-    with gui.col(padding=20, gap=14, style="min-height:100vh"):
+    with gui.row(gap=0, style="min-height:100vh"):
 
-        with gui.row(justify="space-between", align="center"):
-            gui.title("Weather Explorer")
+        # ── Sidebar — controls ───────────────────────────────────────
+        with gui.col(
+            padding=16, gap=14,
+            style="width:240px;flex-shrink:0;"
+                  "border-right:1px solid var(--border);"
+                  "background:var(--surface)"
+        ):
+            gui.title("Weather Explorer", size="lg")
             gui.badge(f"{len(df)} days selected", variant="primary")
+            gui.divider()
 
-        # ── Controls
-        with gui.card(gap=12, padding=14):
-            with gui.row(gap=16, align="flex-end"):
-                gui.date_input("From", value=start_date,
-                               on_change=start_date.set, key="from")
-                gui.date_input("To",   value=end_date,
-                               on_change=end_date.set,   key="to")
-                gui.select(
-                    [("temp_c",   "Air temperature (°C)"),
-                     ("solar_mj", "Solar radiation (MJ/m²/day)")],
-                    "Variable",
-                    value=show_var, on_change=show_var.set, key="var"
-                )
+            gui.date_input("From", value=start_date,
+                           on_change=start_date.set, key="from")
+            gui.date_input("To",   value=end_date,
+                           on_change=end_date.set,   key="to")
+            gui.select(
+                [("temp_c",   "Air temperature (°C)"),
+                 ("solar_mj", "Solar radiation (MJ/m²/day)")],
+                "Variable",
+                value=show_var, on_change=show_var.set, key="var"
+            )
 
             if len(df) > 0:
                 col = show_var.value
-                with gui.row(gap=20):
-                    gui.text(f"Mean:  {df[col].mean():.2f}", bold=True)
-                    gui.text(f"Min:   {df[col].min():.2f}", muted=True)
-                    gui.text(f"Max:   {df[col].max():.2f}", muted=True)
+                gui.divider()
+                gui.text(f"Mean:  {df[col].mean():.2f}", bold=True)
+                gui.text(f"Min:   {df[col].min():.2f}", muted=True)
+                gui.text(f"Max:   {df[col].max():.2f}", muted=True)
 
-        # ── Chart
-        if len(df) > 1:
-            with gui.card(padding=12):
-                gui.figure(make_figure(df), dpi=110)
+        # ── Main — chart + table ────────────────────────────────────
+        with gui.col(padding=16, gap=14, fill=True):
+            if len(df) > 1:
+                with gui.card(padding=12):
+                    gui.figure(make_figure(df), dpi=110)
 
-        # ── Table
-        with gui.card(padding=0, style="overflow-y:auto;max-height:260px"):
-            gui.table(
-                df.assign(date=df["date"].dt.strftime("%Y-%m-%d")),
-                columns=["date","temp_c","solar_mj"]
-            )
+            with gui.card(padding=0, fill=True, style="overflow-y:auto"):
+                gui.table(
+                    df.assign(date=df["date"].dt.strftime("%Y-%m-%d")),
+                    columns=["date","temp_c","solar_mj"]
+                )

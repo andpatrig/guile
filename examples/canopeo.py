@@ -1,8 +1,10 @@
 """
-examples/10_canopeo.py — Green canopy cover with the Canopeo algorithm.
+examples/canopeo.py — Green canopy cover with the Canopeo algorithm.
 
 Load an image, classify green canopy using Canopeo ratio thresholds,
 blend the mask over the original with a slider, and download the mask.
+Controls live in a sidebar so dragging a threshold and watching the
+image update happen side by side, not scrolled apart.
 
 Canopeo (Patrignani & Ochsner, 2015 — Agronomy Journal):
     A pixel is green canopy when ALL three conditions hold:
@@ -12,7 +14,7 @@ Canopeo (Patrignani & Ochsner, 2015 — Agronomy Journal):
 
 Run:
     pip install numpy pillow matplotlib
-    python examples/10_canopeo.py
+    python examples/canopeo.py
 """
 
 import sys, os
@@ -82,7 +84,7 @@ def blend_image(rgb: np.ndarray,
     overlay = rgb.copy().astype(float)
     green_px = np.array([0, 200, 0], dtype=float)
 
-    # Apply green colour where mask is True
+    # Apply green color where mask is True
     overlay[mask] = (1 - alpha) * rgb[mask].astype(float) + alpha * green_px
     # Non-mask pixels: darken slightly to make canopy pop
     overlay[~mask] = rgb[~mask].astype(float) * (1 - alpha * 0.25)
@@ -164,15 +166,19 @@ def make_figure() -> plt.Figure:
 
 # ── App ────────────────────────────────────────────────────────────────────
 
-@gui.app("Canopeo — Green Canopy Cover", width=860, height=700)
+@gui.app("Canopeo — Green Canopy Cover", width=980, height=720)
 def ui():
-    with gui.col(padding=20, gap=14, style="min-height:100vh"):
+    with gui.row(gap=0, style="min-height:100vh"):
 
-        # ── Header
-        with gui.row(justify="space-between", align="center"):
-            gui.title("Canopeo")
-            gui.text("Green canopy cover classifier",
-                     muted=True, size="sm")
+        # ── Sidebar — controls ──────────────────────────────────────
+        with gui.col(
+            padding=16, gap=14,
+            style="width:260px;flex-shrink:0;"
+                  "border-right:1px solid var(--border);"
+                  "background:var(--surface);overflow-y:auto"
+        ):
+            gui.title("Canopeo", size="lg")
+            gui.text("Green canopy cover classifier", muted=True, size="sm")
             if cover_pct.value > 0 or mask_array.value is not None:
                 gui.badge(
                     f"{cover_pct.value:.1f}% green cover",
@@ -180,90 +186,86 @@ def ui():
                     style="font-size:15px;padding:6px 14px"
                 )
 
-        # ── Load image
-        with gui.card(gap=10, padding=14):
-            with gui.row(gap=12, align="center"):
-                gui.file_picker(
-                    "Load image",
-                    file_types=(
-                        "Image Files (*.jpg)",
-                        "Image Files (*.jpeg)",
-                        "Image Files (*.png)",
-                        "Image Files (*.tif)",
-                        "Image Files (*.bmp)",
-                        "All files (*.*)",
-                    ),
-                    on_change=load_image,
-                    key="img-load",
-                )
-                gui.file_picker(
-                    "Save mask",
-                    save=True,
-                    file_types=("PNG Files (*.png)",),
-                    disabled=mask_array.value is None,
-                    on_change=save_mask,
-                    key="mask-save",
-                )
-                if img_path.value:
-                    gui.text(
-                        os.path.basename(img_path.value),
-                        muted=True, size="sm"
-                    )
+            gui.divider()
 
-        if img_array.value is not None:
+            gui.file_picker(
+                "Load image",
+                file_types=(
+                    "Image Files (*.jpg)",
+                    "Image Files (*.jpeg)",
+                    "Image Files (*.png)",
+                    "Image Files (*.tif)",
+                    "Image Files (*.bmp)",
+                    "All files (*.*)",
+                ),
+                on_change=load_image,
+                key="img-load",
+                style="width:100%",
+            )
+            gui.file_picker(
+                "Save mask",
+                save=True,
+                file_types=("PNG Files (*.png)",),
+                disabled=mask_array.value is None,
+                on_change=save_mask,
+                key="mask-save",
+                style="width:100%",
+            )
+            if img_path.value:
+                gui.text(
+                    os.path.basename(img_path.value),
+                    muted=True, size="sm"
+                )
 
-            # ── Blend slider
-            with gui.card(gap=10, padding=14):
+            if img_array.value is not None:
+                gui.divider()
+
                 gui.slider(
                     "Mask blend",
                     min=0, max=100, step=1,
                     value=blend, on_change=blend.set,
                     key="blend-sl",
                 )
-                with gui.row(gap=16):
-                    gui.text("← Original image",
-                             muted=True, size="sm")
-                    gui.text("Mask overlay →",
-                             muted=True, size="sm",
-                             style="margin-left:auto")
+                gui.text("0 = original photo, 100 = mask overlay",
+                         muted=True, size="sm")
 
-            # ── Threshold controls
-            with gui.card(gap=10, padding=14):
+                gui.divider()
+
                 gui.text("Canopeo thresholds", bold=True, size="sm",
                          muted=True,
                          style="text-transform:uppercase;letter-spacing:.06em")
-                with gui.row(gap=12, align="flex-end"):
-                    gui.number_input(
-                        "R/G threshold", value=rg_thresh,
-                        min=0.5, max=1.5, step=0.01,
-                        on_change=lambda v: (rg_thresh.set(v), run_canopeo()),
-                        key="rg"
-                    )
-                    gui.number_input(
-                        "B/G threshold", value=bg_thresh,
-                        min=0.5, max=1.5, step=0.01,
-                        on_change=lambda v: (bg_thresh.set(v), run_canopeo()),
-                        key="bg"
-                    )
-                    gui.number_input(
-                        "Excess Green", value=exg_thresh,
-                        min=0, max=100, step=1,
-                        on_change=lambda v: (exg_thresh.set(v), run_canopeo()),
-                        key="exg"
-                    )
+                gui.number_input(
+                    "R/G threshold", value=rg_thresh,
+                    min=0.5, max=1.5, step=0.01,
+                    on_change=lambda v: (rg_thresh.set(v), run_canopeo()),
+                    key="rg"
+                )
+                gui.number_input(
+                    "B/G threshold", value=bg_thresh,
+                    min=0.5, max=1.5, step=0.01,
+                    on_change=lambda v: (bg_thresh.set(v), run_canopeo()),
+                    key="bg"
+                )
+                gui.number_input(
+                    "Excess Green", value=exg_thresh,
+                    min=0, max=100, step=1,
+                    on_change=lambda v: (exg_thresh.set(v), run_canopeo()),
+                    key="exg"
+                )
 
-            # ── Blended image
-            fig = make_figure()
-            if fig is not None:
-                with gui.card(padding=8):
-                    gui.figure(fig, dpi=110)
-
-        else:
-            # Placeholder before image is loaded
-            with gui.card(padding=40):
-                with gui.col(align="center", gap=8):
-                    gui.text("No image loaded", muted=True)
-                    gui.text(
-                        "Load a JPG, PNG, or TIFF to begin classification.",
-                        muted=True, size="sm"
-                    )
+        # ── Main — image ────────────────────────────────────────────
+        with gui.col(padding=16, fill=True):
+            if img_array.value is not None:
+                fig = make_figure()
+                if fig is not None:
+                    with gui.card(padding=8, fill=True):
+                        gui.figure(fig, dpi=110)
+            else:
+                with gui.col(align="center", justify="center", fill=True):
+                    with gui.card(padding=40):
+                        with gui.col(align="center", gap=8):
+                            gui.text("No image loaded", muted=True)
+                            gui.text(
+                                "Load a JPG, PNG, or TIFF to begin classification.",
+                                muted=True, size="sm"
+                            )

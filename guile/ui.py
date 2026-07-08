@@ -100,7 +100,16 @@ def _next_id(key: Optional[str] = None) -> str:
 
 def _arity(fn: Callable) -> int:
     """
-    Number of positional parameters fn accepts (0 or 1 in practice).
+    Number of REQUIRED positional parameters fn accepts (0 or 1 in practice).
+
+    Only counts parameters WITHOUT a default. This matters because the
+    standard Python idiom for capturing a loop variable in a callback is a
+    default argument — `on_click=lambda i=tid: delete(i)` inside a `for`
+    loop. That parameter has a default, so it isn't something the caller is
+    required to supply; dispatch() below should call it with zero arguments
+    and let the default (captured per-iteration) do its job. Counting it as
+    "1" would make dispatch() pass the widget's own trigger value (usually
+    None) into that slot instead, silently discarding the captured value.
 
     Resolved ONCE at registration so dispatch() never has to guess by
     catching TypeError — which risked re-running a handler whose body
@@ -108,7 +117,13 @@ def _arity(fn: Callable) -> int:
     """
     import inspect
     try:
-        return len(inspect.signature(fn).parameters)
+        params = inspect.signature(fn).parameters.values()
+        return sum(
+            1 for p in params
+            if p.default is inspect.Parameter.empty
+            and p.kind in (inspect.Parameter.POSITIONAL_ONLY,
+                           inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        )
     except (TypeError, ValueError):
         return 1        # uninspectable callables: assume handler(value)
 
@@ -296,6 +311,12 @@ class Column(_Container):
         gap, padding, align (horizontal), justify (vertical), fill, scroll
     Style props (HOW the container looks):
         style="..." — any raw CSS
+
+    align/justify position children WITHIN this column; fill grows THIS
+    column within its own parent. Neither one makes a child fill this
+    column automatically — align="stretch" (the default) already stretches
+    children to the column's width, but if a child still looks narrow,
+    give that specific child fill=True (col/row/card) or style="flex:1".
     """
     def __init__(self, *, gap: int = 12, padding: Union[int, str] = 0,
                  align: str = "stretch", justify: str = "flex-start",
@@ -315,6 +336,14 @@ class Row(_Container):
 
     Layout props: gap, padding, align (vertical), justify (horizontal),
                   fill, wrap
+
+    align/justify position children WITHIN this row; fill grows THIS row
+    within its own parent. Neither one makes a child fill this row's
+    width automatically — a row's children only take their natural content
+    width unless told otherwise. To make one child fill the remaining
+    width, give that specific child fill=True (col/row/card) or
+    style="flex:1". To split the row into N equal or proportional shares,
+    give fill=True (equal) or style="flex:N" (proportional) to each child.
     """
     def __init__(self, *, gap: int = 8, padding: Union[int, str] = 0,
                  align: str = "center", justify: str = "flex-start",
@@ -334,13 +363,21 @@ class Card(_Container):
 
     margin= adds space around the outside of the card.
     Use a string for fine control: margin="0 0 12px 0" (top right bottom left).
+
+    fill=True makes THIS card stretch to fill its parent — the full width of
+    a gui.row(), or the full height of a gui.col(). This is the single-child
+    equivalent of fill= on gui.row()/gui.col(): those grow the container
+    itself within ITS parent; this grows the card itself within ITS parent.
+    Neither one makes a plain child fill *automatically* — fill always has
+    to be set on the element that should do the growing.
     """
     def __init__(self, *, gap: int = 12, padding: Union[int, str] = 20,
-                 margin: Union[int, str] = 0,
+                 margin: Union[int, str] = 0, fill: bool = False,
                  style: str = "", key: Optional[str] = None):
         # Only emit margin CSS when non-zero (avoids polluting every card)
         m = f"margin:{_px(margin)};" if margin and margin != 0 else ""
-        s = f"gap:{_px(gap)};padding:{_px(padding)};{m}" + style
+        f = "flex:1;align-self:stretch;" if fill else ""
+        s = f"gap:{_px(gap)};padding:{_px(padding)};{m}{f}" + style
         super().__init__(css_class="guile-col guile-card", inline_style=s, key=key)
 
 

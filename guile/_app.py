@@ -90,7 +90,7 @@ class _App:
         """
         Build the root container that wraps the user's ui().
 
-        With center=True the root fills the window and centres its children
+        With center=True the root fills the window and centers its children
         on both axes — the same effect as wrapping everything in
         gui.col(align="center", justify="center", style="min-height:100vh"),
         but without the boilerplate. Handy for small single-card apps.

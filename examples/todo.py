@@ -1,5 +1,5 @@
 """
-examples/02_todo.py — To-do list.
+examples/todo.py — To-do list.
 
 Shows:
   - gui.input() returning its own State, so we can read name.value inline

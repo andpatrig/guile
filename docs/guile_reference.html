@@ -303,7 +303,7 @@ pre {
 <nav id="sidebar">
   <div class="logo">
     <div class="logo-name">gui<span>le</span></div>
-    <div class="logo-sub">API reference v0.5.4</div>
+    <div class="logo-sub">API reference v0.5.5</div>
   </div>
   <div id="nav-links"></div>
 </nav>
@@ -318,9 +318,9 @@ const WIDGETS = [
    args:[
      ["gap","int = 12","Spacing between children in px"],
      ["padding","int|str = 0","Inner padding (px or CSS string like '12px 20px')"],
-     ["align","str = 'stretch'","Cross-axis (horizontal): stretch | center | flex-start | flex-end"],
-     ["justify","str = 'flex-start'","Main-axis (vertical): flex-start | center | flex-end | space-between"],
-     ["fill","bool = False","flex:1 — expands to fill available space"],
+     ["align","str = 'stretch'","Cross-axis (horizontal), for children: stretch | center | flex-start | flex-end"],
+     ["justify","str = 'flex-start'","Main-axis (vertical), for children: flex-start | center | flex-end | space-between"],
+     ["fill","bool = False","Grows THIS column to fill its own parent (flex:1). Does not affect children — give a child fill=True or style='flex:1' to make it fill this column."],
      ["scroll","bool = False","Enable vertical scrolling when content overflows"],
      ["style","str = ''","Raw CSS appended to the element style attribute"],
      ["key","str = None","Stable DOM ID — required when used inside a loop"],
@@ -332,9 +332,9 @@ const WIDGETS = [
    args:[
      ["gap","int = 8","Spacing between children in px"],
      ["padding","int|str = 0","Inner padding"],
-     ["align","str = 'center'","Cross-axis (vertical): center | flex-start | flex-end | baseline | stretch"],
-     ["justify","str = 'flex-start'","Main-axis (horizontal): flex-start | center | flex-end | space-between"],
-     ["fill","bool = False","flex:1"],
+     ["align","str = 'center'","Cross-axis (vertical), for children: center | flex-start | flex-end | baseline | stretch"],
+     ["justify","str = 'flex-start'","Main-axis (horizontal), for children: flex-start | center | flex-end | space-between"],
+     ["fill","bool = False","Grows THIS row to fill its own parent (flex:1). Does not affect children — give a child fill=True or style='flex:1' to make it fill this row's width."],
      ["wrap","bool = False","Allow children to wrap onto the next line"],
      ["style","str = ''","Raw CSS"],
      ["key","str = None","Stable DOM ID"],
@@ -346,6 +346,8 @@ const WIDGETS = [
    args:[
      ["gap","int = 12","Spacing between children"],
      ["padding","int|str = 20","Inner padding"],
+     ["margin","int|str = 0","Space around the outside of the card"],
+     ["fill","bool = False","Grows THIS card to fill its parent — full width in a gui.row(), full height in a gui.col()"],
      ["style","str = ''","Raw CSS — e.g. style='margin:0 20px'"],
      ["key","str = None","Stable DOM ID"],
    ],

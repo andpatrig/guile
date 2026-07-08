@@ -74,6 +74,26 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
 .swatch{border-radius:8px;padding:12px 16px;font-size:12px;font-weight:500;
   cursor:pointer;border:1px solid rgba(0,0,0,.1);transition:transform .1s}
 .swatch:hover{transform:scale(1.04)}
+/* ── Layout diagrams ──────────────────────────────────────────── */
+.dg{margin:16px 0 20px}
+.dg svg{display:block;max-width:480px;width:100%;height:auto}
+.dg-outer{fill:none;stroke:var(--border-2);stroke-width:1.4;stroke-dasharray:4 3}
+.dg-box{fill:var(--surface-2);stroke:var(--border-2);stroke-width:1}
+.dg-box-hi{fill:var(--accent-bg);stroke:var(--accent);stroke-width:1.3}
+.dg-arrow{stroke:var(--accent);stroke-width:1.6;fill:none}
+.dg-arrow-2{stroke:var(--text-3);stroke-width:1.3;fill:none}
+.dg-arrowhead{fill:var(--accent)}
+.dg-arrowhead-2{fill:var(--text-3)}
+.dg-lbl{font-family:var(--mono);font-size:9px;fill:var(--text-3);letter-spacing:.02em}
+.dg-lbl-hi{font-family:var(--mono);font-size:9.5px;fill:var(--accent-txt);font-weight:500}
+.dg-cap{font-size:12.5px;color:var(--text-2);line-height:1.55;margin-top:2px}
+.dg-cap code{font-size:11.5px}
+.dg-legend{display:flex;align-items:center;gap:18px;margin:10px 0 18px;
+  font-size:12px;color:var(--text-2)}
+.dg-legend span{display:inline-flex;align-items:center;gap:6px}
+.dg-swatch{width:14px;height:14px;border-radius:3px;display:inline-block}
+.dg-swatch.fixed{background:var(--surface-2);border:1px solid var(--border-2)}
+.dg-swatch.fill{background:var(--accent-bg);border:1px solid var(--accent)}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
@@ -94,6 +114,8 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
   <a href="#themes-custom">Custom theme</a>
   <a href="#themes-vars">CSS variables</a>
   <div class="nav-cat">Layout</div>
+  <a href="#layout-mental-model">Fill vs. align</a>
+  <a href="#layout-common">Common layouts</a>
   <a href="#layout-center">Centering</a>
   <a href="#layout-cols">Unequal columns</a>
   <a href="#layout-grid">CSS grid</a>
@@ -396,6 +418,221 @@ def ui():
 
 <p>The full list of derived variables (set automatically) is in <code>_template.py</code> under <em>Design tokens</em>.
 You can still override any of them directly via <code>gui.html("&lt;style&gt;:root{--border-focus:#ff0}...&lt;/style&gt;")</code>.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="layout-mental-model">
+<h2>Fill vs. align — the short version</h2>
+
+<p>Every container is a flexbox with two independent axes: a <strong>main
+axis</strong> (vertical for <code>gui.col()</code>, horizontal for
+<code>gui.row()</code>) and a <strong>cross axis</strong> (the other one).
+Three different props touch these axes, and mixing them up is the #1 source
+of "why won't this stretch" confusion:</p>
+
+<div class="dg">
+<svg viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Diagram: gui.col() stacks children down a vertical main axis and aligns them across a horizontal cross axis. gui.row() is the mirror image — main axis horizontal, cross axis vertical.">
+  <defs>
+    <marker id="dgA-main" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 Z" class="dg-arrowhead"/>
+    </marker>
+    <marker id="dgA-cross" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 Z" class="dg-arrowhead-2"/>
+    </marker>
+  </defs>
+
+  <!-- col panel -->
+  <text x="120" y="10" text-anchor="middle" class="dg-lbl-hi">gui.col()</text>
+  <line x1="45" y1="34" x2="195" y2="34" class="dg-arrow-2" marker-start="url(#dgA-cross)" marker-end="url(#dgA-cross)"/>
+  <text x="120" y="29" text-anchor="middle" class="dg-lbl">cross · align</text>
+  <rect x="45" y="42" width="150" height="100" rx="6" class="dg-outer"/>
+  <rect x="59" y="54" width="122" height="18" rx="3" class="dg-box"/>
+  <rect x="59" y="80" width="122" height="18" rx="3" class="dg-box"/>
+  <rect x="59" y="106" width="122" height="18" rx="3" class="dg-box"/>
+  <line x1="30" y1="46" x2="30" y2="138" class="dg-arrow" marker-start="url(#dgA-main)" marker-end="url(#dgA-main)"/>
+  <text x="18" y="92" text-anchor="middle" class="dg-lbl" transform="rotate(-90 18 92)">main · justify</text>
+
+  <!-- row panel -->
+  <text x="405" y="10" text-anchor="middle" class="dg-lbl-hi">gui.row()</text>
+  <line x1="316" y1="46" x2="316" y2="138" class="dg-arrow-2" marker-start="url(#dgA-cross)" marker-end="url(#dgA-cross)"/>
+  <text x="304" y="92" text-anchor="middle" class="dg-lbl" transform="rotate(-90 304 92)">cross · align</text>
+  <rect x="330" y="42" width="150" height="100" rx="6" class="dg-outer"/>
+  <rect x="344" y="56" width="34" height="72" rx="3" class="dg-box"/>
+  <rect x="388" y="56" width="34" height="72" rx="3" class="dg-box"/>
+  <rect x="432" y="56" width="34" height="72" rx="3" class="dg-box"/>
+  <line x1="330" y1="150" x2="480" y2="150" class="dg-arrow" marker-start="url(#dgA-main)" marker-end="url(#dgA-main)"/>
+  <text x="405" y="164" text-anchor="middle" class="dg-lbl">main · justify</text>
+</svg>
+</div>
+<p class="dg-cap">Squares are children. The <strong>main axis</strong> arrow is where <code>justify</code> spaces things out and where <code>fill</code> grows an element; the <strong>cross axis</strong> arrow is where <code>align</code> works. Rotate one 90° to get the other.</p>
+
+<table style="width:100%;border-collapse:collapse;margin:12px 0 18px;font-size:13.5px">
+<tr style="border-bottom:1px solid var(--border)">
+  <th style="text-align:left;padding:6px 10px 6px 0;color:var(--text-3);font-weight:600">Prop</th>
+  <th style="text-align:left;padding:6px 10px;color:var(--text-3);font-weight:600">Lives on</th>
+  <th style="text-align:left;padding:6px 0;color:var(--text-3);font-weight:600">Controls</th>
+</tr>
+<tr style="border-bottom:1px solid var(--border)">
+  <td style="padding:6px 10px 6px 0"><code>align=</code></td>
+  <td style="padding:6px 10px">the container</td>
+  <td style="padding:6px 0">how its <em>children</em> sit on the <strong>cross</strong> axis. <code>align="stretch"</code> (col's default) already stretches children to full width — it's the reason a single card usually fills a column with no extra work.</td>
+</tr>
+<tr style="border-bottom:1px solid var(--border)">
+  <td style="padding:6px 10px 6px 0"><code>justify=</code></td>
+  <td style="padding:6px 10px">the container</td>
+  <td style="padding:6px 0">how its <em>children</em> are spaced on the <strong>main</strong> axis.</td>
+</tr>
+<tr>
+  <td style="padding:6px 10px 6px 0"><code>fill=</code></td>
+  <td style="padding:6px 10px">the element itself</td>
+  <td style="padding:6px 0">grows <em>that element</em> to fill remaining space on its <strong>parent's main axis</strong>. It never reaches down into children — <code>gui.row(fill=True)</code> grows the row, not what's inside it.</td>
+</tr>
+</table>
+
+<p><strong>The case that trips people up:</strong> a single <code>gui.card()</code>
+as the only thing in a <code>gui.row()</code>. <code>gui.row(fill=True)</code>
+does nothing visible here because the row was probably already full width;
+<code>gui.row(align="stretch")</code> does nothing useful because a row's
+cross axis is <em>vertical</em>, not horizontal. What you actually want is
+to grow the <em>card</em>, so put <code>fill=True</code> on the card:</p>
+
+<div class="dg">
+<svg viewBox="0 0 560 130" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Diagram: a plain card in a row keeps its natural width, leaving empty space. A card with fill=True grows to fill the row.">
+  <defs>
+    <marker id="dgB-arrow" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 Z" class="dg-arrowhead"/>
+    </marker>
+  </defs>
+
+  <!-- default: card keeps natural width -->
+  <text x="140" y="10" text-anchor="middle" class="dg-lbl">gui.card() — default</text>
+  <rect x="30" y="18" width="220" height="66" rx="6" class="dg-outer"/>
+  <rect x="42" y="30" width="70" height="42" rx="4" class="dg-box"/>
+  <text x="140" y="102" text-anchor="middle" class="dg-lbl">keeps its natural width</text>
+
+  <!-- fill=True: card grows to fill the row -->
+  <text x="420" y="10" text-anchor="middle" class="dg-lbl-hi">gui.card(fill=True)</text>
+  <rect x="310" y="18" width="220" height="66" rx="6" class="dg-outer"/>
+  <rect x="322" y="30" width="196" height="42" rx="4" class="dg-box-hi"/>
+  <line x1="322" y1="94" x2="518" y2="94" class="dg-arrow" marker-start="url(#dgB-arrow)" marker-end="url(#dgB-arrow)"/>
+  <text x="420" y="108" text-anchor="middle" class="dg-lbl-hi">flex:1 — fills the row</text>
+</svg>
+</div>
+
+<pre># Card fills the row's width
+with gui.row():
+    with gui.card(fill=True):
+        gui.title("I fill the row")
+
+# Equivalent, if you need something style= can do that fill= can't
+with gui.row():
+    with gui.card(style="flex:1"):
+        gui.title("Same result")</pre>
+
+<div class="note"><code>gui.col()</code>, <code>gui.row()</code>, and
+<code>gui.card()</code> all accept <code>fill=</code> — put it on whichever
+one is actually supposed to grow. Every widget also accepts
+<code>style=</code>, so <code>style="flex:1"</code> works anywhere <code>fill=</code>
+isn't offered.</div>
+
+<div class="note">⚠️ <code>center=True</code> on <code>@gui.app()</code>
+switches the app's root container from <code>align="stretch"</code> to
+<code>align="center"</code> — so everything stops auto-filling the window
+width. It's meant for small, single-card apps only. If you're building a
+dashboard or anything with a real layout, leave <code>center</code> at its
+default (<code>False</code>).</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="layout-common">
+<h2>Common layouts</h2>
+
+<p>Most apps need one of four shapes. Here's each one at its shortest.</p>
+
+<div class="dg-legend">
+  <span><i class="dg-swatch fixed"></i> fixed / default size</span>
+  <span><i class="dg-swatch fill"></i> fill=True (grows)</span>
+</div>
+
+<h3>1. Single column (the default — no wrapping needed)</h3>
+<p>The app's root is already a full-width column with <code>align="stretch"</code>.
+Just write widgets top to bottom; each card fills the window width on its own.</p>
+<div class="dg">
+<svg viewBox="0 0 420 90" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Diagram: one full-width column containing two stacked cards, each spanning the full width.">
+  <rect x="10" y="10" width="400" height="70" rx="6" class="dg-outer"/>
+  <rect x="24" y="22" width="372" height="22" rx="3" class="dg-box-hi"/>
+  <rect x="24" y="52" width="372" height="22" rx="3" class="dg-box-hi"/>
+</svg>
+</div>
+<pre>@gui.app("My app", width=900, height=600)
+def ui():
+    gui.title("Dashboard")
+    with gui.card():
+        gui.text("First section")
+    with gui.card():
+        gui.text("Second section")</pre>
+
+<h3>2. Sidebar + main area</h3>
+<p>A fixed-width column next to a column that fills whatever's left.
+<code>fill=True</code> on the main column is the correct use of fill: it grows
+to consume the row's remaining space after the fixed sidebar.</p>
+<div class="dg">
+<svg viewBox="0 0 420 90" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Diagram: a narrow fixed-width sidebar on the left next to a wide main area that fills the remaining space.">
+  <rect x="10" y="10" width="400" height="70" rx="6" class="dg-outer"/>
+  <rect x="20" y="20" width="90" height="50" rx="3" class="dg-box"/>
+  <rect x="120" y="20" width="280" height="50" rx="3" class="dg-box-hi"/>
+</svg>
+</div>
+<pre>with gui.row(fill=True, gap=0):
+    with gui.col(style="width:220px;flex-shrink:0", padding=16):
+        gui.title("Menu", size="lg")
+    with gui.col(fill=True, padding=16):
+        gui.title("Main content")</pre>
+
+<h3>3. Three or four equal columns</h3>
+<p>Give <code>fill=True</code> to every column (or card) in the row — each one
+claims an equal share of the width.</p>
+<div class="dg">
+<svg viewBox="0 0 420 90" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Diagram: four equal-width columns side by side, each filling an equal share of the row.">
+  <rect x="10" y="10" width="400" height="70" rx="6" class="dg-outer"/>
+  <rect x="22" y="20" width="88" height="50" rx="3" class="dg-box-hi"/>
+  <rect x="118" y="20" width="88" height="50" rx="3" class="dg-box-hi"/>
+  <rect x="214" y="20" width="88" height="50" rx="3" class="dg-box-hi"/>
+  <rect x="310" y="20" width="88" height="50" rx="3" class="dg-box-hi"/>
+</svg>
+</div>
+<pre>with gui.row(gap=16):
+    for label in ["Revenue", "Users", "Errors", "Uptime"]:
+        with gui.card(fill=True):
+            gui.text(label, muted=True, size="sm")
+            gui.text("—", size="2xl", bold=True)</pre>
+
+<h3>4. One level of nested columns</h3>
+<p>A row of columns, each stacking its own cards — the most nesting most
+apps ever need.</p>
+<div class="dg">
+<svg viewBox="0 0 420 110" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Diagram: a row split into two columns, each column stacking two cards vertically.">
+  <rect x="10" y="10" width="400" height="90" rx="6" class="dg-outer"/>
+  <rect x="20" y="20" width="180" height="70" rx="4" class="dg-outer"/>
+  <rect x="30" y="30" width="160" height="22" rx="3" class="dg-box-hi"/>
+  <rect x="30" y="58" width="160" height="22" rx="3" class="dg-box-hi"/>
+  <rect x="210" y="20" width="180" height="70" rx="4" class="dg-outer"/>
+  <rect x="220" y="30" width="160" height="22" rx="3" class="dg-box-hi"/>
+  <rect x="220" y="58" width="160" height="22" rx="3" class="dg-box-hi"/>
+</svg>
+</div>
+<pre>with gui.row(fill=True, gap=16):
+    with gui.col(fill=True, gap=16):
+        with gui.card(): gui.title("Top left")
+        with gui.card(): gui.title("Bottom left")
+    with gui.col(fill=True, gap=16):
+        with gui.card(): gui.title("Top right")</pre>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->

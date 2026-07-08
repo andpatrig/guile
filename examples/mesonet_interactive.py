@@ -1,5 +1,5 @@
 """
-examples/04b_mesonet_interactive.py — Bidirectional Leaflet map demo.
+examples/mesonet_interactive.py — Bidirectional Leaflet map demo.
 
 Demonstrates all map callback types:
   • Marker.on_click  — click a station → show station details in a sidebar
@@ -7,7 +7,7 @@ Demonstrates all map callback types:
   • leaflet on_move  — pan/zoom → keep view state in sync
 
 Run from the project root:
-    python 04b_mesonet_interactive.py
+    python mesonet_interactive.py
 """
 
 import sys, os
@@ -69,10 +69,10 @@ def ui():
             gui.title("Kansas Mesonet")
             gui.text("Interactive map demo", muted=True, size="sm")
 
-        with gui.row(gap=14, style="flex:1"):
+        with gui.row(gap=14, fill=True):
 
             # ── Map ─────────────────────────────────────────────────────────
-            with gui.col(gap=8, style="flex:1"):
+            with gui.col(gap=8, fill=True):
                 with gui.card(padding=8):
                     markers = [
                         gui.Marker(

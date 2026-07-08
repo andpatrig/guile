@@ -1,12 +1,13 @@
 """
-examples/04_mesonet_map.py — Kansas Mesonet station map.
+examples/mesonet_map.py — Kansas Mesonet station map.
 
 Shows ~25 KS Mesonet stations on an interactive Leaflet map.
 Click a marker to see the station name and county.
-Use the multiselect to filter by region.
+Use the multiselect to filter by region — the map updates immediately,
+without losing sight of the filter controls.
 
 Run:
-    python examples/04_mesonet_map.py
+    python examples/mesonet_map.py
 """
 
 import sys, os
@@ -61,23 +62,10 @@ ALL_REGIONS = list(REGIONS.keys())
 selected_regions = gui.state(ALL_REGIONS)
 
 # ── App ────────────────────────────────────────────────────────────────────
-@gui.app("KS Mesonet Stations", width=780, height=680)
+@gui.app("KS Mesonet Stations", width=860, height=640)
 def ui():
-    with gui.col(padding=20, gap=14, style="min-height:100vh"):
+    with gui.row(gap=0, style="min-height:100vh"):
 
-        with gui.row(justify="space-between", align="center"):
-            gui.title("Kansas Mesonet")
-            gui.text("Weather station network", muted=True, size="sm")
-
-        # Region filter
-        with gui.card(gap=10, padding=14):
-            gui.multiselect(
-                ALL_REGIONS, "Show regions",
-                value=selected_regions, on_change=selected_regions.set,
-                rows=2, key="regions"
-            )
-
-        # Build visible markers
         active_names = {
             name
             for region in selected_regions.value
@@ -85,25 +73,43 @@ def ui():
         }
         visible = [s for s in STATIONS if s[0] in active_names]
 
-        with gui.row(gap=8):
+        # ── Sidebar — filter controls ───────────────────────────────
+        with gui.col(
+            padding=16, gap=12,
+            style="width:220px;flex-shrink:0;"
+                  "border-right:1px solid var(--border);"
+                  "background:var(--surface)"
+        ):
+            gui.title("Kansas Mesonet", size="lg")
+            gui.text("Weather station network", muted=True, size="sm")
+            gui.divider()
+
+            gui.multiselect(
+                ALL_REGIONS, "Show regions",
+                value=selected_regions, on_change=selected_regions.set,
+                rows=4, key="regions"
+            )
+
+            gui.spacer(h=4)
             gui.badge(f"{len(visible)} stations", variant="primary")
             for region in selected_regions.value:
                 gui.badge(region, variant="neutral")
 
-        # Map
-        with gui.card(padding=8):
-            markers = [
-                gui.Marker(
-                    (lat, lon),
-                    popup=f"<b>{name}</b><br>{county} County",
-                    tooltip=name,
+        # ── Main — map ──────────────────────────────────────────────
+        with gui.col(padding=16, fill=True):
+            with gui.card(padding=8, fill=True):
+                markers = [
+                    gui.Marker(
+                        (lat, lon),
+                        popup=f"<b>{name}</b><br>{county} County",
+                        tooltip=name,
+                    )
+                    for name, county, lat, lon in visible
+                ]
+                gui.leaflet(
+                    center=(38.5, -98.5),
+                    zoom=6,
+                    height=560,
+                    markers=markers,
+                    key="ks-map",
                 )
-                for name, county, lat, lon in visible
-            ]
-            gui.leaflet(
-                center=(38.5, -98.5),
-                zoom=6,
-                height=440,
-                markers=markers,
-                key="ks-map",
-            )

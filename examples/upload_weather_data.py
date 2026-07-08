@@ -1,5 +1,5 @@
 """
-examples/09_upload_weather_data.py — Load a DataFrame, display it, download it.
+examples/upload_weather_data.py — Load a DataFrame, display it, download it.
 
 The pattern:
   - df = gui.state(None)        — None means no data yet
@@ -8,7 +8,7 @@ The pattern:
 
 Run:
     pip install pandas
-    python examples/08_dynamic_table.py
+    python examples/upload_weather_data.py
 """
 
 import sys, os

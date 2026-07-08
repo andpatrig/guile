@@ -1,11 +1,11 @@
 """
-examples/11_map_draw.py — Map drawing tools demo.
+examples/map_draw.py — Map drawing tools demo.
 
 Shows how to use draw= to enable polygon/rectangle/circle drawing,
 and how on_shape= receives each completed shape in Python.
 
 Run from the project root:
-    python 11_map_draw.py
+    python map_draw.py
 """
 
 import sys, os
@@ -34,10 +34,10 @@ def ui():
             gui.text("Use the toolbar on the map to draw shapes",
                      muted=True, size="sm")
 
-        with gui.row(gap=14, style="flex:1"):
+        with gui.row(gap=14, fill=True):
 
             # ── Map ──────────────────────────────────────────────────────────
-            with gui.col(style="flex:1"):
+            with gui.col(fill=True):
                 with gui.card(padding=8):
                     gui.leaflet(
                         center=(38.5, -98.5),
