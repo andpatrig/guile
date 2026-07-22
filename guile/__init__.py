@@ -18,11 +18,12 @@ Quick start:
                        min=0, max=212)
             gui.text(f"{to_celsius(fahrenheit.value)} °C", size="2xl", bold=True)
 
-Five source files:
+Source files:
     state.py     — reactive State class
     ui.py        — render engine + all widget classes
     _app.py      — window lifecycle, pywebview bridge
     _template.py — embedded HTML/CSS/JS page
+    _package.py  — build a shareable executable (gui.package)
     __init__.py  — this file: the public API surface (gui.*)
 
 Everything the user ever calls lives in this file as a plain function.
@@ -50,6 +51,7 @@ from .ui import (
     _Theme, THEMES,
 )
 from ._app import _App
+from ._package import package, pack
 
 
 # ── State ──────────────────────────────────────────────────────────────────
@@ -326,6 +328,27 @@ def file_picker(label: str = "Choose file…", *,
                 style: str = "", key: Optional[str] = None) -> _FilePicker:
     """OS native file dialog button. Returns .value (str) with the selected path.
     on_change is called with the selected path string after the dialog closes.
+
+    The picker returns a path only — it never reads or parses the file, so it
+    imposes no restriction on file type. You read the path yourself, e.g.:
+
+        import yaml, tomllib   # tomllib is stdlib on Python 3.11+
+        cfg = gui.file_picker("Load config…",
+                              file_types=("yaml", "yml", "toml"),
+                              on_change=load, key="cfg")
+
+        def load(path):
+            with open(path, "rb") as f:
+                data = (tomllib.load(f) if path.endswith(".toml")
+                        else yaml.safe_load(f))
+
+    file_types accepts either bare extensions or full pywebview filter
+    strings, mixed freely, and an "All files" entry is always appended so a
+    too-narrow filter can never hide a file you meant to open:
+
+        file_types=("yaml", "yml", "toml")   # simplest
+        file_types=(".csv", "*.json")        # dots / globs are fine too
+        file_types=("Data (*.yaml;*.toml)",) # explicit pywebview string
     """
     return _FilePicker(label, value=value, file_types=file_types,
                        save=save, disabled=disabled,
@@ -401,10 +424,10 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
             on_click:  Optional[Callable] = None,
             on_move:   Optional[Callable] = None,
             on_shape:  Optional[Callable] = None,
-            draw: Any = False,
+            draw: Any = False, tiles: Any = "street",
             style: str = "", key: Optional[str] = None) -> _Map:
     """
-    Embed an interactive Leaflet map (OpenStreetMap tiles). Requires internet.
+    Embed an interactive Leaflet map. Requires internet for tile loading.
 
     Callbacks:
         on_click(lat, lon)      — fires when the user clicks the map background
@@ -423,6 +446,24 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
                                         polyline, circle, marker)
         draw=False                    — no tools (default)
 
+    Tile layers (base imagery) — all keyless public servers:
+        tiles="street"     — OpenStreetMap (default)
+        tiles="satellite"  — Esri World Imagery
+        tiles="hybrid"     — satellite + place / road labels
+        tiles="terrain"    — OpenTopoMap
+        tiles="light"      — Carto Positron (muted, good under data)
+        tiles="dark"       — Carto Dark Matter
+        tiles="<url>"      — any XYZ template with {z}/{x}/{y}
+        tiles={"url": "...", "attribution": "...", "max_zoom": 19}
+
+    Switch views live by binding tiles to a State:
+
+        view = gui.state("street")
+        gui.select(["street", "satellite", "hybrid"], "Map view",
+                   value=view, on_change=view.set, key="view")
+        gui.leaflet(center=(39.19, -96.58), zoom=13,
+                    tiles=view.value, key="map")
+
     Per-marker callbacks:
         gui.Marker((lat, lon), on_click=fn)
 
@@ -435,7 +476,8 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
             _App._current._use_leaflet_draw = True
     return _Map(center=center, zoom=zoom, height=height,
                 markers=markers, on_click=on_click, on_move=on_move,
-                on_shape=on_shape, draw=draw, style=style, key=key)
+                on_shape=on_shape, draw=draw, tiles=tiles,
+                style=style, key=key)
 
 
 

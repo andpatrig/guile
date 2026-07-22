@@ -447,26 +447,48 @@ function _guileSyncMaps() {
             var canvas = el.querySelector('.guile-map-canvas');
             if (!canvas) return;
             var map = L.map(canvas, {zoomControl: true}).setView(cfg.center, cfg.zoom);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors', maxZoom: 19
-            }).addTo(map);
             var lg = L.layerGroup().addTo(map);
             var entry = {
                 map: map, layerGroup: lg, cfgJson: cfgJson,
                 onClickCid: null, onMoveCid: null,
-                drawControl: null, drawnItems: null
+                drawControl: null, drawnItems: null,
+                tileLayers: [], tilesJson: null
             };
             _guileMaps[id] = entry;
+            _guileApplyTiles(entry, cfg.tiles);
+            entry.tilesJson = JSON.stringify(cfg.tiles || []);
             _guileAttachMapEvents(entry, cfg);
             _guileApplyMarkers(lg, cfg.markers || []);
         } else if (_guileMaps[id].cfgJson !== cfgJson) {
             var entry = _guileMaps[id];
             entry.map.setView(cfg.center, cfg.zoom);
+            // Rebuild tiles only when they actually changed, so panning /
+            // adding markers doesn't flash the base map.
+            var newTilesJson = JSON.stringify(cfg.tiles || []);
+            if (entry.tilesJson !== newTilesJson) {
+                _guileApplyTiles(entry, cfg.tiles);
+                entry.tilesJson = newTilesJson;
+            }
             entry.layerGroup.clearLayers();
             _guileAttachMapEvents(entry, cfg);
             _guileApplyMarkers(entry.layerGroup, cfg.markers || []);
             entry.cfgJson = cfgJson;
         }
+    });
+}
+
+// Replace an entry's base tile layers. Tiles live in Leaflet's tilePane
+// (below markers/shapes regardless of add order), so switching them never
+// covers your data.
+function _guileApplyTiles(entry, tiles) {
+    (entry.tileLayers || []).forEach(function(l) {
+        entry.map.removeLayer(l);
+    });
+    entry.tileLayers = [];
+    (tiles || []).forEach(function(t) {
+        var layer = L.tileLayer(t.url, t.options || {});
+        layer.addTo(entry.map);
+        entry.tileLayers.push(layer);
     });
 }
 

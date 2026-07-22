@@ -1136,7 +1136,54 @@ class _FilePicker(_Leaf):
     """
     Button that opens the OS native file dialog. Returns .value (str) with
     the selected path. The filename is shown in the button after selection.
+
+    The picker only returns a *path*; it never reads the file, so it places
+    no restriction on what you can open. The only thing that can hide files
+    from you is the dialog's type filter (file_types=). See
+    _normalize_file_types below for the accepted formats.
     """
+
+    @staticmethod
+    def _normalize_file_types(file_types) -> tuple:
+        """
+        Turn a friendly file_types spec into the exact filter strings
+        pywebview expects, and always append an "All files" entry so a
+        badly-formed or too-narrow filter can never hide a file you want.
+
+        Accepts, in any mix:
+            plain extensions   ("yaml", "yml", "toml", ".csv", "*.json")
+            pywebview strings  ("YAML files (*.yaml;*.yml)", "All files (*.*)")
+
+        Plain extensions are grouped into one "Supported files (...)" entry.
+
+            file_types=("yaml", "yml", "toml")
+            #  → ('Supported files (*.yaml;*.yml;*.toml)', 'All files (*.*)')
+
+        pywebview requires each entry to look like 'Label (*.ext;*.ext)';
+        a raw '*.yaml' or a malformed string makes create_file_dialog raise,
+        which is the most common reason a picker seems to "refuse" a type.
+        Normalizing here removes that foot-gun.
+        """
+        if not file_types:
+            return ()
+        passthrough, exts = [], []
+        for ft in file_types:
+            s = str(ft).strip()
+            if "(*." in s or "*.*" in s:      # already a valid filter entry
+                passthrough.append(s)
+            else:                             # a bare extension in some form
+                ext = s.lstrip("*").lstrip(".").lower()
+                if ext:
+                    exts.append(ext)
+        result = []
+        if exts:
+            pattern = ";".join(f"*.{e}" for e in exts)
+            result.append(f"Supported files ({pattern})")
+        result.extend(passthrough)
+        if not any("*.*" in r for r in result):
+            result.append("All files (*.*)")
+        return tuple(result)
+
     def __init__(self, label: str = "Choose file…", *,
                  value: Optional[Union[str, State]] = None,
                  file_types: tuple = (), save: bool = False,
@@ -1144,7 +1191,7 @@ class _FilePicker(_Leaf):
                  on_change: Optional[Callable] = None,
                  style: str = "", key: Optional[str] = None):
         self._label      = label
-        self._file_types = file_types
+        self._file_types = self._normalize_file_types(file_types)
         self._save       = save
         self._disabled   = disabled
         self._style      = style
@@ -1478,15 +1525,108 @@ class _Map(_Leaf):
         draw=["rectangle","polygon"]  — enable specific tools
         draw=True                     — enable all tools
         draw=False / draw=[]          — no tools (default)
+
+    Tile layers (base map imagery):
+        tiles="street"       — OpenStreetMap (default)
+        tiles="satellite"    — Esri World Imagery
+        tiles="hybrid"       — satellite + place / road labels
+        tiles="terrain"      — OpenTopoMap (contours, relief)
+        tiles="light"        — Carto Positron (muted, good under data)
+        tiles="dark"         — Carto Dark Matter
+        tiles="<url>"        — any XYZ template, e.g.
+                               "https://.../{z}/{x}/{y}.png"
+        tiles={"url": "...", "attribution": "...", "max_zoom": 19}
+        tiles=[layer, layer] — stack layers (advanced custom hybrid)
+
+    All presets use keyless public tile servers (no API token needed) and
+    require internet. Switch views live by binding tiles to a State.
     """
     _DRAW_ALL = ["rectangle", "polygon", "polyline", "circle", "marker"]
+
+    # Each preset is a list of raster layers drawn bottom-to-top. Multi-layer
+    # presets (hybrid) put a transparent label overlay on top of imagery.
+    _TILE_PRESETS = {
+        "street": [{
+            "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "options": {"attribution": "© OpenStreetMap contributors",
+                        "maxZoom": 19},
+        }],
+        "satellite": [{
+            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                   "World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            "options": {"attribution": "Tiles © Esri", "maxZoom": 19},
+        }],
+        "hybrid": [
+            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                    "World_Imagery/MapServer/tile/{z}/{y}/{x}",
+             "options": {"attribution": "Tiles © Esri", "maxZoom": 19}},
+            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                    "Reference/World_Boundaries_and_Places/MapServer/tile/"
+                    "{z}/{y}/{x}",
+             "options": {"attribution": "", "maxZoom": 19}},
+        ],
+        "terrain": [{
+            "url": "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+            "options": {"attribution": "© OpenStreetMap, SRTM | © OpenTopoMap",
+                        "maxZoom": 17},
+        }],
+        "light": [{
+            "url": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+            "options": {"attribution": "© OpenStreetMap © CARTO",
+                        "maxZoom": 20, "subdomains": "abcd"},
+        }],
+        "dark": [{
+            "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            "options": {"attribution": "© OpenStreetMap © CARTO",
+                        "maxZoom": 20, "subdomains": "abcd"},
+        }],
+    }
+
+    @classmethod
+    def _normalize_tiles(cls, tiles) -> list:
+        """
+        Resolve the tiles= argument to a list of {url, options} layer dicts
+        the JS side can hand straight to L.tileLayer(url, options).
+
+        Accepts a preset name, a raw URL template, a single custom dict, or
+        a list mixing any of those. Unknown strings are treated as URLs.
+        """
+        def _one(item):
+            if isinstance(item, str):
+                if item in cls._TILE_PRESETS:      # preset name
+                    return list(cls._TILE_PRESETS[item])
+                return [{"url": item,              # bare URL template
+                         "options": {"attribution": "", "maxZoom": 19}}]
+            if isinstance(item, dict):
+                if "options" in item and "url" in item:
+                    return [{"url": item["url"],
+                             "options": dict(item["options"])}]
+                opts = {}
+                if "attribution" in item: opts["attribution"] = item["attribution"]
+                # accept either max_zoom (pythonic) or maxZoom (leaflet)
+                if "max_zoom" in item:    opts["maxZoom"]     = item["max_zoom"]
+                if "maxZoom" in item:     opts["maxZoom"]     = item["maxZoom"]
+                if "subdomains" in item:  opts["subdomains"]  = item["subdomains"]
+                opts.setdefault("attribution", "")
+                opts.setdefault("maxZoom", 19)
+                return [{"url": item["url"], "options": opts}]
+            return []
+
+        if tiles is None:
+            tiles = "street"
+        if isinstance(tiles, (list, tuple)):
+            layers = []
+            for t in tiles:
+                layers.extend(_one(t))
+            return layers or list(cls._TILE_PRESETS["street"])
+        return _one(tiles)
 
     def __init__(self, *, center: tuple = (0.0, 0.0), zoom: int = 10,
                  height: int = 380, markers: Optional[list] = None,
                  on_click: Optional[Callable] = None,
                  on_move:  Optional[Callable] = None,
                  on_shape: Optional[Callable] = None,
-                 draw: Any = False,
+                 draw: Any = False, tiles: Any = "street",
                  style: str = "", key: Optional[str] = None):
         self._center   = center
         self._zoom     = zoom
@@ -1496,6 +1636,7 @@ class _Map(_Leaf):
         self._on_move  = on_move
         self._on_shape = on_shape
         self._style    = style
+        self._tiles    = self._normalize_tiles(tiles)
 
         # Normalise draw tools
         if draw is True:
@@ -1540,6 +1681,7 @@ class _Map(_Leaf):
             "on_move_cid":  self._on_move_cid,
             "on_shape_cid": self._on_shape_cid,
             "draw":         self._draw,
+            "tiles":        self._tiles,
         }
         cfg_json = _esc(json.dumps(cfg))
         return (f'<div id="{self.id}" class="guile-map"'
