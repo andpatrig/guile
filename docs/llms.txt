@@ -1,0 +1,25 @@
+# guile
+
+> guile is a lightweight Python framework for building desktop apps. It layers
+> interactivity on top of ordinary Python: reactive state (`gui.state`) wires
+> your existing functions to widgets, layout is written with `with` blocks, and
+> the app runs as one Python process that opens a native window (pywebview /
+> WebView2 / WKWebView). No server, no ports, no browser tab.
+
+Install: `pip install guile` — requires Python >= 3.9. Current version: 0.7.0.
+
+Every app follows the same five-part structure, in order: (1) your plain
+Python functions, (2) `gui.state()` declarations at module level, (3) callbacks
+that read `.value` and write with `.set()`, (4) a `ui()` function decorated
+with `@gui.app()` that only reads state and builds layout, (5) `gui.run()` as
+the last line. Code after `gui.run()` executes when the window closes.
+
+## Docs
+
+- [Complete AI reference (single file)](https://andpatrig.github.io/guile/llms-full.txt): full API, rules, and canonical examples — read this to write guile apps
+- [How-to guide](https://andpatrig.github.io/guile/guile_howto.html): human-oriented tutorial with annotated examples
+- [API reference](https://andpatrig.github.io/guile/guile_reference.html): human-oriented widget reference
+
+## Source
+
+- [GitHub repository](https://github.com/andpatrig/guile): source, examples/ directory with 13 runnable apps, README

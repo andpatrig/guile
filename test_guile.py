@@ -336,6 +336,43 @@ def test_dev_hot_reload():
     return "swap + state reset + stop-at-run + broken-save recovery"
 
 
+def test_llms_docs_in_sync():
+    """docs/llms-full.txt (the AI-assistant reference) must stay valid:
+    every python block compiles, and the two complete example programs
+    execute against the real API and render."""
+    import re, tempfile
+
+    path = os.path.join(_here, "docs", "llms-full.txt")
+    src = open(path, encoding="utf-8").read()
+    blocks = re.findall(r"```python\n(.*?)```", src, re.S)
+    assert len(blocks) >= 8, f"expected several python blocks, found {len(blocks)}"
+
+    for i, b in enumerate(blocks):
+        compile(b, f"<llms-block-{i}>", "exec")     # SyntaxError = fail
+
+    def _fake_run(*_a, **_kw):
+        gui._run_called = True
+    orig_run = gui.run
+    gui.run = _fake_run
+    cwd = os.getcwd()
+    os.chdir(tempfile.gettempdir())                 # notes example writes a csv
+    try:
+        # blocks[0] is the canonical converter; blocks[-1] the complete example
+        for label, b in [("converter", blocks[0]), ("complete", blocks[-1])]:
+            reset_globals()
+            gui._pending_app = None
+            ns = {"__name__": "__main__", "__file__": "example.py"}
+            exec(compile(b, label, "exec"), ns)
+            assert gui._pending_app is not None, f"{label}: no app registered"
+            html, _ = render_ui(gui._pending_app[0])
+            assert html, f"{label}: rendered empty"
+    finally:
+        os.chdir(cwd)
+        gui.run = orig_run
+        gui._pending_app = None
+    return f"{len(blocks)} blocks compile; 2 examples exec + render"
+
+
 CORE_TESTS = [
     test_batching_one_render,
     test_no_double_dispatch_on_typeerror,
@@ -345,6 +382,7 @@ CORE_TESTS = [
     test_set_in_ui_is_caught_not_looped,
     test_task_keeps_ui_responsive,
     test_dev_hot_reload,
+    test_llms_docs_in_sync,
 ]
 
 

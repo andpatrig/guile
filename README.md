@@ -81,6 +81,18 @@ While building a UI, use `gui.run(dev=True)`: guile watches your script and relo
 
 ---
 
+## Using AI assistants with guile
+
+If you build guile apps with an AI tool (Claude Code, Copilot, ChatGPT, …),
+point it at the machine-readable docs instead of the HTML pages:
+
+- **[llms-full.txt](https://andpatrig.github.io/guile/llms-full.txt)** — the complete API, the golden rules, and verified examples in one self-contained file. Everything an assistant needs to write correct guile apps.
+- **[llms.txt](https://andpatrig.github.io/guile/llms.txt)** — the short index, following the `llms.txt` convention.
+
+Tools working inside a cloned repo can also read the guile source directly — every public function carries a full docstring.
+
+---
+
 ## Dependencies
 
 | Package | Purpose |

@@ -1,0 +1,348 @@
+# guile — complete reference for AI assistants (v0.7.0)
+
+guile is a lightweight Python framework for desktop apps. One Python process
+opens a native window (pywebview: WebView2 on Windows, WKWebView on macOS).
+Reactive state drives the UI: change a state value in a callback and only the
+changed parts of the interface re-render. Install: `pip install guile`
+(Python >= 3.9). Optional scientific extras: `pip install guile[science]`
+(numpy, pandas). matplotlib ships with guile for `gui.figure()`.
+
+This file is self-contained: everything needed to write correct guile apps.
+
+## The canonical app — every guile program has this shape
+
+```python
+import guile as gui
+
+# 1. Your functions — plain Python, no guile inside
+def to_celsius(f):
+    return round((f - 32) * 5 / 9, 1)
+
+# 2. State — module level, one per piece of data the app remembers
+fahrenheit = gui.state(32.0)
+celsius    = gui.state(None)
+
+# 3. Callbacks — read .value, compute, store with .set()
+def convert():
+    celsius.set(to_celsius(fahrenheit.value))
+
+# 4. ui() — reads state and builds layout; NEVER calls .set() here
+@gui.app("Converter", width=380, height=300)
+def ui():
+    with gui.col(padding=24, gap=14):
+        gui.title("°F → °C")
+        gui.number_input("Fahrenheit", value=fahrenheit,
+                         on_change=fahrenheit.set, step=0.5)
+        gui.button("Convert", on_click=convert)
+        if celsius.value is not None:
+            gui.text(f"{celsius.value} °C", size="2xl", bold=True)
+
+# 5. Open the window — blocks until closed; code below runs after close
+gui.run()
+```
+
+## Golden rules (violating these is the source of nearly all bugs)
+
+1. **Read state through `.value`, always** — comparisons and arithmetic
+   included: `if count.value > 0:`, `price.value * qty.value`. Comparing or
+   operating on the State object itself raises TypeError. `state is None`
+   works. This rule is identical for scalars, numpy arrays, and DataFrames.
+2. **Never call `.set()`, `.update()`, or `.toggle()` as a statement inside
+   `ui()`** — ui() re-runs on every render, so a bare .set() loops forever
+   (guile catches it and shows an error). State changes belong in callbacks.
+   Passing a reference like `on_change=state.set` is fine.
+3. **`gui.run()` must be the last line.** `@gui.app()` only *defines* the app.
+   Forgetting gui.run() prints a reminder at exit and no window opens.
+4. **Always give `key=` to stateful widgets inside loops or conditionals**
+   (inputs, checkboxes, selects, sliders, tabs, maps). Keys must be unique;
+   duplicates print a warning and collide. Widgets at fixed positions can
+   omit key=.
+5. **Declare `gui.state()` at module level**, outside every function —
+   created inside ui() it would be recreated (and reset) on every render.
+6. **Two-way binding uses `value=` and `on_change=` together**:
+   `gui.slider("x", value=s, on_change=s.set)`. `value=s` displays the state;
+   `on_change=s.set` writes user edits back. Using on_change without value=
+   makes the widget reset visually on every re-render.
+7. **Slow work goes in `gui.task()`** — a callback that blocks (download,
+   heavy computation) freezes the window until it finishes.
+8. **Lambdas in loops capture late** — bind the loop variable with a default
+   argument: `on_click=lambda i=row["id"]: delete(i)`.
+
+## State
+
+```python
+s = gui.state(initial)   # any Python type: int, str, list, dict, DataFrame, None
+s.value                  # read (the ONLY way to read; also for comparisons)
+s.value = x              # write (triggers re-render), equivalent to s.set(x)
+s.set(x)                 # write, triggers re-render
+s.update(fn)             # s.set(fn(s.value))
+s.toggle()               # boolean flip
+```
+
+str(s) shows the value (usable in prints); repr(s) is `State(value)`.
+For lists/dicts, replace rather than mutate: `items.set(items.value + [x])`
+(in-place mutation does not trigger a re-render).
+
+## Layout containers (context managers — indentation = nesting on screen)
+
+```python
+with gui.col(gap=12, padding=0, align="stretch", justify="flex-start",
+             fill=False, scroll=False, style="", key=None):   # vertical stack
+    ...
+with gui.row(gap=8, padding=0, align="center", justify="flex-start",
+             fill=False, wrap=False, style="", key=None):     # horizontal stack
+    ...
+with gui.card(gap=12, padding=20, margin=0, fill=False,
+              style="", key=None):                            # raised surface
+    ...
+with gui.scroll(max_height=400, style="", key=None):          # scrollable area
+    ...
+gui.spacer(h=None, w_=None, fill=False)   # fill=True → greedy flex spacer
+gui.divider()                             # horizontal rule
+```
+
+- `align`/`justify` position children WITHIN the container (CSS flexbox
+  values). `fill=True` grows the container itself within ITS parent.
+- To make one child of a row take remaining width: give that child
+  `fill=True` or `style="flex:1"`.
+- `@gui.app(center=True)` centers everything in the window — for small
+  single-card apps; skip the wrapper col.
+- `style=` accepts raw CSS on every widget.
+
+**Ambient attachment / composition**: widgets attach to whichever container
+is currently open, so any section can be extracted into a plain function and
+called inside a `with` block — no special signature, nothing to return:
+
+```python
+def note_row(note):                       # helper emits widgets
+    with gui.row(key=f"row-{note['id']}"):
+        gui.checkbox(note["text"], value=note["done"],
+                     on_change=lambda _, i=note["id"]: toggle(i),
+                     key=f"cb-{note['id']}")
+        gui.button("✕", size="sm", on_click=lambda i=note["id"]: delete(i),
+                   key=f"del-{note['id']}")
+
+# inside ui():
+with gui.card():
+    for n in notes.value:
+        note_row(n)                       # rows land inside the card
+```
+
+## Display widgets
+
+```python
+gui.title(content, size="xl", muted=False, style="", key=None)
+    # size: xs|sm|md|lg|xl|2xl|3xl
+gui.text(content, size="md", bold=False, italic=False, muted=False,
+         underline=False, mono=False, color=None, style="", key=None)
+gui.badge(text, variant="primary", style="", key=None)
+    # variant: primary|success|danger|warning|neutral
+gui.progress(value, max=100, color=None)  # bar from 0..max; max=0 shows empty
+gui.html(raw)                             # raw HTML escape hatch (also <style>)
+```
+
+## Input widgets
+
+All inputs: own their State internally (returned object has `.value`,
+`.set()`, `.update()`), OR bind to an external State via `value=state` +
+`on_change=state.set`. All accept `disabled=`, `style=`, `key=`.
+
+```python
+gui.button(label, on_click=None, variant="primary", size="md",
+           disabled=False)               # variant: primary|secondary|ghost|danger
+name = gui.input("Label", placeholder="", value=None, type="text",
+                 on_change=None, live=False, key="name")
+    # .value is str. Re-renders on commit (Enter/blur); live=True re-renders
+    # per keystroke (avoid next to big tables/figures).
+n = gui.number_input("Label", value=0.0, min=None, max=None, step=1.0,
+                     unit="", on_change=None, key="n")
+    # .value is float. on_change fires on commit (Enter, blur, spinner).
+    # Invalid/empty commit keeps the current value. min/max clamp.
+gui.textarea("Label", placeholder="", value=None, rows=4,
+             on_change=None, live=False, key="notes")
+    # multi-line text; same commit semantics as gui.input()
+flag = gui.checkbox("Label", value=False, on_change=None, key="f")  # .value bool
+sel = gui.select(options, "Label", value=None, on_change=None, key="s")
+    # options: list[str] | list[(value, label)] | dict. .value is str.
+multi = gui.multiselect(options, "Label", value=["a"], rows=4, key="m")
+    # .value is list[str]; user holds Ctrl/Cmd to select multiple
+x = gui.slider("Label", min=0, max=100, step=1, value=None,
+               on_change=None, key="x")  # .value float; callback on release
+d = gui.date_input("Label", key="d")     # .value "YYYY-MM-DD"
+t = gui.datetime_input("Label", key="t") # .value "YYYY-MM-DDTHH:MM"
+                                         # parse: datetime.fromisoformat(t.value)
+p = gui.file_picker("Load CSV…", file_types=("csv",), save=False,
+                    on_change=load, key="fp")
+    # Opens the OS file dialog. Returns a PATH string only — you open the
+    # file yourself. on_change(path) fires after the dialog closes.
+    # save=True → Save dialog. file_types: bare extensions or pywebview
+    # filter strings; "All files" is always appended.
+tab = gui.tabs(["Overview", "Data"], value=None, on_change=None, key="tabs")
+    # Returns the ACTIVE LABEL as a plain string. Panels are plain if/elif:
+    #   if tab == "Overview": ...
+    # For programmatic switching bind a State: gui.tabs([...], value=active,
+    # on_change=active.set, key="t") then read active.value in conditions.
+```
+
+## Data, media, overlays
+
+```python
+gui.table(data, columns=None, max_rows=2000, key=None)
+    # data: pandas DataFrame | numpy array | list[dict] | list[list] | list
+    # columns= selects/reorders; rows beyond max_rows are clipped with a notice.
+gui.figure(fig, dpi=96, width="100%", caption=None, transparent=True,
+           static=False, key=None)
+    # Embeds a matplotlib Figure as inline PNG. Create the figure fresh in
+    # ui() each render (guile closes it after drawing). static=True caches.
+    # Use matplotlib.use("Agg") before pyplot import.
+gui.leaflet(center=(lat, lon), zoom=10, height=380, markers=[...],
+            on_click=None, on_move=None, on_shape=None, draw=False,
+            tiles="street", key="map")
+    # Interactive map (needs internet for tiles). ALWAYS set key=.
+    # markers: [gui.Marker((lat, lon), popup="...", tooltip="...",
+    #                      on_click=fn)]  — construct Markers inside ui().
+    # on_click(lat, lon); on_move(center_tuple, zoom);
+    # on_shape(type, coords) with draw=True or draw=["rectangle","polygon",
+    # "polyline","circle","marker"].
+    # tiles: "street"|"satellite"|"hybrid"|"terrain"|"light"|"dark"|url|dict
+gui.notify(message, variant="success", duration=3.0)
+    # Toast notification. Call from CALLBACKS only, never inside ui().
+    # variant: success|danger|warning|primary|neutral
+with gui.modal("Title", visible=confirm.value, width=420,
+               on_close=lambda: confirm.set(False)):
+    # Modal dialog as a context manager. Drive visibility with a bool state;
+    # visible=False renders nothing. Always pass on_close= so ✕/backdrop work.
+    gui.text("This cannot be undone.")
+    with gui.row(gap=8, justify="flex-end"):
+        gui.button("Cancel", variant="ghost",
+                   on_click=lambda: confirm.set(False))
+        gui.button("Delete", variant="danger", on_click=do_delete)
+gui.theme(preset=None, primary=None, bg=None, surface=None, surface_2=None,
+          text=None, text_2=None, border=None, radius=None)
+    # Call FIRST inside ui(). Presets: light|dark|neon|rose|forest|slate.
+    # Any argument overrides one value; all other colors are derived.
+```
+
+## Background work — gui.task()
+
+A slow callback freezes the whole window (events and renders share one
+worker thread). Wrap slow work in a task:
+
+```python
+df, busy = gui.state(None), gui.state(False)
+
+def fetch():                    # runs on a background thread
+    import pandas as pd
+    return pd.read_csv(URL)
+
+def start():
+    gui.task(fetch, on_done=df.set, busy=busy)
+
+# in ui():
+gui.button("Loading…" if busy.value else "Fetch",
+           on_click=start, disabled=busy.value)
+```
+
+- `on_done(result)` / `on_error(exc)` run back on the app's event thread,
+  serialized with clicks — safe to touch state. Omitted on_error → traceback
+  printed + danger toast.
+- `busy=` State[bool] is True while running, False after (success or error).
+- `State.set()` calls made INSIDE the task are safe and re-render — update a
+  progress state in a loop to drive `gui.progress()` live.
+- fn takes no arguments; bind with a lambda.
+
+## App lifecycle
+
+```python
+@gui.app("Window title", width=800, height=600, resizable=False,
+         center=False, debug=False)      # DEFINES the app (last decorated wins)
+def ui(): ...                            # title is positional, not a keyword
+
+gui.run()          # opens the window; blocks until the user closes it
+gui.run(dev=True)  # hot reload: save the script file → app reloads inside the
+                   # open window. Each reload resets state to initial values.
+                   # Errors show in-window; previous UI keeps running.
+                   # Use plain gui.run() for normal use and packaged apps.
+
+# Code AFTER gui.run() executes when the window closes; gui.state() values
+# still hold what the user left in them. Use for: save-on-exit, cleanup
+# (close ports/connections), continuing a pipeline with the user's choices,
+# exit summaries. (In dev mode, after-run code fires only at final close.)
+```
+
+Errors: a crash in ui() shows the traceback in the window; a crash in a
+callback prints a traceback and shows a danger toast.
+
+## Packaging
+
+```python
+# build.py (separate file, or guard with if __name__ == "__main__")
+import guile as gui
+gui.package("my_app.py", name="MyApp", onefile=True, windowed=True,
+            icon=None, add_data=[("presets.yaml", ".")],
+            hidden_imports=None, output_dir="dist", install_missing=False)
+# Wraps PyInstaller; requires `pip install pyinstaller` in the same env.
+# add_data bundles runtime data files as (src, dest) pairs.
+```
+
+## Complete example — list app with persistence (load → run → save)
+
+```python
+import guile as gui
+import csv, os
+from datetime import date
+
+FILE = "notes.csv"
+
+def load_notes():
+    if not os.path.exists(FILE):
+        return []
+    with open(FILE, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+notes = gui.state(load_notes())          # 1. before: load session
+
+def add_note(_=None):
+    text = entry.value.strip()
+    if not text:
+        return
+    notes.set(notes.value + [{"date": str(date.today()), "note": text}])
+    entry.set("")
+
+@gui.app("Notes", width=520, height=520)
+def ui():
+    global entry
+    with gui.col(padding=20, gap=14, style="min-height:100vh"):
+        with gui.card(gap=12):
+            with gui.row(justify="space-between", align="center"):
+                gui.title("Notes")
+                gui.badge(f"{len(notes.value)} notes")
+            with gui.row(gap=8, align="flex-end"):
+                entry = gui.input("Observation", key="entry", style="flex:1")
+                gui.button("Add", on_click=add_note)
+            if notes.value:
+                with gui.scroll(max_height=300):
+                    gui.table(notes.value)
+
+gui.run()                                # 2. blocks while the app is open
+
+if notes.value:                          # 3. window closed: persist
+    with open(FILE, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["date", "note"])
+        w.writeheader()
+        w.writerows(notes.value)
+```
+
+## Pitfall checklist (review generated code against this)
+
+- [ ] `gui.run()` is the last effective line
+- [ ] every state read uses `.value` (including in f-strings, comparisons, math)
+- [ ] no bare `.set()`/`.update()`/`.toggle()` statements inside ui()
+- [ ] widgets created in loops/conditionals have unique `key=`
+- [ ] two-way bound widgets pass BOTH `value=state` AND `on_change=state.set`
+- [ ] loop lambdas bind via default args (`lambda i=i: ...`)
+- [ ] slow callbacks wrapped in `gui.task()`
+- [ ] lists/dicts in state are replaced, not mutated in place
+- [ ] matplotlib figures are created inside ui() (fresh each render)
+- [ ] `gui.notify()` only called from callbacks, never from ui()
+- [ ] `gui.leaflet()` and anything with callbacks has a stable `key=`
