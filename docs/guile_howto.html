@@ -127,11 +127,15 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
   <div class="nav-cat">State</div>
   <a href="#state-cycle">The three methods</a>
   <div class="nav-cat">Functions &amp; logic</div>
-  <a href="#callbacks-vs-streamlit">vs Streamlit</a>
+  <a href="#callbacks-vs-streamlit">Canonical pattern</a>
   <a href="#callbacks-pure">Keep functions pure</a>
   <a href="#callbacks-args">Passing arguments</a>
   <div class="nav-cat">Patterns</div>
   <a href="#pattern-tabs">Tabs</a>
+  <a href="#pattern-structure">Structuring larger UIs</a>
+  <div class="nav-cat">App lifecycle</div>
+  <a href="#after-run">When the window closes</a>
+  <a href="#dev-mode">Dev mode — hot reload</a>
 </nav>
 
 <main>
@@ -217,9 +221,15 @@ None of those lines touch the code you already wrote.
   .guile-tutorial-grid:has(.p4:hover) .p4-bg { background: rgba(24,95,165,.15); }
   .p4-card { background: #E6F1FB; border: 1px solid rgba(24,95,165,.15); }
   .guile-tutorial-grid:has(.p4:hover) .p4-card { border-color: rgba(24,95,165,.6); transform: translateX(2px); }
+
+  /* ── PART 5: RUN STYLES ── */
+  .p5-bg { background: rgba(180,120,0,.06); color: var(--text); }
+  .guile-tutorial-grid:has(.p5:hover) .p5-bg { background: rgba(180,120,0,.16); }
+  .p5-card { background: #FBF3E1; border: 1px solid rgba(180,120,0,.18); }
+  .guile-tutorial-grid:has(.p5:hover) .p5-card { border-color: rgba(180,120,0,.6); transform: translateX(2px); }
 </style>
 
-<p>Every Guile application is built using four structural parts that always execute in the same sequence. Hover over any code segment to highlight its documentation card. You can view the live implementation by checking the <a href="./examples/howto_structure_example.py" style="font-family: var(--mono); background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px; text-decoration: none; color: #185FA5;">howto_structure_example.py</a> file inside the <code>/examples</code> directory of the GitHub repository.</p>
+<p>Every Guile application is built using five structural parts that always execute in the same sequence. Hover over any code segment to highlight its documentation card. You can view the live implementation by checking the <a href="./examples/howto_structure_example.py" style="font-family: var(--mono); background: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px; text-decoration: none; color: #185FA5;">howto_structure_example.py</a> file inside the <code>/examples</code> directory of the GitHub repository.</p>
 
 <div class="guile-tutorial-grid">
   <!-- LEFT PANEL: CODE SOURCE -->
@@ -259,6 +269,10 @@ None of those lines touch the code you already wrote.
     <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#185FA5">if</span> celsius.<span style="color:#185FA5">value</span> <span style="color:#185FA5">is not None</span>:</div>
     <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.text(f<span style="color:#c95f28">"{celsius.value} °C"</span>)</div>
     <div class="code-row p4 p4-bg">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.text(phase.<span style="color:#185FA5">value</span>)</div>
+    <div style="height:10px"></div>
+
+    <div class="code-row" style="color:var(--text-2);font-style:italic"># ── 5. Run ─────────────────────────</div>
+    <div class="code-row p5 p5-bg">gui.<span style="color:#8a5a00">run</span>()</div>
   </div>
 
   <!-- RIGHT PANEL: ANNOTATIONS -->
@@ -285,6 +299,11 @@ None of those lines touch the code you already wrote.
       <p style="font-size:12px;line-height:1.55;color:#185FA5;margin:0">Reads <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.value</code> to display state and passes callbacks by reference (for example, <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">on_change=fahrenheit.set</code>). Never call <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">.set()</code> directly inside <code style="font-size:11px;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">ui()</code>, or it will run on every render and create a render loop.</p>
       <p style="padding-top:5px; font-size:12px;color:var(--text-2);font-style:italic;line-height:1.5">💡 You can also add layout elements using <code style="font-size:11px;color: #0f6e56;font-weight:bold;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">with:</code> blocks, such as <code style="font-size:11px;color: #0f6e56;background:rgba(24,95,165,.12);padding:1px 4px;border-radius:3px">with gui.card(gap=10):</code></p>
 
+    </div>
+
+    <div class="doc-card p5-card">
+      <p style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#8a5a00;margin:0 0 4px 0">5 · Run</p>
+      <p style="font-size:12px;line-height:1.55;color:#8a5a00;margin:0">Opens the window and blocks until the user closes it. <code style="font-size:11px;background:rgba(180,120,0,.12);padding:1px 4px;border-radius:3px">@gui.app()</code> only <em>defines</em> the app — <code style="font-size:11px;background:rgba(180,120,0,.12);padding:1px 4px;border-radius:3px">gui.run()</code> launches it. Any code written after this line runs when the window closes — see <a href="#after-run" style="color:#8a5a00">When the window closes</a>.</p>
     </div>
 
   </div>
@@ -788,7 +807,7 @@ with gui.card(style="margin-top:24px"):
 gui.title("Centred", style="text-align:center")
 
 # Fixed-width number display
-gui.text(count, size="2xl", bold=True, style="min-width:64px;text-align:center")
+gui.text(count.value, size="2xl", bold=True, style="min-width:64px;text-align:center")
 
 # Danger zone card
 with gui.card(style="border:1px solid var(--danger-light)"):
@@ -913,7 +932,12 @@ The initial value is your default. Any type works: number, string, list, dict, D
 <code>None</code>.</p>
 
 <p><strong style="font-weight:500">.value</strong> — reads the current value.
-Call this inside <code>ui()</code> to display it, or inside callbacks to compute with it.</p>
+Call this inside <code>ui()</code> to display it, or inside callbacks to compute with it.
+It is the <em>only</em> way to read a state — comparisons and arithmetic included:
+<code>if count.value &gt; 0:</code>, <code>price.value * qty.value</code>. This works
+identically whether the state holds a number, a numpy array, or a DataFrame;
+comparing the state object itself raises a <code>TypeError</code> that points at
+the line to fix.</p>
 
 <p><strong style="font-weight:500">.set(new_value)</strong> — replaces the value and
 triggers a re-render. Always called from a callback, never directly inside <code>ui()</code>.</p>
@@ -946,10 +970,13 @@ def reset():
 @gui.app("Score", width=320, height=200)
 def ui():
     with gui.col(align="center", justify="center", style="height:100vh"):
-        gui.title(score, size="3xl")          # displays score.value
+        gui.title(score.value, size="3xl")
         with gui.row(gap=8):
             gui.button("+1", on_click=add_point)
-            gui.button("Reset", variant="ghost", on_click=reset)</pre>
+            gui.button("Reset", variant="ghost", on_click=reset)
+
+# 4. Open the window
+gui.run()</pre>
 
 <div class="note">
 <strong>The rule:</strong> never <em>call</em> <code>state.set(x)</code>
@@ -967,13 +994,14 @@ when the user interacts with the widget.
 <p>Every guile app follows the same structure, regardless of complexity.
 Understanding this structure once means you can build any app.</p>
 
-<p>There are four parts, always in this order:</p>
+<p>There are five parts, always in this order:</p>
 
 <ol style="color:var(--text-2);font-size:14px;line-height:2;padding-left:20px;margin-bottom:16px">
   <li><strong style="color:var(--text)">Your functions</strong> — pure Python, no guile inside</li>
   <li><strong style="color:var(--text)">State variables</strong> — one per piece of data the app needs to remember</li>
   <li><strong style="color:var(--text)">Callbacks</strong> — call your functions, store the results in state</li>
   <li><strong style="color:var(--text)">ui()</strong> — reads state, builds the layout, nothing else</li>
+  <li><strong style="color:var(--text)">gui.run()</strong> — the last line: opens the window and blocks until it closes</li>
 </ol>
 
 <pre>import guile as gui
@@ -1005,11 +1033,16 @@ def ui():
                          on_change=fahrenheit.set, step=0.5)
         gui.button("Convert", on_click=convert)
         if celsius.value is not None:
-            gui.text(f"{celsius.value} °C", size="2xl", bold=True)</pre>
+            gui.text(f"{celsius.value} °C", size="2xl", bold=True)
+
+
+# ── 5. Open the window — blocks until the user closes it ─────────────
+gui.run()</pre>
 
 <h3>Why <code>on_change=fahrenheit.set</code>?</h3>
 
-<p>When the user types a new value, <code>on_change</code> fires and
+<p>When the user commits a new value — pressing Enter, clicking away,
+or clicking a spinner arrow — <code>on_change</code> fires and
 calls <code>fahrenheit.set(new_value)</code>. This stores the value in
 state so that <code>convert()</code> can read it later via
 <code>fahrenheit.value</code>. Without <code>on_change=</code> the
@@ -1153,7 +1186,10 @@ def ui():
             r = results.value
             with gui.card(gap=8):
                 gui.text(f"Temperature:  {r['celsius']} °C",   bold=True)
-                gui.text(f"Wind chill:   {r['feels_like']} °C", bold=True)</pre>
+                gui.text(f"Wind chill:   {r['feels_like']} °C", bold=True)
+
+
+gui.run()</pre>
 
 <p>Notice that <code>to_celsius()</code>, <code>to_fahrenheit()</code>,
 and <code>feels_like()</code> contain zero guile references.
@@ -1218,7 +1254,9 @@ def ui():
                     gui.button("✕", variant="ghost", size="sm",
                                # capture row["id"] now, not at click time
                                on_click=lambda i=row["id"]: delete(i),
-                               key=f"del-{row['id']}")</pre>
+                               key=f"del-{row['id']}")
+
+gui.run()</pre>
 
 <p>The <code>key=f"del-{row['id']}"</code> on the button is also
 important here — it gives each button a stable DOM ID so the patcher
@@ -1257,7 +1295,9 @@ def ui():
 
         elif tab == "Info":
             with gui.card(gap=6):
-                gui.text("Built with guile.", muted=True, size="sm")</pre>
+                gui.text("Built with guile.", muted=True, size="sm")
+
+gui.run()</pre>
 
 <div class="note">
   Unlike a hidden-div approach, only the active panel is rendered at all.
@@ -1293,10 +1333,177 @@ def ui():
         if active.value == "Overview":
             ...
         elif active.value == "Data":
-            gui.table(records.value)</pre>
+            gui.table(records.value)
+
+gui.run()</pre>
 
 <p>When using an external state, read <code>active.value</code> in the
 panel conditions (not the return value of <code>gui.tabs()</code>, which
 is only the initial value in that render).</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="pattern-structure">
+<h2>Structuring larger UIs — ambient attachment</h2>
+
+<p>Sooner or later a <code>ui()</code> grows past one screen and four or
+five indent levels. The fix is the most ordinary tool in Python: extract
+a function. It works because of a property called <em>ambient
+attachment</em> — every widget you create attaches itself to whichever
+container is currently open. A helper function needs no special
+signature, returns nothing, and threads nothing: call it inside a
+<code>with</code> block and its widgets land in that container.</p>
+
+<pre># A plain function that emits widgets. No special signature,
+# no children lists to build and return — just widget calls.
+def note_row(note):
+    with gui.row(justify="space-between", align="center",
+                 key=f"row-{note['id']}"):
+        gui.checkbox(note["text"], value=note["done"],
+                     on_change=lambda _, i=note["id"]: toggle(i),
+                     key=f"cb-{note['id']}")
+        gui.button("✕", variant="ghost", size="sm",
+                   on_click=lambda i=note["id"]: delete(i),
+                   key=f"del-{note['id']}")
+
+def header():
+    with gui.row(justify="space-between", align="center"):
+        gui.title("Notes")
+        gui.badge(f"{len(notes.value)} items")
+
+@gui.app("Notes", width=460, height=560)
+def ui():
+    with gui.col(padding=20, gap=14):
+        with gui.card(gap=12):
+            header()                     # widgets land inside the card
+            gui.divider()
+            for n in notes.value:
+                note_row(n)              # one row per note, same card
+
+gui.run()</pre>
+
+<p>Each helper reads like a small <code>ui()</code> of its own, and the
+main <code>ui()</code> collapses into a table of contents for the
+window. This is the intended way to keep indentation shallow — cut the
+tree at natural seams (a header, a row, a settings panel, a tab's
+contents) and name the pieces.</p>
+
+<p>Three rules keep helpers predictable:</p>
+
+<ul style="color:var(--text-2);font-size:14px;line-height:1.9;padding-left:20px">
+  <li><strong style="color:var(--text)">Call them from inside <code>ui()</code></strong> (directly or
+      nested) — they only make sense while a render is building the tree.
+      Calling one from a callback does nothing useful.</li>
+  <li><strong style="color:var(--text)">Pass data in as arguments</strong>, like any function. Helpers
+      may read <code>state.value</code> freely; like <code>ui()</code>
+      itself, they should never call <code>.set()</code>.</li>
+  <li><strong style="color:var(--text)">Keys still matter</strong> — a helper called inside a loop must
+      put a unique <code>key=</code> on its stateful widgets, exactly as
+      if the code were written inline (it effectively is).</li>
+</ul>
+
+<div class="note">
+A helper can also open its own container (like <code>note_row</code>
+above opening a <code>gui.row()</code>) — the container attaches to the
+current parent, and the helper's widgets attach inside it. Composition
+nests to any depth.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="after-run">
+<h2>When the window closes — code after gui.run()</h2>
+
+<p>A guile script has three phases. <code>@gui.app()</code> only
+<em>defines</em> the app; <code>gui.run()</code> opens the window and
+blocks while it is in use; and everything written <em>after</em>
+<code>gui.run()</code> executes the moment the user closes the window.
+Your <code>gui.state()</code> variables still hold whatever the user
+left in them, so the closing code can read them directly.</p>
+
+<pre># ── 1. Before the window: load the previous session ──────────────
+notes = gui.state(load_notes())          # runs at import
+
+@gui.app("Field notes", width=560, height=560)
+def ui():
+    ...                                  # the app itself
+
+# ── 2. Open the window; blocks until the user closes it ──────────
+gui.run()
+
+# ── 3. After the window closes: persist and summarise ────────────
+save_notes(notes.value)
+print(f"{len(notes.value)} notes saved")</pre>
+
+<p>This turns "closing the app" into a meaningful event. Common uses:</p>
+
+<ul style="color:var(--text-2);font-size:14px;line-height:1.9;padding-left:20px">
+  <li><strong style="color:var(--text)">Save on exit</strong> — write the session to CSV/JSON so no
+      "Save" button discipline is needed. Pair it with a load at the top
+      of the script and your app gets persistence in four lines.</li>
+  <li><strong style="color:var(--text)">Cleanup</strong> — close a serial port to an instrument,
+      disconnect from a database, stop a logger, delete temp files.</li>
+  <li><strong style="color:var(--text)">Interactive stage in a pipeline</strong> — the window becomes
+      one step of a longer script: the user picks or QCs data
+      interactively, closes the window, and batch processing continues
+      with their choices.</li>
+  <li><strong style="color:var(--text)">Exit summary</strong> — print where results were written, or
+      <code>sys.exit(1)</code> if a required step was skipped, so the app
+      can participate in shell scripts.</li>
+</ul>
+
+<p>Because the decorator no longer launches anything, your script is an
+ordinary Python module: importing it does <em>not</em> open a window,
+which makes app files testable and tool-friendly.</p>
+
+<div class="note">
+<strong>Forgot gui.run()?</strong> The script exits after printing a
+reminder — an app was defined but never launched. Just add
+<code>gui.run()</code> as the last line.
+</div>
+
+<p>See <code>examples/field_notes.py</code> for a complete working
+example of the load → run → save pattern.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="dev-mode">
+<h2>Dev mode — hot reload</h2>
+
+<p>While you are building a UI, relaunching the window on every edit is
+the biggest friction in the workflow. Dev mode removes it: pass
+<code>dev=True</code> to <code>gui.run()</code> and guile watches your
+script file. Every time you save, the app reloads <em>inside the open
+window</em> — same position, same size, no flicker of a closing and
+reopening window.</p>
+
+<pre>@gui.app("My App", width=560, height=480)
+def ui():
+    ...
+
+gui.run(dev=True)     # save the file → the window updates</pre>
+
+<p>What a reload does, precisely:</p>
+
+<ul style="color:var(--text-2);font-size:14px;line-height:1.9;padding-left:20px">
+  <li><strong style="color:var(--text)">Fresh start</strong> — your module-level code re-runs and every
+      <code>gui.state()</code> resets to its initial value, exactly as if
+      you had re-run the script. There is no state-migration magic: what
+      you see after a save is what a cold start of the new code shows.</li>
+  <li><strong style="color:var(--text)">Errors don't kill the session</strong> — a save with a syntax
+      error or a crash shows the traceback in the window while the
+      previous working UI keeps running. Fix the file, save again.</li>
+  <li><strong style="color:var(--text)">Code after <code>gui.run()</code> stays quiet</strong> —
+      execution stops at the <code>gui.run()</code> line on reloads, so a
+      save-on-exit block doesn't fire every time you press Ctrl+S. It
+      runs once, when you finally close the window.</li>
+  <li><strong style="color:var(--text)">Window settings follow</strong> — changing the title or size in
+      <code>@gui.app()</code> is applied to the open window on reload.</li>
+</ul>
+
+<div class="note">
+Dev mode is for building. For normal use — and always for
+<code>gui.package()</code> builds — call plain <code>gui.run()</code>.
+</div>
 </div>
 </main>

@@ -67,3 +67,5 @@ def ui():
                                           style="background:var(--surface-2)"):
                                 gui.badge(s["type"], variant="primary")
                                 gui.text(s["summary"], size="sm", muted=True)
+
+gui.run()

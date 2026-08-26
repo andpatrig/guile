@@ -227,6 +227,115 @@ def test_set_in_ui_is_caught_not_looped():
     return "loop prevented, error shown"
 
 
+def test_task_keeps_ui_responsive():
+    """gui.task runs work off the worker thread: clicks are handled while
+    the task runs; on_done, on_error and busy land back on the worker."""
+    gate    = threading.Event()
+    started = threading.Event()
+    busy    = gui.state(False)
+    result  = gui.state(None)
+    clicks  = []
+
+    def slow():
+        started.set()
+        gate.wait(2.0)
+        return 42
+
+    def build():
+        gui.button("go", key="go", on_click=lambda: gui.task(
+            slow, on_done=result.set, busy=busy))
+        gui.button("ping", key="ping", on_click=lambda: clicks.append(1))
+
+    app = make_app(build)
+    bridge = _Bridge(app)
+    app._queue.put(("render", None, None)); drain(app)
+
+    bridge.handle("gk-go", None)
+    assert started.wait(2.0), "task never started"
+    drain(app)
+    assert busy.value is True, "busy flag not set while task runs"
+
+    bridge.handle("gk-ping", None)          # click while the task is running
+    drain(app)
+    assert clicks == [1], "UI event was not handled while task ran"
+
+    gate.set()
+    deadline = time.time() + 2.0
+    while time.time() < deadline and result.value != 42:
+        time.sleep(0.01)
+    drain(app)
+    assert result.value == 42, f"on_done not delivered: {result.value}"
+    assert busy.value is False, "busy flag not cleared after task"
+
+    errors = []
+    gui.task(lambda: 1 / 0, on_error=lambda e: errors.append(type(e).__name__))
+    deadline = time.time() + 2.0
+    while time.time() < deadline and not errors:
+        time.sleep(0.01)
+    drain(app)
+    assert errors == ["ZeroDivisionError"], f"on_error not delivered: {errors}"
+    return "clicks handled mid-task; on_done, on_error, busy delivered"
+
+
+def test_dev_hot_reload():
+    """Saving a changed script swaps ui() into the open window, resets
+    state, stops at gui.run() (after-run code must NOT execute), and a
+    broken save shows an error while keeping the old UI alive."""
+    import tempfile
+    from guile import _dev
+
+    V1 = (
+        "import guile as gui\n"
+        "count = gui.state(1)\n"
+        "@gui.app('T')\n"
+        "def ui():\n"
+        "    gui.text(f'version-one-{count.value}')\n"
+        "gui.run()\n"
+        "raise RuntimeError('after-run code executed during reload')\n"
+    )
+    V2 = V1.replace("version-one", "version-two").replace("gui.state(1)",
+                                                          "gui.state(7)")
+    V_BROKEN = "def oops(:\n"
+
+    fd, path = tempfile.mkstemp(suffix=".py")
+    os.close(fd)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(V1)
+
+        fn1, _cfg = _dev._execute(path)     # would raise if after-run ran
+        app = make_app(fn1)
+        app._queue.put(("render", None, None)); drain(app)
+        assert "version-one-1" in app._window.calls[-1]
+
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(V2)
+        with contextlib.redirect_stdout(io.StringIO()):
+            _dev.reload_app(app, path)      # what the watcher enqueues
+        drain(app)
+        renders = [c for c in app._window.calls
+                   if c.startswith("window._guile.update")]
+        assert "version-two-7" in renders[-1], "reload did not swap ui()"
+
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(V_BROKEN)
+        with contextlib.redirect_stderr(io.StringIO()):
+            _dev.reload_app(app, path)
+        drain(app)
+        assert any("innerHTML" in c and "SyntaxError" in c
+                   for c in app._window.calls), "broken save showed no error"
+        assert app._build is not fn1 and app._build is not None
+        # old UI still renderable after the bad save
+        app._queue.put(("render", None, None)); drain(app)
+        renders = [c for c in app._window.calls
+                   if c.startswith("window._guile.update")]
+        assert "version-two-7" in renders[-1], "old UI lost after bad save"
+    finally:
+        os.unlink(path)
+        gui._pending_app = None             # don't leak into other tests
+    return "swap + state reset + stop-at-run + broken-save recovery"
+
+
 CORE_TESTS = [
     test_batching_one_render,
     test_no_double_dispatch_on_typeerror,
@@ -234,26 +343,32 @@ CORE_TESTS = [
     test_silent_then_render_order,
     test_build_error_surfaces_in_window,
     test_set_in_ui_is_caught_not_looped,
+    test_task_keeps_ui_responsive,
+    test_dev_hot_reload,
 ]
 
 
 # ── PART 2: example smoke tests ─────────────────────────────────────────────
 
 def load_example(path):
-    """Import an example with @gui.app patched to a no-op and _App.run
-    stubbed, so importing it never opens a window."""
-    orig_app = gui.app
-    orig_run = _App.run
-    gui.app  = lambda *a, **kw: (lambda fn: fn)
-    _App.run = lambda self, fn: None
+    """Import an example with gui.run() stubbed so no window opens.
+    Since 0.7 the @gui.app decorator only registers the app, so it needs
+    no patching — importing an example is safe by design; only the
+    explicit gui.run() call at the bottom must be neutralised."""
+    def _fake_run(*_a, **_kw):    # accept run()'s signature, e.g. dev=True
+        gui._run_called = True    # keep the atexit "forgot gui.run()?" hint quiet
+    orig_run = gui.run
+    gui.run  = _fake_run
     try:
         mod = types.ModuleType("_ex")
         mod.__file__ = path
         src = open(path, encoding="utf-8").read()
-        exec(compile(src, path, "exec"), mod.__dict__)
+        # Suppress import-time prints (e.g. the after-run summary in
+        # field_notes.py, which executes here because gui.run is stubbed).
+        with contextlib.redirect_stdout(io.StringIO()):
+            exec(compile(src, path, "exec"), mod.__dict__)
     finally:
-        gui.app  = orig_app
-        _App.run = orig_run
+        gui.run = orig_run
     return mod
 
 
@@ -315,45 +430,60 @@ def smoke(ui_fn):
 
 
 def check_for_set_in_ui(path):
-    """Static warning: a bare .set() as a statement directly inside ui() runs
-    on every render, and under the worker each render queues another render —
-    an infinite loop. Inside a callback (lambda/on_click/on_change) it's fine,
-    since callbacks only run on user interaction."""
+    """Static warning: a .set()/.update()/.toggle() executed directly inside
+    ui() runs on every render, and under the worker each render queues another
+    render — an infinite loop. Inside a lambda or nested def (an on_click/
+    on_change callback) it's fine, since callbacks only run on user
+    interaction. AST-based so multi-line lambdas don't false-positive."""
+    import ast
+
     src = open(path, encoding="utf-8").read()
-    if "@gui.app" not in src:
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
         return []
 
-    lines = src[src.index("@gui.app"):].splitlines()
+    def _is_gui_app_decorated(fn):
+        for dec in fn.decorator_list:
+            target = dec.func if isinstance(dec, ast.Call) else dec
+            if isinstance(target, ast.Attribute) and target.attr == "app":
+                return True
+            if isinstance(target, ast.Name) and target.id == "app":
+                return True
+        return False
+
+    def _walk_own_body(node):
+        """Walk descendants, but never descend into lambdas or nested defs —
+        code there only runs when the callback fires, not during render."""
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.Lambda, ast.FunctionDef,
+                                  ast.AsyncFunctionDef)):
+                continue
+            yield child
+            yield from _walk_own_body(child)
+
+    lines  = src.splitlines()
     issues = []
-    in_ui  = False
-    depth  = 0
-    for lineno, line in enumerate(lines, 1):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.FunctionDef) and _is_gui_app_decorated(node)):
             continue
-        if stripped.startswith("def ui("):
-            in_ui = True
-            depth = len(line) - len(line.lstrip())
-            continue
-        if not in_ui:
-            continue
-        if len(line) - len(line.lstrip()) <= depth:      # dedent → left ui()
-            in_ui = False
-            continue
-        if (".set(" in line and "lambda" not in line
-                and "on_click" not in line and "on_change" not in line
-                and "sync_" not in line
-                and not stripped.startswith("def ")):
-            issues.append(f"line {lineno}: {stripped[:80]}")
+        for sub in _walk_own_body(node):
+            if (isinstance(sub, ast.Call)
+                    and isinstance(sub.func, ast.Attribute)
+                    and sub.func.attr in ("set", "update", "toggle",
+                                          "set_silent")):
+                snippet = lines[sub.lineno - 1].strip()[:80]
+                issues.append(f"line {sub.lineno}: {snippet}")
     return issues
 
 
 EXAMPLES = [
-    "01_counter.py",
-    "02_todo.py",
-    "03_settings.py",
-    "06_soils_lab.py",
-    "08_soil_water_retention.py",
+    "counter.py",
+    "todo.py",
+    "settings.py",
+    "soils_lab.py",
+    "soil_water_retention.py",
+    "field_notes.py",
 ]
 
 

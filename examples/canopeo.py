@@ -269,3 +269,5 @@ def ui():
                                 "Load a JPG, PNG, or TIFF to begin classification.",
                                 muted=True, size="sm"
                             )
+
+gui.run()

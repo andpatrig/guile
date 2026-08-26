@@ -124,3 +124,5 @@ def ui():
                     df.assign(date=df["date"].dt.strftime("%Y-%m-%d")),
                     columns=["date","temp_c","solar_mj"]
                 )
+
+gui.run()

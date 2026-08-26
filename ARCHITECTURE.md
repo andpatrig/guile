@@ -23,6 +23,11 @@ count = gui.state(0)
 count.set(count.value + 1)   # triggers a re-render
 ```
 
+Reading always goes through `.value` — comparisons and arithmetic
+included (`if count.value > 0:`). `State` deliberately does not proxy
+operators: doing so silently misbehaved for numpy arrays and
+DataFrames, and made states inconsistent in dicts and sets.
+
 Internally, `state.py` keeps a list of listener functions. When a value
 changes, it calls all of them. In practice there is only ever one
 listener: the app's render function, registered by `_app.py`.
@@ -96,12 +101,12 @@ class.
 One important detail: `handle()` must return *immediately* without
 doing any real work. This is because pywebview calls it on its internal
 WebView thread, and if that thread is busy, it cannot also run
-`evaluate_js()` — causing a deadlock. So `handle()` instantly spawns
-a background thread that does the actual dispatch and re-render.
+`evaluate_js()` — causing a deadlock. So `handle()` just puts the event
+on a queue; a single long-lived worker thread drains the queue, runs
+the callback, and re-renders (coalescing bursts into one render).
 
-If pywebview is not installed, `_App` falls back to running a tiny
-local HTTP server and opening the app in your default browser — useful
-for development.
+pywebview is a hard requirement: if it is not installed, `run()` exits
+with a clear `pip install pywebview` message.
 
 ---
 
@@ -148,8 +153,13 @@ The internal classes (`_Button`, `_Input`, `_App`, etc.) can change
 their internals without affecting user code, as long as the functions
 here stay the same.
 
-It also re-exports `Marker` (for map markers) and the `@gui.app()`
-decorator, which is the entry point that launches the window.
+It also re-exports `Marker` (for map markers), the `@gui.app()`
+decorator, and `gui.run()`. The decorator only *registers* the ui
+function; `gui.run()` — called at the end of the script — opens the
+window and blocks until it closes. This keeps app scripts importable
+(no window at import time) and gives code after `gui.run()` a natural
+"window just closed" role: saving the session, cleanup, or continuing
+a pipeline.
 
 ---
 

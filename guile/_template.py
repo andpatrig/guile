@@ -307,7 +307,11 @@ function _guilePatch(oldNode, newNode) {
         if (!newNode.hasAttribute(oa[i].name))
             oldNode.removeAttribute(oa[i].name);
     }
-    if (savedValue !== undefined) oldNode.value = savedValue;
+    // Focused element: keep what the user is typing. Assigning .value
+    // resets the caret even for an identical string, so only assign on a
+    // real difference.
+    if (savedValue !== undefined && oldNode.value !== savedValue)
+        oldNode.value = savedValue;
 
     if (isPreserved) return;
 
@@ -330,11 +334,97 @@ function _guilePatch(oldNode, newNode) {
             _guilePatch(oc[i], nc[i]);
         }
     }
+
+    // Sync live form properties (dirty-value fix).
+    // Once the user has interacted with a form control, the browser stops
+    // reflecting the value/checked/selected ATTRIBUTES into the displayed
+    // state, so attribute patching alone can't apply a Python-side change
+    // (e.g. state.set("") to clear a field). Assign the properties
+    // explicitly — but never on the focused element, which keeps whatever
+    // the user is mid-typing. SELECT runs after the child sync above so
+    // the new <option> set is already in place.
+    if (!isFocused && oldNode.tagName) {
+        var tag = oldNode.tagName;
+        if (tag === 'INPUT') {
+            if (oldNode.type === 'checkbox' || oldNode.type === 'radio') {
+                var chk = newNode.hasAttribute('checked');
+                if (oldNode.checked !== chk) oldNode.checked = chk;
+            } else {
+                var nv = newNode.getAttribute('value');
+                if (nv !== null && oldNode.value !== nv) oldNode.value = nv;
+            }
+        } else if (tag === 'TEXTAREA') {
+            if (oldNode.value !== newNode.value) oldNode.value = newNode.value;
+        } else if (tag === 'SELECT') {
+            var oo = oldNode.options;
+            for (var i = 0; i < oo.length; i++) {
+                var sel = oo[i].hasAttribute('selected');
+                if (oo[i].selected !== sel) oo[i].selected = sel;
+            }
+        }
+    }
 }
 
 // ── Leaflet map registry ──────────────────────────────────────────────────
 
 var _guileMaps = {};
+
+// ── Lazy Leaflet loader ───────────────────────────────────────────────────
+// The Leaflet <script>/<link> tags are normally injected at startup, when
+// the silent probe run of ui() reaches a gui.leaflet() call. But a map that
+// only renders conditionally (a non-default tab, behind an if) is invisible
+// to that probe — the flag is never set and the map would stay blank
+// forever. This loader is the fallback: when a data-guile-map element
+// appears and Leaflet (or the draw plugin) is missing, fetch it from the
+// CDN, then re-sync.
+var _guileLeafletLoading = false;
+
+function _guileLoadCss(href) {
+    var l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = href;
+    document.head.appendChild(l);
+}
+
+function _guileLoadJs(src, onload) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload  = onload;
+    s.onerror = function() {
+        _guileLeafletLoading = false;
+        console.error('[guile] failed to load ' + src);
+    };
+    document.body.appendChild(s);
+}
+
+function _guileLoadLeaflet(needDraw) {
+    if (_guileLeafletLoading) return;
+    _guileLeafletLoading = true;
+    var finish = function() {
+        _guileLeafletLoading = false;
+        // Re-attach events on existing maps: a map created before the draw
+        // plugin arrived is skipped by the cfgJson comparison in
+        // _guileSyncMaps, so give it its draw control explicitly.
+        Object.keys(_guileMaps).forEach(function(id) {
+            var entry = _guileMaps[id];
+            _guileAttachMapEvents(entry, JSON.parse(entry.cfgJson));
+        });
+        _guileSyncMaps();
+    };
+    var loadDraw = function(next) {
+        _guileLoadCss('__LEAFLET_DRAW_CSS__');
+        _guileLoadJs('__LEAFLET_DRAW_JS__', next);
+    };
+    if (typeof L === 'undefined') {
+        _guileLoadCss('__LEAFLET_CSS__');
+        _guileLoadJs('__LEAFLET_JS__', function() {
+            if (needDraw) loadDraw(finish); else finish();
+        });
+    } else if (needDraw) {
+        loadDraw(finish);
+    } else {
+        _guileLeafletLoading = false;
+    }
+}
 
 // ── Attach / update map-level event listeners ─────────────────────────────
 // Called on first creation AND whenever cfgJson changes.
@@ -437,8 +527,27 @@ function _guileAttachMapEvents(entry, cfg) {
 }
 
 function _guileSyncMaps() {
-    if (typeof L === 'undefined') return;
-    document.querySelectorAll('[data-guile-map]').forEach(function(el) {
+    var els = document.querySelectorAll('[data-guile-map]');
+    if (!els.length) return;
+
+    // Do any of the maps on the page need the draw plugin?
+    var needDraw = false;
+    els.forEach(function(el) {
+        var cfg = JSON.parse(el.getAttribute('data-guile-map'));
+        if (cfg.draw && cfg.draw.length) needDraw = true;
+    });
+
+    // Assets missing (conditionally-rendered map the startup probe never
+    // saw) → fetch them; the loader re-runs this function when done.
+    if (typeof L === 'undefined' ||
+            (needDraw && typeof L.Control.Draw === 'undefined')) {
+        _guileLoadLeaflet(needDraw);
+        if (typeof L === 'undefined') return;
+        // Leaflet itself is present — create maps now; draw controls
+        // attach on the re-sync after the plugin finishes loading.
+    }
+
+    els.forEach(function(el) {
         var id      = el.id;
         var cfg     = JSON.parse(el.getAttribute('data-guile-map'));
         var cfgJson = JSON.stringify(cfg);
@@ -574,6 +683,10 @@ def get_html(title: str, use_leaflet: bool = False,
     """Return the full base HTML page for the WebView window."""
     safe_title = title.replace("<", "&lt;").replace(">", "&gt;")
 
+    # Fast path: when the startup probe saw a gui.leaflet() call, include
+    # the assets directly so the map appears without a lazy-load round trip.
+    # Maps the probe missed (conditional tabs) are covered by the lazy
+    # loader in _JS, which fetches these same URLs on demand.
     leaflet_head = ""
     leaflet_js   = ""
     if use_leaflet:
@@ -582,6 +695,12 @@ def get_html(title: str, use_leaflet: bool = False,
         if use_leaflet_draw:
             leaflet_head += f'\n<link rel="stylesheet" href="{_LEAFLET_DRAW_CSS}">'
             leaflet_js   += f'\n<script src="{_LEAFLET_DRAW_JS}"></script>'
+
+    js = (_JS
+          .replace("__LEAFLET_CSS__",      _LEAFLET_CSS)
+          .replace("__LEAFLET_JS__",       _LEAFLET_JS)
+          .replace("__LEAFLET_DRAW_CSS__", _LEAFLET_DRAW_CSS)
+          .replace("__LEAFLET_DRAW_JS__",  _LEAFLET_DRAW_JS))
 
     return f"""<!DOCTYPE html>
 <html lang="en-GB">
@@ -595,6 +714,6 @@ def get_html(title: str, use_leaflet: bool = False,
 <body>
 <div id="guile-app"></div>
 {leaflet_js}
-<script>{_JS}</script>
+<script>{js}</script>
 </body>
 </html>"""

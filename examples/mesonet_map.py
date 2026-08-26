@@ -113,3 +113,5 @@ def ui():
                     markers=markers,
                     key="ks-map",
                 )
+
+gui.run()

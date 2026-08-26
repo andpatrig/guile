@@ -32,3 +32,5 @@ def ui():
         if celsius.value is not None:
             gui.text(f"{celsius.value} °C")
             gui.text(phase.value)
+
+gui.run()

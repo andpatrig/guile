@@ -98,3 +98,5 @@ def ui():
                              [t for t in todos.value if not t["done"]]
                          ),
                          style="align-self:flex-start")
+
+gui.run()

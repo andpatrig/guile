@@ -45,6 +45,11 @@ class State:
         count = gui.state(0)
         count.set(count.value + 1)
         count.update(lambda x: x + 1)
+
+    Always read through .value — for comparisons and arithmetic too:
+
+        if count.value > 0: ...
+        total = price.value * qty.value
     """
 
     def __init__(self, initial: Any):
@@ -75,28 +80,49 @@ class State:
         """Shorthand for boolean state."""
         self.value = not self._v
 
-    # ── Transparent proxy operators ────────────────────────────────────────
+    # ── Display ────────────────────────────────────────────────────────────
+    # str() shows the value so gui.text(my_state) and print(my_state) stay
+    # readable; repr() makes the wrapper visible for debugging.
     def __str__(self):      return str(self._v)
     def __repr__(self):     return f"State({self._v!r})"
-    def __int__(self):      return int(self._v)
-    def __float__(self):    return float(self._v)
-    def __bool__(self):     return bool(self._v)
-    def __len__(self):      return len(self._v)
-    def __iter__(self):     return iter(self._v)
-    def __contains__(self, item): return item in self._v
-    def __getitem__(self, k):     return self._v[k]
-    def __add__(self, o):   return self._v + (o._v if isinstance(o, State) else o)
-    def __radd__(self, o):  return (o._v if isinstance(o, State) else o) + self._v
-    def __sub__(self, o):   return self._v - (o._v if isinstance(o, State) else o)
-    def __rsub__(self, o):  return (o._v if isinstance(o, State) else o) - self._v
-    def __mul__(self, o):   return self._v * (o._v if isinstance(o, State) else o)
-    def __truediv__(self, o): return self._v / (o._v if isinstance(o, State) else o)
-    def __eq__(self, o):    return self._v == (o._v if isinstance(o, State) else o)
-    def __lt__(self, o):    return self._v <  (o._v if isinstance(o, State) else o)
-    def __gt__(self, o):    return self._v >  (o._v if isinstance(o, State) else o)
-    def __le__(self, o):    return self._v <= (o._v if isinstance(o, State) else o)
-    def __ge__(self, o):    return self._v >= (o._v if isinstance(o, State) else o)
-    def __hash__(self):     return id(self)
-    def __neg__(self):      return -self._v
-    def __abs__(self):      return abs(self._v)
-    def __mod__(self, o):   return self._v % (o._v if isinstance(o, State) else o)
+
+    # ── One rule: read the value through .value ────────────────────────────
+    # Earlier versions proxied comparison and arithmetic operators so that
+    # `count > 0` worked without .value. That shortcut was removed in 0.7:
+    # it silently broke for numpy arrays and DataFrames ("truth value is
+    # ambiguous"), and made State objects behave inconsistently in dicts
+    # and sets. Now there is a single rule with no exceptions:
+    #
+    #     if count.value > 0: ...          not:  if count > 0
+    #     total = price.value * qty.value  not:  price * qty
+    #
+    # Comparing or operating on a State object directly raises TypeError,
+    # which points at the exact line to fix.
+    def __bool__(self):
+        # Without this, `if my_state:` would be silently True forever —
+        # worse than an error. Raise with guidance instead (same approach
+        # pandas takes for ambiguous truth values).
+        raise TypeError(
+            "State objects have no truth value. Use .value instead: "
+            "`if my_state.value:`"
+        )
+
+    def __eq__(self, other):
+        # Python's default would silently compare identity (`state == 5`
+        # → False, always), which is a stealth bug for code migrating
+        # from the old proxy behaviour. Raise with guidance instead.
+        # `state is None` / `is not None` are unaffected.
+        raise TypeError(
+            "Compare the value, not the State object: "
+            "`my_state.value == x`"
+        )
+
+    def __ne__(self, other):
+        raise TypeError(
+            "Compare the value, not the State object: "
+            "`my_state.value != x`"
+        )
+
+    # Defining __eq__ would otherwise disable hashing; keep identity
+    # hashing so States can still be dict keys / set members.
+    __hash__ = object.__hash__

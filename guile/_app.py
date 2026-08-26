@@ -7,7 +7,8 @@ This file contains two classes:
   _Bridge  — the thin object exposed to JavaScript as window.pywebview.api
 
 You don't need to read this file to use guile. It's called automatically
-by the @gui.app() decorator in __init__.py.
+by gui.run() in __init__.py (the @gui.app() decorator registers the ui
+function; gui.run() instantiates _App and starts it).
 
 The event flow for a button click:
     1. User clicks → JS calls window._guile.trigger(cid, value)
@@ -53,7 +54,7 @@ class _App:
     """
     Manages the pywebview window and the render loop.
 
-    Created by @gui.app() — you never instantiate this directly.
+    Created by gui.run() — you never instantiate this directly.
     """
 
     # Class-level reference to the running app — used by gui.leaflet()
@@ -79,6 +80,9 @@ class _App:
         #   ("event",  cid, value)  — user interaction → dispatch(cid, value)
         #   ("silent", cid, value)  — state update only, no render
         #   ("render", None, None)  — a State changed, re-render needed
+        #   ("call",   fn,  None)   — run fn() on the worker thread; used by
+        #                             gui.task() to deliver on_done/on_error
+        #                             serialized with all other events
         # One daemon worker drains it; see _worker_loop().
         self._queue = queue.Queue()
         self._in_render = False   # True while ui() runs inside _render()
@@ -118,7 +122,9 @@ class _App:
         # (e.g. gui.leaflet() → _use_leaflet) are captured before get_html()
         # picks which <script>/<link> tags to include. Any error here is
         # ignored on purpose: the first real _render() runs ui() again and
-        # reports the error (console + in-window panel).
+        # reports the error (console + in-window panel). Maps this probe
+        # can't reach (conditional tabs) are covered by the lazy Leaflet
+        # loader in _template.py.
         try:
             _reset_render()
             root = self._make_root()
@@ -204,6 +210,13 @@ class _App:
                     _dispatch_silent(cid, value)
                 elif kind == "render":
                     needs_render = True
+                elif kind == "call":
+                    # gui.task() completion — cid holds the callable.
+                    try:
+                        cid()
+                    except Exception:
+                        from .ui import _report_callback_error
+                        _report_callback_error()
             if needs_render:
                 self._render()
 

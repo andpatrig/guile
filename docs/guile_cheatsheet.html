@@ -262,7 +262,7 @@ tr:last-child td { border-bottom: none; }
     <div class="title-desc">Build lightweight desktop apps with plain Python.</div>
     <div class="title-meta">
       <div class="row"><span class="k">install</span><code>pip install guile</code></div>
-      <div class="row"><span class="k">version</span><span>v0.6.0</span></div>
+      <div class="row"><span class="k">version</span><span>v0.7.0</span></div>
       <div class="row"><span class="k">requires</span><span>Python ≥ 3.9</span></div>
     </div>
     <div class="title-meta">
@@ -313,8 +313,10 @@ tr:last-child td { border-bottom: none; }
         <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">if</span> celsius.value <span class="kw">is not None</span>:</div>
         <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.<span class="fn">text</span>(<span class="st">f"{celsius.value} °C"</span>)</div>
         <div class="code-row">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gui.<span class="fn">text</span>(phase.value)</div>
+        <div class="code-row">&nbsp;</div>
+        <div class="code-row">gui.<span class="fn">run</span>()</div>
       </div>
-      <div class="skel-card s4b"><b>4 · Layout</b>Re-runs on every state change. Never call <code style="font-size:10.5px">.set()</code> inside <code style="font-size:10.5px">ui()</code>.</div>
+      <div class="skel-card s4b"><b>4 · Layout + run</b>Re-runs on every state change; never call <code style="font-size:10.5px">.set()</code> inside <code style="font-size:10.5px">ui()</code>. <code style="font-size:10.5px">gui.run()</code> opens the window; code after it runs when the window closes.</div>
 
     </div>
   </div>
@@ -333,6 +335,8 @@ tr:last-child td { border-bottom: none; }
     <div><strong>State lives outside <code>ui()</code></strong> — declare it at module level, or it resets on every render.</div>
     <div><strong>Don't call <code>.set()</code> unconditionally inside <code>ui()</code></strong> — it triggers another render and loops forever. Use <code>on_change=</code> callbacks instead.</div>
     <div><strong>Lambda captures loop variables late</strong> — lock in the current value with a default arg: <code>lambda i=i: delete(i)</code></div>
+    <div><strong>End the script with <code>gui.run()</code></strong> — the decorator defines the app; <code>gui.run()</code> opens the window. Code after it runs when the window closes (save your session there).</div>
+    <div><strong>Read state via <code>.value</code>, always</strong> — comparisons and arithmetic too: <code>if count.value &gt; 0:</code>. Works the same for scalars, arrays, and DataFrames.</div>
   </div>
 </div>
 
@@ -348,8 +352,8 @@ count.<span class="fn">set</span>(<span class="num">42</span>)                  
 count.<span class="fn">update</span>(<span class="kw">lambda</span> x: x+<span class="num">1</span>)   <span class="cm"># transform</span>
 count.<span class="fn">toggle</span>()                  <span class="cm"># bool flip</span>
 
-gui.<span class="fn">text</span>(count)              <span class="cm"># State directly — no .value</span>
-gui.<span class="fn">text</span>(<span class="st">f"{count.value} items"</span>)</pre>
+gui.<span class="fn">text</span>(<span class="st">f"{count.value} items"</span>)
+<span class="kw">if</span> count.value &gt; <span class="num">0</span>: ...      <span class="cm"># always read via .value</span></pre>
 </div>
 
 
@@ -525,6 +529,11 @@ gui.<span class="fn">theme</span>(<span class="st">"light"</span>, primary=<span
         <td><code>message</code> <code>variant</code> <code>duration=3.0</code></td>
         <td class="dim">toast — call from a callback, not inside <code>ui()</code></td>
       </tr>
+      <tr>
+        <td><code>gui.task()</code></td>
+        <td><code>fn</code> <code>on_done</code> <code>on_error</code> <code>busy</code></td>
+        <td class="dim">run slow work in the background — UI stays responsive</td>
+      </tr>
     </tbody>
   </table>
 </div>
@@ -534,7 +543,7 @@ gui.<span class="fn">theme</span>(<span class="st">"light"</span>, primary=<span
 
 <div class="footer">
   <span>guile — lightweight Python desktop UI &nbsp;·&nbsp; <strong>pip install guile</strong></span>
-  <span>v0.5.0</span>
+  <span>v0.7.0</span>
 </div>
 
 </body>

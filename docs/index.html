@@ -409,7 +409,7 @@ pre.code .id    { color: var(--text); }
 <section class="hero" id="top">
   <div class="hero-inner">
     <div class="hero-stack">
-      <div class="eyebrow"><span class="dot"></span> v0.6.0 · MIT · Python ≥ 3.9</div>
+      <div class="eyebrow"><span class="dot"></span> v0.7.0 · MIT · Python ≥ 3.9</div>
       <div class="hero-wordmark">
         <span class="wordmark"><span class="gui">gui</span>le</span>
       </div>
@@ -418,8 +418,8 @@ pre.code .id    { color: var(--text); }
       </h1>
       <p class="hero-sub">
         A lightweight framework for the kind of internal dashboards, data explorers, and parameter
-        tools you need at work or at home. Write Python, get a desktop window —
-        no full-page re-execution on refresh, no nesting hell, no server.
+        tools you need at work or at home. An interactive layer on top of the Python you already
+        have: change a state value and the window updates — no full-page refresh, no server.
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#start">
@@ -497,7 +497,9 @@ pre.code .id    { color: var(--text); }
         <span class="id">gui</span><span class="punct">.</span><span class="fn">slider</span><span class="punct">(</span><span class="str">&quot;°F&quot;</span><span class="punct">,</span> <span class="id">value</span><span class="punct">=</span><span class="id">fahrenheit</span><span class="punct">,</span>
                    <span class="id">on_change</span><span class="punct">=</span><span class="id">fahrenheit</span><span class="punct">.</span><span class="id">set</span><span class="punct">,</span> <span class="id">min</span><span class="punct">=</span><span class="num">0</span><span class="punct">,</span> <span class="id">max</span><span class="punct">=</span><span class="num">212</span><span class="punct">)</span>
         <span class="id">gui</span><span class="punct">.</span><span class="fn">text</span><span class="punct">(</span><span class="str">f&quot;{to_celsius(fahrenheit.value)} °C&quot;</span><span class="punct">,</span>
-                 <span class="id">size</span><span class="punct">=</span><span class="str">&quot;2xl&quot;</span><span class="punct">,</span> <span class="id">bold</span><span class="punct">=</span><span class="kw">True</span><span class="punct">)</span></code></pre>
+                 <span class="id">size</span><span class="punct">=</span><span class="str">&quot;2xl&quot;</span><span class="punct">,</span> <span class="id">bold</span><span class="punct">=</span><span class="kw">True</span><span class="punct">)</span>
+
+<span class="id">gui</span><span class="punct">.</span><span class="fn">run</span><span class="punct">()</span></code></pre>
       </div>
       <div class="preview-window">
         <div class="win-bar">

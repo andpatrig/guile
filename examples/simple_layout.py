@@ -21,3 +21,5 @@ def ui():
         gui.title("Temperature converter")
         gui.slider("°F", value=fahrenheit, on_change=fahrenheit.set, min=0, max=212)
         gui.text(f"{to_celsius(fahrenheit.value)} °C", size="2xl", bold=True)
+
+gui.run()

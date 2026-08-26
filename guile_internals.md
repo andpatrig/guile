@@ -12,12 +12,23 @@ guile/
 ├── state.py        State class — reactive values + listener registry
 ├── ui.py           render engine + every widget class
 ├── _app.py         window lifecycle, pywebview bridge
-└── _template.py    the embedded HTML page (CSS + JS DOM patcher)
+├── _template.py    the embedded HTML page (CSS + JS DOM patcher)
+├── _package.py     gui.package() — PyInstaller wrapper
+└── _dev.py         gui.run(dev=True) — hot reload watcher
 ```
 
 Nothing in `__init__.py` does real work — it just wraps the classes from
-`ui.py` in plain functions, keeping the public surface clean. All substance
-is in the four files below it.
+`ui.py` in plain functions, keeping the public surface clean (the app/run
+registration and gui.task() are the exceptions — small and self-contained).
+
+`_dev.py` deserves one note because it shows how the pieces compose: the
+file watcher never touches the app directly — it enqueues the reload as a
+`("call", fn, None)` item (the same delivery gui.task() uses), so the
+re-exec of the user's script, the ui() swap, and the re-render all happen
+on the worker thread, serialized with callbacks. Re-execution stops at
+the gui.run() line via a sentinel exception, so after-run code doesn't
+fire on every save. A map added mid-session works because of the lazy
+Leaflet loader in `_template.py`.
 
 ---
 
@@ -26,8 +37,8 @@ is in the four files below it.
 ```
   Your code
   ─────────
-  @gui.app(...)          # __init__.py → _App.run()
-  def ui():
+  @gui.app(...)          # __init__.py → registers (fn, config)
+  def ui():              # gui.run() at the end of the script → _App.run()
       gui.state()        # state.py  → State object
       gui.button(...)    # ui.py     → _Button node, registers callback
       gui.text(...)      # ui.py     → _Text node
@@ -50,17 +61,19 @@ is in the four files below it.
   ────────────────────
   browser → _guile.trigger(cid)                 _template.py  (JS)
           → window.pywebview.api.handle(cid)
-          → _Bridge.handle()  spawns thread      _app.py
-          → dispatch(cid)  finds callback        ui.py
+          → _Bridge.handle()  enqueues, returns  _app.py
+          → worker thread: dispatch(cid)         ui.py
           → your on_click lambda runs
           → State.set()  fires listeners         state.py
-          → _App._rerender() → _App._render()    _app.py
+          → _App._rerender() queues a render     _app.py
+          → worker drains queue → one _render()
           (loop repeats from top)
 ```
 
-The thread dance in `_Bridge` exists because `evaluate_js()` and the
-pywebview message thread share a lock. If `handle()` did work synchronously
-it would deadlock. The daemon thread sidesteps that.
+The queue in `_Bridge` exists because `evaluate_js()` and the pywebview
+message thread share a lock. If `handle()` did work synchronously it
+would deadlock. Enqueueing to the single worker thread sidesteps that —
+and serialises all callbacks and renders as a bonus.
 
 ---
 
@@ -80,9 +93,14 @@ count.set_silent(42)   # sets ._v without firing (used by multiselect)
 `_App.run()` registers `self._rerender` as a listener, so every `State.set()`
 anywhere in the app triggers a full re-render.
 
-**Proxy operators** (`__str__`, `__add__`, `__eq__`, …) let you pass a
-`State` directly to `gui.text(count)` or use it in f-strings and comparisons
-without calling `.value` explicitly.
+**One rule: read through `.value`** — comparisons and arithmetic included
+(`if count.value > 0:`). Earlier versions proxied operators (`__eq__`,
+`__add__`, …) so `count > 0` worked directly; 0.7 removed them because
+they silently misbehaved for numpy arrays and DataFrames ("truth value
+is ambiguous") and made states inconsistent in dicts/sets. Only
+`__str__`/`__repr__` remain (printable states). `__bool__` and `__eq__`
+raise a guiding TypeError rather than being silently always-True /
+always-False; `state is None` and hashing (identity) still work.
 
 **Nothing to change here unless** you need a new mutation method (e.g.
 `append`, `pop`) or want persistent/serialised state.
@@ -196,25 +214,37 @@ both shapes.
 
 | method | what it does |
 |---|---|
-| `run(build_fn)` | silent probe run, opens window, starts event loop |
-| `_on_loaded()` | fires when page loads → triggers first real render |
+| `run(build_fn)` | silent probe run, opens window, starts pywebview |
+| `_on_loaded()` | fires when page loads → queues the first real render |
 | `_on_closed()` | cleans up listeners and state store |
+| `_worker_loop()` | the single worker thread: drains the queue in batches |
 | `_render()` | runs `ui()`, serialises to HTML, pushes via `evaluate_js` |
-| `_rerender()` | registered as a `State` listener; calls `_render()` |
+| `_rerender()` | registered as a `State` listener; queues a render request |
 | `_make_root()` | builds the root `Column` (centered or default) |
 
-`_render()` is a loop, not recursion. If a state change arrives mid-render
-it sets `_needs_render = True` and the loop runs one more time. It stops
-after that — two renders is enough to stabilise.
+Everything flows through one queue drained by one daemon worker thread.
+Queue items are tuples of `(kind, a, b)`:
+
+| kind | meaning |
+|---|---|
+| `"event"` | user interaction → `dispatch(cid, value)` |
+| `"silent"` | state update only, no render (multiselect / text inputs) |
+| `"render"` | a `State` changed; the batch drain coalesces any number of these into ONE render |
+| `"call"` | run a callable on the worker thread — how `gui.task()` delivers `on_done`/`on_error` serialized with everything else |
+
+Because dispatch, callbacks, `ui()` and `evaluate_js` all run on this one
+thread, renders are serial by construction and a callback that calls
+`.set()` five times still produces a single render. A `.set()` *inside*
+`ui()` is caught by a loop guard and surfaced as a clear error instead of
+rendering forever.
 
 **`_Bridge`** is the object pywebview exposes as `window.pywebview.api`.
 Its methods **must not** start with `_` (pywebview filters them). `handle()`
-spawns a daemon thread immediately and returns — blocking here deadlocks
-`evaluate_js`.
+and `silent_update()` just enqueue and return immediately — blocking here
+would deadlock `evaluate_js`, which needs the same WebView thread.
 
-**`_fallback_browser()`** — when pywebview is absent, a local HTTP server
-serves the app and opens the browser. POST requests dispatch callbacks; GET
-`/` returns the page HTML and GET anything else returns a fresh render.
+pywebview is a hard requirement: if it is missing, `run()` exits with a
+clear `pip install pywebview` message.
 
 ---
 
@@ -271,7 +301,13 @@ for colours so dark mode and themes work for free.
 **`_guilePatch(oldNode, newNode)`** walks both trees and updates only
 attributes and text that differ. Key behaviours:
 - Saves and restores `document.activeElement.value` so focused inputs don't
-  lose the cursor on every keystroke.
+  lose the cursor on every keystroke (and only assigns on a real difference,
+  since setting `.value` resets the caret even for an identical string).
+- Syncs the live form *properties* (`value`, `checked`, option `selected`)
+  on non-focused controls after patching. Once the user has interacted with
+  a control, the browser stops reflecting those attributes into the display
+  (the "dirty value" flag), so attribute patching alone can't apply a
+  Python-side change like `state.set("")` clearing a field.
 - Skips children of `.guile-map` elements — Leaflet owns that subtree.
 
 **`window._guile`** is the client-side API:
@@ -290,9 +326,16 @@ serialised `cfgJson`.
 ### `get_html(title, use_leaflet, use_leaflet_draw)`
 
 Assembles the full page string. Leaflet `<link>` and `<script>` tags are
-injected only when `_App._use_leaflet` was set to `True` during the silent
-probe run (before the window opens). That's why `gui.leaflet()` sets a flag
-on `_App._current` rather than just returning an element.
+injected at startup when `_App._use_leaflet` was set to `True` during the
+silent probe run (before the window opens). That's why `gui.leaflet()` sets
+a flag on `_App._current` rather than just returning an element.
+
+The probe can't see a map that only renders conditionally (a non-default
+tab, behind an `if`), so `_guileSyncMaps` has a fallback: when a
+`data-guile-map` element appears and Leaflet (or the draw plugin) is
+missing, `_guileLoadLeaflet` fetches the same CDN assets on demand and
+re-syncs once they arrive. The startup tags remain the fast path — no
+lazy-load round trip for maps the probe did see.
 
 ---
 
@@ -322,6 +365,13 @@ thread-local stack, every leaf widget attaches itself to whatever is on top,
 `__exit__` pops and attaches the container to its own parent. Simple enough to
 read in one sitting, solid enough that it never needs to change.
 
+The user-facing name for this property is **ambient attachment** (see the
+how-to's "Structuring larger UIs" section): because widgets attach to
+whichever container is currently open, any section of a `ui()` can be
+extracted into a plain function and called inside a `with` block — no
+special signature, no children lists to return. It's guile's entire
+composition story, and it falls out of the stack for free.
+
 ### The reactive state model — the right idea, stripped down
 
 `gui.state()` is React's `useState` translated to Python, and that's not a
@@ -333,10 +383,11 @@ That sounds expensive. For a single-window desktop app with a few dozen
 widgets it's essentially free, and it means there are zero rules to learn about
 when things update. The tradeoff was made consciously.
 
-The proxy operators on `State` (`__str__`, `__add__`, `__eq__`, …) are a
-Python-specific improvement over the React original. You can write
-`gui.text(count)` or use a State in an f-string and it just works. That's not
-possible in JavaScript.
+Early versions also proxied operators on `State` (`count > 0` compared the
+inner value). That convenience was removed in 0.7 in favour of one explicit
+rule — read through `.value` — after the proxies proved to silently
+misbehave with numpy arrays and DataFrames. `__str__` survives, so printing
+a state (or using one in an f-string) still shows its value.
 
 ### Widget-internal state — one fewer declaration
 

@@ -18,18 +18,22 @@ Quick start:
                        min=0, max=212)
             gui.text(f"{to_celsius(fahrenheit.value)} °C", size="2xl", bold=True)
 
+    gui.run()
+
 Source files:
     state.py     — reactive State class
     ui.py        — render engine + all widget classes
     _app.py      — window lifecycle, pywebview bridge
     _template.py — embedded HTML/CSS/JS page
     _package.py  — build a shareable executable (gui.package)
+    _dev.py      — hot reload for development (gui.run(dev=True))
     __init__.py  — this file: the public API surface (gui.*)
 
 Everything the user ever calls lives in this file as a plain function.
 """
 
 from __future__ import annotations
+import os
 from typing import Any, Callable, Optional, Union
 
 from .state import State
@@ -196,7 +200,10 @@ def number_input(label: str = "", *,
     Numeric input. Returns .value (float) directly — no string conversion needed.
 
     Follows the same value= convention as every other input widget.
-    Empty or invalid input silently falls back to the initial value.
+    .value is kept current on every valid keystroke, but the UI only
+    re-renders (and on_change only fires) when the field commits — Enter,
+    focus leave, or a spinner click. An empty or invalid commit keeps the
+    current value.
 
     Standalone — widget owns its state:
         depth = gui.number_input("Root depth", value=1.0, step=0.1, unit="m")
@@ -217,7 +224,7 @@ def number_input(label: str = "", *,
         step      — spinner arrow increment
         unit      — unit label shown to the right: "mm", "m³/m³", "days" …
         disabled  — read-only appearance
-        on_change — called with the new float on every valid change
+        on_change — called with the new float when the field commits
     """
     return _NumberInput(label, value=value,
                         min=min, max=max, step=step,
@@ -506,6 +513,7 @@ def notify(message: str, *,
     """
     from ._app import _App
     import html as _h
+    import json as _json
     app = _App._current
     if not app or not app._window:
         return
@@ -519,8 +527,8 @@ def notify(message: str, *,
     }
     fg, bg = COLOURS.get(variant, COLOURS["primary"])
     # NOTE: no manual quote-escaping needed — the message is embedded
-    # below via repr(), which produces a valid JS string literal.
-    # (The old .replace("'", "\'") was a no-op: "\'" is just "'".)
+    # below via json.dumps(), the canonical way to produce a JS string
+    # literal from Python (handles quotes, backslashes, and unicode).
     msg    = _h.escape(str(message))
     ms     = int(duration * 1000)
 
@@ -542,13 +550,106 @@ def notify(message: str, *,
         "(function(){"
         "var e=document.createElement('div');"
         "e.className='guile-notify';"
-        f"e.style.cssText={repr(card_css)};"
-        f"e.innerHTML={repr(inner)};"
+        f"e.style.cssText={_json.dumps(card_css)};"
+        f"e.innerHTML={_json.dumps(inner)};"
         "document.body.appendChild(e);"
         f"setTimeout(function(){{if(e.parentNode)e.remove();}},{ms});"
         "})();"
     )
     app._window.evaluate_js(js)
+
+
+# ── Background tasks ────────────────────────────────────────────────────────
+
+def task(fn: Callable, *,
+         on_done: Optional[Callable] = None,
+         on_error: Optional[Callable] = None,
+         busy: Optional[State] = None) -> None:
+    """
+    Run fn() on a background thread so the window stays responsive.
+
+    Call from a callback (on_click=, on_change=) when the work is slow —
+    downloading data, crunching an image, a long computation. Without
+    task(), a slow callback freezes the whole app until it finishes:
+    no clicks are handled and no renders happen, so even a progress bar
+    can't update.
+
+        df   = gui.state(None)
+        busy = gui.state(False)
+
+        def fetch():                      # runs in the background
+            import pandas as pd
+            return pd.read_csv(URL)       # the UI stays alive meanwhile
+
+        def start():
+            gui.task(fetch, on_done=df.set, busy=busy)
+
+        @gui.app("Weather")
+        def ui():
+            gui.button("Loading…" if busy.value else "Fetch data",
+                       on_click=start, disabled=busy.value)
+            if df.value is not None:
+                gui.table(df.value)
+
+    Arguments:
+        fn        — the slow function, called with no arguments (use a
+                    lambda or functools.partial to bind arguments).
+        on_done   — called with fn's return value when it finishes.
+        on_error  — called with the exception if fn raises. When omitted,
+                    the error is printed and shown as a danger toast.
+        busy      — a State[bool] set to True while the task runs and
+                    back to False when it finishes (success or error).
+                    Bind it to disable buttons / show a "working" label.
+
+    How it fits the render model:
+      • State .set() calls made inside fn are safe from the background
+        thread and re-render as usual — update a gui.state() progress
+        value inside fn to drive a live progress bar.
+      • on_done / on_error run back on the app's worker thread,
+        serialized with every other event — so they can freely touch
+        state without racing a render or another callback.
+      • Call task() from callbacks, not from inside ui().
+    """
+    import threading as _threading
+    from ._app import _App
+    app = _App._current
+
+    if busy is not None:
+        busy.set(True)
+
+    def _deliver(cb):
+        """Run cb on the worker thread when there is an app, else inline."""
+        if app is not None:
+            app._queue.put(("call", cb, None))
+        else:
+            cb()
+
+    def _runner():
+        try:
+            result = fn()
+        except Exception as exc:
+            def _fail(exc=exc):
+                if busy is not None:
+                    busy.set(False)
+                if on_error is not None:
+                    on_error(exc)
+                else:
+                    try:
+                        raise exc
+                    except Exception:
+                        from .ui import _report_callback_error
+                        _report_callback_error()
+            _deliver(_fail)
+        else:
+            def _ok(result=result):
+                if busy is not None:
+                    busy.set(False)
+                if on_done is not None:
+                    on_done(result)
+            _deliver(_ok)
+
+    _threading.Thread(target=_runner, daemon=True,
+                      name="guile-task").start()
 
 
 # ── Overlays ────────────────────────────────────────────────────────────────
@@ -647,28 +748,127 @@ def theme(
                   border=border, radius=radius, key=key)
 
 
-# ── App decorator ───────────────────────────────────────────────────────────
+# ── App decorator + run ─────────────────────────────────────────────────────
+
+# The app registered by @gui.app, waiting for gui.run() to launch it.
+_pending_app: Optional[tuple] = None   # (fn, config dict)
+_run_called:  bool = False
+_hint_installed: bool = False
+
+
+def _install_run_hint():
+    """
+    If a script defines an app but never calls gui.run(), it exits doing
+    nothing — the most confusing possible failure for a beginner. Print a
+    clear hint at interpreter exit instead of staying silent.
+    """
+    global _hint_installed
+    if _hint_installed:
+        return
+    _hint_installed = True
+    import atexit
+
+    def _hint():
+        if _pending_app is not None and not _run_called:
+            print("[guile] Your app never opened. @gui.app() defines the "
+                  "app; gui.run() launches it.\n"
+                  "        Add this line at the end of your script:\n\n"
+                  "            gui.run()")
+    atexit.register(_hint)
+
 
 def app(title_: str = "Guile App", *, width: int = 800, height: int = 600,
         resizable: bool = False, center: bool = False, debug: bool = False):
     """
-    Decorator that turns a ui() function into a runnable desktop app.
+    Decorator that marks a function as the app's UI. The window opens when
+    you call gui.run() — put it at the end of your script:
 
         @gui.app("My App", width=480, height=400)
         def ui():
             with gui.card():
                 gui.title("Hello, world")
 
-    center=True fills the window and centres your content on both axes, so a
-    small single-card app needs no wrapping gui.col():
+        gui.run()
 
-        @gui.app("Converter", width=360, height=300, center=True)
-        def ui():
-            with gui.card():
-                gui.title("Hello, world")
+    Because the decorator only *marks* the function, your script stays an
+    ordinary Python module: importing it does not open a window, and code
+    after gui.run() executes once the window is closed (see gui.run).
+
+    center=True fills the window and centres your content on both axes, so a
+    small single-card app needs no wrapping gui.col().
+
+    If several functions are decorated, the last one defined is the app.
     """
     def decorator(fn: Callable):
-        _App(title_, width=width, height=height,
-             resizable=resizable, center=center, debug=debug).run(fn)
+        global _pending_app
+        _pending_app = (fn, dict(title=title_, width=width, height=height,
+                                 resizable=resizable, center=center,
+                                 debug=debug,
+                                 # source file of ui() — watched by dev mode
+                                 file=fn.__code__.co_filename))
+        _install_run_hint()
         return fn
     return decorator
+
+
+def run(dev: bool = False) -> None:
+    """
+    Open the window and hand control to the app. Blocks until the user
+    closes the window, then returns — so code after gui.run() is your
+    "when the window closes" hook:
+
+        df = gui.state(None)
+
+        @gui.app("Data check")
+        def ui():
+            ...
+
+        gui.run()
+
+        # window just closed — your gui.state() values still hold
+        # whatever the user left in them
+        if df.value is not None:
+            df.value.to_csv("last_session.csv", index=False)
+
+    Typical uses for code after gui.run(): saving the session, closing
+    instruments or connections, continuing a processing pipeline with the
+    user's interactive choices, printing an exit summary.
+
+    dev=True — hot reload while you build the UI:
+
+        gui.run(dev=True)
+
+    guile watches your script file; every time you save it, the app
+    reloads inside the open window — no closing and relaunching. Each
+    reload is a fresh start: module-level code re-runs and gui.state()
+    values reset to their initial values, exactly as if you had re-run
+    the script, except the window stays put. A save with a syntax error
+    or crash shows the traceback in the window and keeps the previous
+    UI running — fix the file and save again. Code after gui.run() does
+    NOT execute on reloads, only when you finally close the window.
+    Turn dev off for normal use and packaged apps.
+    """
+    global _run_called
+    if _pending_app is None:
+        raise SystemExit(
+            "[guile] gui.run() was called but no app is defined.\n"
+            "        Decorate your ui function first:\n\n"
+            "            @gui.app(\"My App\")\n"
+            "            def ui():\n"
+            "                ...\n\n"
+            "            gui.run()"
+        )
+    _run_called = True
+    fn, cfg = _pending_app
+    app = _App(cfg["title"], width=cfg["width"], height=cfg["height"],
+               resizable=cfg["resizable"], center=cfg["center"],
+               debug=cfg["debug"])
+    if dev:
+        script = cfg.get("file", "")
+        if script and os.path.isfile(script):
+            from ._dev import start_watcher
+            start_watcher(app, script)
+        else:
+            print("[guile] dev mode unavailable: cannot locate the app's "
+                  f"source file ({script!r}) — running without hot reload.")
+    app.run(fn)

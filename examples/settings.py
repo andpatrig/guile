@@ -377,3 +377,5 @@ def ui():
                     gui.figure(make_surface_figure(), dpi=110)
 
 
+
+gui.run()

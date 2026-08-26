@@ -132,3 +132,5 @@ def ui():
                     with gui.card(gap=6, padding=14):
                         gui.text("Click a marker or the map to see details.",
                                  muted=True, size="sm")
+
+gui.run()

@@ -104,3 +104,5 @@ def ui():
             with gui.card(padding=0,
                           style="overflow-y:auto;max-height:420px"):
                 gui.table(df.value)
+
+gui.run()

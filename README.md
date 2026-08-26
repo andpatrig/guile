@@ -6,15 +6,7 @@ A lightweight Python framework for building desktop apps.
 
 ## Philosophy
 
-Guile started as a personal tool for building lab and research apps — the kind of quick internal dashboards, data explorers, and parameter tools that are too specific to justify a full web stack, but too interactive for a script. The goal was always to stay out of the way: write Python top to bottom, get a window with a clean interface, nothing more.
-
-It is not trying to compete with NiceGUI, PyQt, or Dash. It is the right tool for a simple lab, company, or personal project — and deliberately nothing more.
-
-A few specific choices that shape how guile feels:
-
-- **No full-page refresh.** When state changes, only the parts of the UI that actually changed are updated. Text stays in inputs, sliders don't jump, focus is never lost.
-- **No nesting hell.** Layout is written top to bottom using `with` blocks. `with gui.card():` followed by indented widget calls reads the same way the finished UI looks.
-- **No server.** The app runs as a single Python process and opens a window. There is no local HTTP server, no port to bind, no browser tab to manage.
+Guile started as a personal tool for building lab and research apps — the kind of quick internal dashboards, data explorers, and parameter tools that are too specific to justify a full web stack, but too interactive for a script. It does two things and tries to do them well. First, it layers interactivity on top of the Python you already have: your functions stay ordinary Python, and guile just wires them to widgets. Second, it follows a single reactive rule — change a state value and the interface updates, patching only the parts that actually changed, so text stays in inputs and focus is never lost. The app is one Python process that opens a native window: no server, no ports, no browser tab.
 
 ---
 
@@ -43,21 +35,30 @@ def ui():
             with gui.row(gap=16, align="center", justify="center"):
                 gui.button("−", variant="secondary",
                            on_click=lambda: count.update(lambda x: x - 1))
-                gui.text(count, size="2xl", bold=True,
+                gui.text(count.value, size="2xl", bold=True,
                          style="min-width:64px;text-align:center")
                 gui.button("+",
                            on_click=lambda: count.update(lambda x: x + 1))
+
+gui.run()
 ```
+
+`@gui.app()` defines the app; `gui.run()` opens the window and blocks until it is closed. Code written after `gui.run()` executes once the window closes — a natural place to save the session or continue a processing pipeline (see `examples/field_notes.py`).
+
+While building a UI, use `gui.run(dev=True)`: guile watches your script and reloads the app inside the open window every time you save the file. Errors show in the window without killing the session; each reload resets state to its initial values.
 
 ---
 
 ## How it works
 
-- `gui.state(value)` — a reactive value; setting it re-renders the UI automatically
+- `gui.state(value)` — a reactive value; setting it re-renders the UI automatically. Read it through `.value`, always
 - `with gui.card():` / `with gui.col():` / `with gui.row():` — layout containers; everything indented goes inside
 - `gui.button()`, `gui.slider()`, `gui.input()`, `gui.table()` — widgets that take `on_click=` or return their current value
 - `gui.figure(fig)` — embed a matplotlib figure inline
 - `gui.leaflet(center, markers=...)` — embed an interactive map
+- `gui.task(fn, on_done=...)` — run slow work on a background thread; the window stays responsive
+- `gui.run()` — opens the window; `gui.run(dev=True)` adds hot reload while you build
+- `gui.package("my_app.py")` — build a shareable executable in one call
 
 ---
 
@@ -65,17 +66,18 @@ def ui():
 
 | File | What it shows |
 |------|--------------|
-| `01_counter.py`             | State, buttons, badges                |
-| `02_todo.py`                | Lists, dynamic rendering, checkboxes  |
-| `03_settings.py`            | Sliders, selects, form layout         |
-| `04_mesonet_map.py`         | Leaflet map with markers              |
-| `05_weather_explorer.py`    | Table, date picker, file picker       |
-| `06_soils_lab.py`           | Lab data entry form                   |
-| `07_ks_mesonet.py`          | Live mesonet station data             |
-| `08_soil_water_retention.py`| Sliders driving a live chart          |
-| `09_upload_weather_data.py` | File picker, DataFrame, table         |
-| `10_canopeo.py`             | Image analysis                        |
-| `11_map_draw.py`            | Leaflet with draw tools               |
+| `counter.py`              | State, buttons, badges                       |
+| `todo.py`                 | Lists, dynamic rendering, checkboxes         |
+| `settings.py`             | Sliders, selects, form layout                |
+| `field_notes.py`          | Save on exit — code after `gui.run()`        |
+| `mesonet_map.py`          | Leaflet map with markers                     |
+| `mesonet_interactive.py`  | Live mesonet station data                    |
+| `weather_explorer.py`     | Table, date picker, file picker              |
+| `soils_lab.py`            | Lab data entry form                          |
+| `soil_water_retention.py` | Sliders driving a live chart                 |
+| `upload_weather_data.py`  | File picker, DataFrame, table                |
+| `canopeo.py`              | Image analysis                               |
+| `map_draw.py`             | Leaflet with draw tools                      |
 
 ---
 
@@ -83,9 +85,9 @@ def ui():
 
 | Package | Purpose |
 |---------|---------|
-| `pywebview` | Window |
-| `matplotlib` | Only if you use `gui.figure()` |
-| `numpy` | Only if your app uses it |
+| `pywebview` | The window (installed with guile) |
+| `matplotlib` | `gui.figure()` (installed with guile) |
+| `numpy`, `pandas` | Optional — `pip install guile[science]` |
 
 Everything else is Python standard library.
 
@@ -99,11 +101,27 @@ Everything else is Python standard library.
 | `ui.py` | Render engine + all widgets |
 | `_app.py` | Window lifecycle, pywebview bridge |
 | `_template.py` | Embedded HTML/CSS/JS |
+| `_package.py` | `gui.package()` — PyInstaller wrapper |
+| `_dev.py` | `gui.run(dev=True)` — hot reload |
 | `__init__.py` | Public API (`gui.*`) |
 
 ---
 
 ## Changelog
+**v0.7.0**
+- `@gui.app` now only *defines* the app; add `gui.run()` at the end of your script to open the window. Code after `gui.run()` executes when the window closes — a natural place to save the session or continue a pipeline (see `examples/field_notes.py`).
+- Hot reload: `gui.run(dev=True)` watches your script and reloads the app inside the open window on every save. Errors show in the window without killing the session; each reload resets state to initial values.
+- `State` is now fully explicit: read and compare through `.value` (`if count.value > 0:`). Comparing or operating on the State object itself raises a clear `TypeError` — this fixes silent misbehavior with numpy arrays and DataFrames.
+- New `gui.task(fn, on_done=, on_error=, busy=)` — run slow work on a background thread; clicks and renders keep flowing, and state set inside the task drives live progress bars.
+- Errors raised in callbacks now show a danger toast in the window (previously invisible in packaged, windowed apps).
+- DOM patcher fix: programmatic updates to inputs, checkboxes, textareas, and selects now render correctly after the user has interacted with them; the caret no longer jumps in `live=True` inputs.
+- `gui.number_input()` keeps `.value` current per keystroke but re-renders on commit (Enter, focus leave, spinner); an empty or invalid commit keeps the current value.
+- Maps rendered conditionally (e.g. inside a tab) now load Leaflet lazily instead of staying blank.
+- Duplicate `key=` values print a one-time warning; `gui.progress(value, max=0)` no longer raises.
+- New example `field_notes.py` (load → run → save-on-exit); test suite expanded to 14 tests.
+
+**v0.6.0** — Improved map tile presets. Added `gui.package()` for one-call PyInstaller builds.
+
 **v0.5.0** — Added center=True to app window. Improved code structure in how-to page.
 
 **v0.4.0** — Added tabs. Fixed `datetime-local` input to display in 24-hour format.

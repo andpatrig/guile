@@ -73,6 +73,8 @@ _id_counter:    int  = 0
 _callbacks:       dict = {}  # scratch — rebuilt every render
 _live_callbacks:  dict = {}  # committed snapshot — always safe to read
 _silent_callbacks: dict = {} # silent handlers (no re-render on update)
+_seen_keys:       set  = set()  # explicit keys used this render
+_warned_dup_keys: set  = set()  # keys already warned about (once per process)
 
 def _reset_render():
     """Start a fresh render: reset IDs, callbacks, and the auto-key counter."""
@@ -81,6 +83,7 @@ def _reset_render():
     _auto_key_counter = 0   # must reset so widget N always gets key _auto_N
     _callbacks.clear()
     _silent_callbacks.clear()
+    _seen_keys.clear()
 
 def _commit_callbacks():
     """After a render completes, promote scratch callbacks to live."""
@@ -94,6 +97,15 @@ def _commit_callbacks():
 def _next_id(key: Optional[str] = None) -> str:
     global _id_counter
     if key:
+        # Two widgets sharing a key share one DOM id and one callback slot —
+        # the second silently steals the first's events and state. Warn once
+        # per key so the collision is visible instead of baffling.
+        if key in _seen_keys and key not in _warned_dup_keys:
+            _warned_dup_keys.add(key)
+            print(f"[guile] warning: duplicate key='{key}' — two widgets "
+                  f"share this key, so their state and events will collide. "
+                  f"Give each widget a unique key.")
+        _seen_keys.add(key)
         return f"gk-{key}"
     _id_counter += 1
     return f"g{_id_counter}"
@@ -131,6 +143,29 @@ def _reg(cid: str, fn: Callable):
     """Register an event handler for this render pass."""
     _callbacks[cid] = (fn, _arity(fn))
 
+def _report_callback_error():
+    """
+    Called from inside an `except` block when a user callback raises.
+
+    Prints the full traceback to the console AND shows a danger toast in
+    the window. The toast matters in packaged apps: a --windowed build has
+    no console, so without it a failing callback dies in silence and the
+    app just appears to ignore the click.
+    """
+    import sys
+    import traceback
+    traceback.print_exc()
+    try:
+        exc = sys.exc_info()[1]
+        msg = f"{type(exc).__name__}: {exc}"
+        if len(msg) > 120:
+            msg = msg[:117] + "…"
+        from . import notify   # lazy: guile/__init__ is fully loaded by now
+        notify(f"Error in callback — {msg}", variant="danger", duration=6)
+    except Exception:
+        pass                   # never let error reporting raise
+
+
 def dispatch_silent(cid: str, value: Any = None):
     """
     Call cid's silent handler, if any, without triggering a re-render.
@@ -143,8 +178,7 @@ def dispatch_silent(cid: str, value: Any = None):
         try:
             fn(value)
         except Exception:
-            import traceback
-            traceback.print_exc()
+            _report_callback_error()
 
 
 def dispatch(cid: str, value: Any = None):
@@ -154,7 +188,8 @@ def dispatch(cid: str, value: Any = None):
     Handlers come in two shapes: input widgets take one arg, handler(value);
     buttons, the file picker and modal close take none, handler(). The shape
     was recorded at registration time (_reg), so no trial-and-error calling.
-    Exceptions from the handler are printed, never re-dispatched.
+    Exceptions from the handler are printed and shown as a danger toast,
+    never re-dispatched.
     """
     entry = _live_callbacks.get(cid)
     if not entry:
@@ -166,8 +201,7 @@ def dispatch(cid: str, value: Any = None):
         else:
             fn(value)
     except Exception:
-        import traceback
-        traceback.print_exc()
+        _report_callback_error()
 
 
 # ── HTML helpers ───────────────────────────────────────────────────────────
@@ -510,7 +544,12 @@ class _ProgressBar(_Leaf):
         super().__init__(key)
 
     def render(self) -> str:
-        pct    = min(100, max(0, float(self._value) / self._max * 100))
+        # Accept a State directly (value=pct_state) as a convenience.
+        v = self._value.value if isinstance(self._value, State) else self._value
+        # max=0 is the natural call with an empty list (max=len(items));
+        # show an empty bar instead of raising ZeroDivisionError.
+        denom  = float(self._max)
+        pct    = min(100, max(0, float(v) / denom * 100)) if denom > 0 else 0.0
         fill_s = f"width:{pct:.1f}%;background:{self._color or 'var(--primary)'};"
         return (f'<div id="{self.id}" class="guile-progress-track" style="{self._extra}">'
                 f'<div class="guile-progress-fill" style="{fill_s}"></div></div>')
@@ -669,7 +708,10 @@ class _NumberInput(_Leaf):
     Numeric input. Returns .value (float), .set(), .update().
 
     Stores and returns a float directly — no string conversion needed.
-    Empty or invalid input silently falls back to the initial value.
+    Same event strategy as _Input: .value is kept current on every valid
+    keystroke (silent path), the UI re-renders and on_change fires when the
+    field commits — Enter, focus leave, or a spinner click. An empty or
+    invalid commit keeps the current value.
 
     Follows the same value= convention as every other input widget:
 
@@ -714,18 +756,38 @@ class _NumberInput(_Leaf):
         _fallback = self._fallback
         _state    = self._state
 
-        def _handler(v):
+        def _parse(v):
+            """Parse + clamp, or None when v isn't a complete number."""
             try:
                 parsed = float(v)
-                if min is not None: parsed = builtins_max(parsed, min)
-                if max is not None: parsed = builtins_min(parsed, max)
             except (ValueError, TypeError):
-                parsed = _fallback
+                return None
+            if min is not None: parsed = builtins_max(parsed, min)
+            if max is not None: parsed = builtins_min(parsed, max)
+            return parsed
+
+        def _handler(v):
+            parsed = _parse(v)
+            if parsed is None:
+                # Empty/invalid commit: keep the current value rather than
+                # snapping back to the initial one; the re-render restores
+                # the field display from state.
+                cur = _state.value
+                parsed = cur if isinstance(cur, (int, float)) else _fallback
             _state.set(parsed)
             if on_change:
                 on_change(parsed)
 
+        def _silent(v):
+            # Per-keystroke path: keep .value current without re-rendering.
+            # Mid-entry fragments like "-" or "1e" parse to None — leave
+            # state alone instead of fighting the user's typing.
+            parsed = _parse(v)
+            if parsed is not None:
+                _state.set_silent(parsed)
+
         _reg(self.id, _handler)
+        _reg(self.id + "__silent", _silent)
 
     @property
     def value(self) -> float: return self._state.value
@@ -734,7 +796,11 @@ class _NumberInput(_Leaf):
 
     def render(self) -> str:
         val  = self._state.value
-        js   = f"window._guile.trigger('{self.id}',this.value)"
+        # Same event strategy as _Input: silent per-keystroke state updates,
+        # full render on commit (Enter, focus leave, or spinner click —
+        # spinner steps fire both input and change).
+        silent  = f"window._guile.silent('{self.id}',this.value)"
+        trigger = f"window._guile.trigger('{self.id}',this.value)"
         dis  = " disabled" if self._disabled else ""
         mn   = f' min="{self._min}"'   if self._min is not None else ""
         mx   = f' max="{self._max}"'   if self._max is not None else ""
@@ -750,7 +816,7 @@ class _NumberInput(_Leaf):
             f'<div style="display:flex;align-items:center;gap:0">'
             f'<input class="guile-input" type="number"'
             f' value="{_esc(display)}" step="{self._step}"{mn}{mx}'
-            f' oninput="{js}"{dis}>'
+            f' oninput="{silent}" onchange="{trigger}"{dis}>'
             f'{unit}'
             f'</div>'
             f'</div>'
@@ -1231,8 +1297,7 @@ class _FilePicker(_Leaf):
                     if _on_change:
                         _on_change(str(path))
             except Exception:
-                import traceback
-                traceback.print_exc()
+                _report_callback_error()
 
         _reg(self.id, _handler)
 

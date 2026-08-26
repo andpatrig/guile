@@ -129,3 +129,5 @@ def ui():
                            on_click=lambda: confirm_clear.set(False))
                 gui.button("Clear all", variant="danger",
                            on_click=do_clear)
+
+gui.run()

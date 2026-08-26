@@ -140,3 +140,5 @@ def ui():
 
                 with gui.card(padding=14):
                     gui.figure(make_figure(), dpi=110)
+
+gui.run()
