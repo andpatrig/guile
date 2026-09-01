@@ -278,10 +278,13 @@ callback prints a traceback and shows a danger toast.
 ```python
 # build.py (separate file, or guard with if __name__ == "__main__")
 import guile as gui
-gui.package("my_app.py", name="MyApp", onefile=True, windowed=True,
+gui.package("my_app.py", name="MyApp", package_mode="onedir", windowed=True,
             icon=None, add_data=[("presets.yaml", ".")],
             hidden_imports=None, output_dir="dist", install_missing=False)
 # Wraps PyInstaller; requires `pip install pyinstaller` in the same env.
+# package_mode="onedir" (default) builds a folder — fewer antivirus false
+# positives, faster start; zip it or wrap it in an installer to share.
+# package_mode="onefile" builds a single self-contained executable instead.
 # add_data bundles runtime data files as (src, dest) pairs.
 ```
 

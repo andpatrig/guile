@@ -2,8 +2,13 @@
 guile._package — Turn a guile app into a shareable executable.
 
 This is a thin, opinionated wrapper around PyInstaller. It exists so someone
-who has never touched PyInstaller can go from `my_app.py` to a single file
+who has never touched PyInstaller can go from `my_app.py` to a shareable app
 they can hand to a colleague, without learning the tool's flag soup.
+
+By default it builds a folder (package_mode="onedir"): the executable plus its
+libraries, which draws fewer antivirus/SmartScreen false positives and starts
+faster — zip it up or wrap it in an installer to share. Pass
+package_mode="onefile" for a single self-contained executable instead.
 
 It is a BUILD step, not a runtime feature: call it from a small build script
 or a `if __name__ == "__main__"` guard, NOT from inside your ui() function.
@@ -83,7 +88,7 @@ def package(
     script: Optional[str] = None,
     *,
     name: Optional[str] = None,
-    onefile: bool = True,
+    package_mode: str = "onedir",
     windowed: bool = True,
     icon: Optional[str] = None,
     add_data: Optional[Sequence[Tuple[str, str]]] = None,
@@ -105,8 +110,15 @@ def package(
                         script that is currently running (__main__).
         name            Name of the executable. Defaults to the script's
                         filename without extension.
-        onefile         True  → one self-contained file, easiest to share.
-                        False → a folder (starts faster, many files).
+        package_mode    "onedir" (default) → a folder holding the executable
+                        and its libraries. Fewer antivirus/SmartScreen false
+                        positives and a faster startup; share it as a zip or
+                        wrap it in an installer. This is PyInstaller's own
+                        default and the recommended way to distribute.
+                        "onefile" → a single self-contained executable, tidy
+                        to hand over but more likely to trip antivirus
+                        heuristics (it unpacks itself to a temp dir at launch)
+                        and slower to start.
         windowed        True  → no console window (normal for a GUI app).
                         False → keep a console so you can see tracebacks —
                                 use this while debugging a build.
@@ -129,6 +141,12 @@ def package(
                     add_data=[("stations.csv", ".")],
                     icon="weather.ico")
     """
+    if package_mode not in ("onedir", "onefile"):
+        raise ValueError(
+            f"package_mode must be 'onedir' or 'onefile', got {package_mode!r}."
+        )
+    onefile = package_mode == "onefile"
+
     entry = _resolve_script(script)
     if not os.path.isfile(entry):
         raise FileNotFoundError(f"App script not found: {entry}")

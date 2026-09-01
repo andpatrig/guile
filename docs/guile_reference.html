@@ -694,7 +694,7 @@ const WIDGETS = [
    args:[
      ["script","str = None","Entry .py file. Defaults to the running script."],
      ["name","str = None","Executable name. Defaults to the script filename."],
-     ["onefile","bool = True","True = one shareable file  |  False = a folder"],
+     ["package_mode","str = 'onedir'","'onedir' = a folder (fewer antivirus false positives, faster start, recommended)  |  'onefile' = a single shareable executable"],
      ["windowed","bool = True","True = no console  |  False = keep console for debugging a build"],
      ["icon","str = None","Path to a .ico (Windows) or .icns (macOS)"],
      ["add_data","list = None","Extra runtime data files to bundle, as (src, dest) pairs"],

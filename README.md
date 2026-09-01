@@ -120,6 +120,9 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.0**
+- `gui.package()` now defaults to `package_mode="onedir"` (a folder holding the executable and its libraries) instead of a single file. Onedir draws fewer antivirus/SmartScreen false positives and starts faster — zip it or wrap it in an installer to share. Pass `package_mode="onefile"` for the old single-executable behavior. This replaces the `onefile=` argument.
+
 **v0.7.0**
 - `@gui.app` now only *defines* the app; add `gui.run()` at the end of your script to open the window. Code after `gui.run()` executes when the window closes — a natural place to save the session or continue a pipeline (see `examples/field_notes.py`).
 - Hot reload: `gui.run(dev=True)` watches your script and reloads the app inside the open window on every save. Errors show in the window without killing the session; each reload resets state to initial values.
