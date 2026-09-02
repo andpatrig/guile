@@ -610,7 +610,6 @@ function _guileApplyDrawn(entry, cfg) {
         items.addLayer(layer);
     });
 }
-}
 
 function _guileSyncMaps() {
     var els = document.querySelectorAll('[data-guile-map]');

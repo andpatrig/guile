@@ -484,7 +484,67 @@ def test_map_drawn_and_labels():
     return "drawn ids/style/label ok; 4 shape callbacks + GeoJSON label/hover"
 
 
+def test_template_js_parses():
+    """The inline script in guile/_template.py must be valid JavaScript.
+    v0.8.4 shipped a stray '}' that made window._guile undefined and broke
+    every render. Uses `node --check` when node is on PATH; otherwise falls
+    back to a bracket-balance scan that ignores strings and comments — enough
+    to catch a stray brace, which is the realistic failure mode."""
+    import shutil, subprocess, tempfile, re
+    from guile import _template as T
+
+    js = T._JS
+    for ph in re.findall(r"__[A-Z_]+__", js):
+        js = js.replace(ph, "x")
+
+    node = shutil.which("node")
+    if node:
+        fd, path = tempfile.mkstemp(suffix=".js")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(js)
+        try:
+            r = subprocess.run([node, "--check", path], capture_output=True, text=True)
+        finally:
+            os.unlink(path)
+        assert r.returncode == 0, "inline JS failed node --check:\n" + r.stderr[:800]
+        return "node --check passed"
+
+    # Fallback: balance () [] {} outside strings / comments.
+    pairs = {")": "(", "]": "[", "}": "{"}
+    stack, i, n, line = [], 0, len(js), 1
+    while i < n:
+        ch = js[i]
+        if ch == "\n":
+            line += 1
+        if js.startswith("//", i):
+            i = js.find("\n", i)
+            i = n if i < 0 else i
+            continue
+        if js.startswith("/*", i):
+            j = js.find("*/", i + 2)
+            line += js[i:j].count("\n")
+            i = j + 2
+            continue
+        if ch in "\"'`":
+            j = i + 1
+            while j < n and js[j] != ch:
+                j += 2 if js[j] == "\\" else 1
+            line += js[i:j].count("\n")
+            i = j + 1
+            continue
+        if ch in "([{":
+            stack.append((ch, line))
+        elif ch in ")]}":
+            assert stack and stack[-1][0] == pairs[ch], \
+                f"unbalanced {ch!r} at JS line {line}"
+            stack.pop()
+        i += 1
+    assert not stack, f"unclosed {stack[-1][0]!r} opened at JS line {stack[-1][1]}"
+    return "bracket balance OK (node not found)"
+
+
 CORE_TESTS = [
+    test_template_js_parses,
     test_batching_one_render,
     test_no_double_dispatch_on_typeerror,
     test_concurrent_events_serialize,
