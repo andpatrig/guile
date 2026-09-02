@@ -241,6 +241,13 @@ body {
 }
 .guile-map-canvas { width: 100%; }
 .guile-map-canvas .leaflet-container { width: 100%; height: 100%; }
+/* Permanent on-shape labels (GeoJSON label=, drawn "label") */
+.leaflet-tooltip.guile-map-label {
+    background: rgba(20,20,22,.82); color: #fff; border: none;
+    border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0,0,0,.4); white-space: nowrap;
+}
+.leaflet-tooltip.guile-map-label::before { display: none; }
 
 
 /* ── Table ──────────────────────────────────────────────────────────────── */
@@ -469,13 +476,20 @@ function _guileAttachMapEvents(entry, cfg) {
         }
     }
 
-    // ── Draw tools (Leaflet.draw plugin) ─────────────────────────────────
-    // Only set up once per map instance; tools don't change after creation.
+    // ── Shape callbacks ──────────────────────────────────────────────────
+    // Cids live on the entry and are read at fire time, so a re-render that
+    // adds or drops a callback never needs the listeners re-wired.
+    entry.shapeCid       = cfg.on_shape_cid        || null;
+    entry.shapeEditCid   = cfg.on_shape_edit_cid   || null;
+    entry.shapeDeleteCid = cfg.on_shape_delete_cid || null;
+    entry.shapeClickCid  = cfg.on_shape_click_cid  || null;
+    entry.shapeHoverCid  = cfg.on_shape_hover_cid  || null;
+
+    // ── Draw toolbar (Leaflet.draw) — set up once per map instance ───────
     var drawTools = cfg.draw || [];
     if (drawTools.length > 0 && !entry.drawControl
             && typeof L.Control.Draw !== 'undefined') {
-        var drawnItems = new L.FeatureGroup().addTo(map);
-        entry.drawnItems = drawnItems;
+        var drawnItems = _guileDrawnItems(entry);
 
         // Build per-tool options: tool enabled = {}, disabled = false
         var toolOpts = {};
@@ -491,39 +505,111 @@ function _guileAttachMapEvents(entry, cfg) {
         map.addControl(drawControl);
         entry.drawControl = drawControl;
 
-        // Wire draw:created → Python callback
-        var shapeCid = cfg.on_shape_cid || null;
-        if (shapeCid) {
-            (function(cid, items) {
-                map.on('draw:created', function(e) {
-                    var type  = e.layerType;
-                    var layer = e.layer;
-                    var coords;
-
-                    if (type === 'rectangle' || type === 'polygon'
-                            || type === 'polyline') {
-                        var lls = layer.getLatLngs();
-                        // polygon/rectangle: [[pt,...]], polyline: [pt,...]
-                        var pts = (lls.length === 1 && Array.isArray(lls[0]))
-                                  ? lls[0] : lls;
-                        coords = pts.map(function(ll) {
-                            return [ll.lat, ll.lng];
-                        });
-                    } else if (type === 'circle') {
-                        var c = layer.getLatLng();
-                        coords = {lat: c.lat, lng: c.lng,
-                                  radius: layer.getRadius()};
-                    } else { // marker, circlemarker
-                        var c = layer.getLatLng();
-                        coords = {lat: c.lat, lng: c.lng};
-                    }
-
-                    items.addLayer(layer); // keep drawn shape on the map
-                    _guile.trigger(cid, {type: type, coords: coords});
+        map.on('draw:created', function(e) {
+            var layer = e.layer;
+            layer._guileType = e.layerType;
+            // Keep it visible now; with drawn= Python re-renders it with an
+            // id on the next pass, without drawn= this copy is the record.
+            drawnItems.addLayer(layer);
+            if (entry.shapeCid) {
+                _guile.trigger(entry.shapeCid, {
+                    type: e.layerType,
+                    coords: _guileShapeCoords(e.layerType, layer)
                 });
-            })(shapeCid, drawnItems);
-        }
+            }
+        });
+        // Edit / delete toolbars fire once per affected layer on Save.
+        map.on('draw:edited', function(e) {
+            if (!entry.shapeEditCid) return;
+            e.layers.eachLayer(function(l) {
+                _guile.trigger(entry.shapeEditCid, {
+                    id: l._guileId || null, type: l._guileType,
+                    coords: _guileShapeCoords(l._guileType, l)
+                });
+            });
+        });
+        map.on('draw:deleted', function(e) {
+            if (!entry.shapeDeleteCid) return;
+            e.layers.eachLayer(function(l) {
+                _guile.trigger(entry.shapeDeleteCid, {id: l._guileId || null});
+            });
+        });
     }
+}
+
+// ── Drawn shapes ──────────────────────────────────────────────────────────
+// One FeatureGroup holds everything drawn; Leaflet.draw's edit toolbar
+// operates on it. Created lazily so drawn= also works with draw=False
+// (read-only display) and before the draw plugin has loaded.
+function _guileDrawnItems(entry) {
+    if (!entry.drawnItems) {
+        entry.drawnItems = new L.FeatureGroup().addTo(entry.map);
+    }
+    return entry.drawnItems;
+}
+
+// Layer → plain coords: the format on_shape hands to Python and drawn=
+// accepts back. [[lat,lng],...] for polygon/rectangle/polyline,
+// {lat,lng,radius} for circle, {lat,lng} for marker.
+function _guileShapeCoords(type, layer) {
+    if (type === 'rectangle' || type === 'polygon' || type === 'polyline') {
+        var lls = layer.getLatLngs();
+        // polygon/rectangle: [[pt,...]], polyline: [pt,...]
+        var pts = (lls.length === 1 && Array.isArray(lls[0])) ? lls[0] : lls;
+        return pts.map(function(ll) { return [ll.lat, ll.lng]; });
+    }
+    var c = layer.getLatLng();
+    if (type === 'circle') {
+        return {lat: c.lat, lng: c.lng, radius: layer.getRadius()};
+    }
+    return {lat: c.lat, lng: c.lng};
+}
+
+// Inverse: a drawn= entry → Leaflet layer (types Leaflet.draw can edit).
+function _guileShapeLayer(shape, style) {
+    var t = shape.type, c = shape.coords;
+    if (t === 'polygon')   return L.polygon(c, style);
+    if (t === 'polyline')  return L.polyline(c, style);
+    if (t === 'rectangle') return L.rectangle(L.latLngBounds(c), style);
+    if (t === 'circle')    return L.circle([c.lat, c.lng],
+                                    Object.assign({radius: c.radius}, style));
+    if (t === 'marker')    return L.marker([c.lat, c.lng]);
+    return null;
+}
+
+function _guileLabel(layer, text) {
+    layer.bindTooltip(String(text), {
+        permanent: true, className: 'guile-map-label',
+        direction: (layer instanceof L.Marker) ? 'top' : 'center'
+    });
+}
+
+// Rebuild the drawn layer from Python's list (drawn=). Called only when
+// the list or draw_style actually changed.
+function _guileApplyDrawn(entry, cfg) {
+    var items = _guileDrawnItems(entry);
+    items.clearLayers();
+    (cfg.drawn || []).forEach(function(shape) {
+        var style = Object.assign({}, cfg.draw_style || {}, shape.style || {});
+        var layer = _guileShapeLayer(shape, style);
+        if (!layer) return;
+        layer._guileId   = shape.id;
+        layer._guileType = shape.type;
+        if (shape.label) _guileLabel(layer, shape.label);
+        layer.on('click', function(e) {
+            if (!entry.shapeClickCid) return;      // let map on_click fire
+            L.DomEvent.stopPropagation(e);
+            _guile.trigger(entry.shapeClickCid, {id: shape.id});
+        });
+        layer.on('mouseover', function() {
+            if (entry.shapeHoverCid) _guile.trigger(entry.shapeHoverCid, {id: shape.id});
+        });
+        layer.on('mouseout', function() {
+            if (entry.shapeHoverCid) _guile.trigger(entry.shapeHoverCid, null);
+        });
+        items.addLayer(layer);
+    });
+}
 }
 
 function _guileSyncMaps() {
@@ -585,7 +671,8 @@ function _guileSyncMaps() {
                 onClickCid: null, onMoveCid: null,
                 drawControl: null, drawnItems: null,
                 tileLayers: [], tilesJson: null,
-                overlayLayers: [], overlaysJson: null
+                overlayLayers: [], overlaysJson: null,
+                drawnJson: null
             };
             _guileMaps[id] = entry;
             _guileApplyTiles(entry, cfg.tiles);
@@ -593,6 +680,8 @@ function _guileSyncMaps() {
             _guileApplyOverlays(entry, cfg.layers);
             entry.overlaysJson = JSON.stringify(cfg.layers || []);
             _guileAttachMapEvents(entry, cfg);
+            if (cfg.drawn) _guileApplyDrawn(entry, cfg);
+            entry.drawnJson = JSON.stringify([cfg.drawn || null, cfg.draw_style || null]);
             _guileApplyMarkers(lg, cfg.markers || []);
         } else if (_guileMaps[id].cfgJson !== cfgJson) {
             var entry = _guileMaps[id];
@@ -612,6 +701,12 @@ function _guileSyncMaps() {
             }
             entry.layerGroup.clearLayers();
             _guileAttachMapEvents(entry, cfg);
+            // drawn=None (null) means the JS layer owns shapes: leave it be.
+            var newDrawnJson = JSON.stringify([cfg.drawn || null, cfg.draw_style || null]);
+            if (entry.drawnJson !== newDrawnJson) {
+                if (cfg.drawn) _guileApplyDrawn(entry, cfg);
+                entry.drawnJson = newDrawnJson;
+            }
             _guileApplyMarkers(entry.layerGroup, cfg.markers || []);
             entry.cfgJson = cfgJson;
         }
@@ -671,11 +766,19 @@ function _guileApplyOverlays(entry, layers) {
                             && props[cfg.popup] !== null) {
                         lyr.bindPopup(String(props[cfg.popup]));
                     }
+                    if (cfg.label && props[cfg.label] !== undefined
+                            && props[cfg.label] !== null) {
+                        _guileLabel(lyr, props[cfg.label]);
+                    }
                     if (cfg.cid) {
                         lyr.on('click', function(e) {
                             L.DomEvent.stopPropagation(e); // not also map click
                             _guile.trigger(cfg.cid, props);
                         });
+                    }
+                    if (cfg.hover_cid) {
+                        lyr.on('mouseover', function() { _guile.trigger(cfg.hover_cid, props); });
+                        lyr.on('mouseout',  function() { _guile.trigger(cfg.hover_cid, null); });
                     }
                 }
             });

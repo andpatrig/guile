@@ -425,6 +425,65 @@ def test_map_layers_render():
     return "3 layer types serialised; GeoJSON click delivers properties"
 
 
+def test_map_drawn_and_labels():
+    """drawn= shapes serialise with ids and Leaflet-style keys; the shape
+    callbacks unpack their payloads; GeoJSON label/on_hover round-trip."""
+    import json, re, html as _h
+
+    got = {}
+    geo = {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "properties": {"plot": "P1", "cover": 42.5},
+         "geometry": {"type": "Point", "coordinates": [-96.58, 39.19]}}]}
+
+    def build():
+        gui.leaflet(center=(39.19, -96.58), key="m", draw=["polygon"],
+            drawn=[{"id": "a", "type": "polygon", "coords": [[1, 2], [3, 4], [5, 6]],
+                    "style": {"fill_opacity": 0.5}, "label": "A"},
+                   {"type": "circle", "coords": {"lat": 1, "lng": 2, "radius": 30}}],
+            draw_style={"color": "#39ff14", "fill_color": "#000"},
+            on_shape_edit=lambda i, t, c: got.update(edit=(i, t, c)),
+            on_shape_delete=lambda i: got.update(delete=i),
+            on_shape_click=lambda i: got.update(click=i),
+            on_shape_hover=lambda i: got.update(hover=i),
+            layers=[gui.GeoJSON(geo, label=lambda p: f"{p['cover']:.0f}%",
+                                on_hover=lambda p: got.update(gj_hover=p))])
+
+    reset_globals()
+    html, _ = render_ui(build)
+    cfg = json.loads(_h.unescape(re.search(r'data-guile-map="([^"]+)"', html).group(1)))
+
+    d = cfg["drawn"]
+    assert [x["id"] for x in d] == ["a", "1"], "ids: given, else index"
+    assert d[0]["style"] == {"fillOpacity": 0.5} and d[0]["label"] == "A"
+    assert cfg["draw_style"] == {"color": "#39ff14", "fillColor": "#000"}
+
+    dispatch(cfg["on_shape_edit_cid"], {"id": "a", "type": "polygon", "coords": [[9, 9]]})
+    dispatch(cfg["on_shape_delete_cid"], {"id": "a"})
+    dispatch(cfg["on_shape_click_cid"], {"id": "a"})
+    dispatch(cfg["on_shape_hover_cid"], None)
+    assert got["edit"] == ("a", "polygon", [[9, 9]]) and got["delete"] == "a"
+    assert got["click"] == "a" and got["hover"] is None
+
+    gj = cfg["layers"][0]
+    assert gj["label"] == "_guile_label"
+    assert gj["data"]["features"][0]["properties"]["_guile_label"] == "42%"
+    assert "_guile_label" not in geo["features"][0]["properties"]
+    dispatch(gj["hover_cid"], None)
+    assert got["gj_hover"] is None
+
+    # drawn=None stays None (legacy JS-owned), bad entries fail loudly.
+    reset_globals()
+    html, _ = render_ui(lambda: gui.leaflet(key="m2"))
+    cfg2 = json.loads(_h.unescape(re.search(r'data-guile-map="([^"]+)"', html).group(1)))
+    assert cfg2["drawn"] is None
+    try:
+        gui.leaflet(key="m3", drawn=[{"type": "polygon"}])
+        assert False, "expected ValueError for entry without coords"
+    except ValueError:
+        pass
+    return "drawn ids/style/label ok; 4 shape callbacks + GeoJSON label/hover"
+
+
 CORE_TESTS = [
     test_batching_one_render,
     test_no_double_dispatch_on_typeerror,
@@ -436,6 +495,7 @@ CORE_TESTS = [
     test_dev_hot_reload,
     test_llms_docs_in_sync,
     test_map_layers_render,
+    test_map_drawn_and_labels,
 ]
 
 
@@ -576,6 +636,7 @@ EXAMPLES = [
     "soil_water_retention.py",
     "field_notes.py",
     "map_overlays.py",
+    "map_areas.py",
 ]
 
 

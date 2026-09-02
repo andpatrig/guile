@@ -433,6 +433,12 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
             on_shape:  Optional[Callable] = None,
             draw: Any = False, tiles: Any = "street",
             layers: Optional[list] = None,
+            drawn: Optional[list] = None,
+            draw_style: Optional[dict] = None,
+            on_shape_edit:   Optional[Callable] = None,
+            on_shape_delete: Optional[Callable] = None,
+            on_shape_click:  Optional[Callable] = None,
+            on_shape_hover:  Optional[Callable] = None,
             style: str = "", key: Optional[str] = None) -> _Map:
     """
     Embed an interactive Leaflet map. Requires internet for tile loading.
@@ -468,6 +474,26 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
                                         polyline, circle, marker)
         draw=False                    — no tools (default)
 
+    Drawn shapes owned by Python — pass drawn= and guile rebuilds the
+    editable draw layer from your list instead of keeping its own copy:
+
+        areas = gui.state([])      # [{"id","type","coords","style"?,"label"?}]
+        gui.leaflet(..., draw=["polygon","rectangle","circle"],
+                    drawn=areas.value,
+                    draw_style={"color": "#39ff14", "weight": 3},
+                    on_shape=lambda t, c: areas.update(     # create
+                        lambda a: a + [{"id": new_id(), "type": t, "coords": c}]),
+                    on_shape_edit=lambda id, t, c: ...,     # toolbar edit → Save
+                    on_shape_delete=lambda id: ...,         # toolbar delete → Save
+                    on_shape_click=lambda id: ...,          # select
+                    on_shape_hover=lambda id: ...)          # id, or None on leave
+
+    Entries are exactly what on_shape delivers plus an id you assign, so
+    plot boundaries loaded from a file and areas drawn in-app can live in
+    one list. A per-shape "style" overrides draw_style (highlight the
+    selection); "label" pins a text pill on the shape. drawn=[] clears.
+    drawn= also displays with draw=False (read-only view, no toolbar).
+
     Tile layers (base imagery) — all keyless public servers:
         tiles="street"     — OpenStreetMap (default)
         tiles="satellite"  — Esri World Imagery
@@ -499,7 +525,10 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
     return _Map(center=center, zoom=zoom, height=height,
                 markers=markers, on_click=on_click, on_move=on_move,
                 on_shape=on_shape, draw=draw, tiles=tiles,
-                layers=layers, style=style, key=key)
+                layers=layers, drawn=drawn, draw_style=draw_style,
+                on_shape_edit=on_shape_edit, on_shape_delete=on_shape_delete,
+                on_shape_click=on_shape_click, on_shape_hover=on_shape_hover,
+                style=style, key=key)
 
 
 

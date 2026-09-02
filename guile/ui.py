@@ -1607,6 +1607,15 @@ def _bounds(bounds) -> list:
             f"got {bounds!r}") from None
 
 
+_STYLE_KEYS = {"fill_color": "fillColor", "fill_opacity": "fillOpacity",
+               "dash_array": "dashArray"}
+
+def _path_style(style: Optional[dict]) -> dict:
+    """Map pythonic Leaflet path-style keys (fill_color) to Leaflet's
+    (fillColor); keys already in Leaflet form pass through."""
+    return {_STYLE_KEYS.get(k, k): v for k, v in (style or {}).items()}
+
+
 class ImageOverlay:
     """
     A georeferenced raster draped on gui.leaflet(): a PNG/JPG plus the
@@ -1675,28 +1684,40 @@ class GeoJSON:
     Vector features (points, lines, polygons) from GeoJSON on gui.leaflet().
 
         GeoJSON("plots.geojson", color="#e63946", fill_opacity=0.15,
-                popup="plot_id", on_click=lambda props: selected.set(props))
+                popup="plot_id", label="cover_pct",
+                on_click=lambda props: selected.set(props),
+                on_hover=lambda props: hovered.set(props))
 
     data       dict, JSON string, or path to a .geojson / .json file.
     popup      property name shown when a feature is clicked, or a callable
                props -> str/HTML for custom content.
+    label      property name, or callable props -> str, shown permanently
+               as a small pill centred on each feature.
     on_click   on_click(properties) — the clicked feature's properties dict.
                Propagation to the map's own on_click is stopped.
+    on_hover   on_hover(properties) when the pointer enters a feature and
+               on_hover(None) when it leaves. Each call renders, so keep
+               the handler light.
     color, weight, opacity, fill_color, fill_opacity — Leaflet path style.
     """
     def __init__(self, data, *, color: str = "#3388ff", weight: float = 2,
                  opacity: float = 1.0, fill_color: Optional[str] = None,
-                 fill_opacity: float = 0.2, popup=None,
-                 on_click: Optional[Callable] = None):
+                 fill_opacity: float = 0.2, popup=None, label=None,
+                 on_click: Optional[Callable] = None,
+                 on_hover: Optional[Callable] = None):
         self.data  = self._load(data)
         self.style = {"color": color, "weight": weight, "opacity": opacity,
                       "fillColor": fill_color or color,
                       "fillOpacity": fill_opacity}
         self.popup = popup
-        self._cid  = None
+        self.label = label
+        self._cid = self._hover_cid = None
         if on_click:
             self._cid = _next_id()
             _reg(self._cid, on_click)
+        if on_hover:
+            self._hover_cid = _next_id()
+            _reg(self._hover_cid, on_hover)
 
     @staticmethod
     def _load(data) -> dict:
@@ -1712,21 +1733,25 @@ class GeoJSON:
             return json.load(f)
 
     def to_dict(self) -> dict:
-        data, popup_key = self.data, self.popup
-        if callable(self.popup):
-            # Pre-render popups in Python and stash one on each feature so
-            # the JS side only has to read a property.
-            import copy
-            data  = copy.deepcopy(self.data)
-            feats = data.get("features", [data])
-            for f in feats:
+        # Callable popup/label are pre-rendered in Python and stashed on a
+        # copy of each feature, so the JS side only ever reads a property.
+        data, keys = self.data, {}
+        for name, spec in (("popup", self.popup), ("label", self.label)):
+            if not callable(spec):
+                keys[name] = spec
+                continue
+            if data is self.data:
+                import copy
+                data = copy.deepcopy(self.data)
+            prop = f"_guile_{name}"
+            for f in data.get("features", [data]):
                 props = f.get("properties") or {}
-                props["_guile_popup"] = self.popup(props)
+                props[prop] = spec(props)
                 f["properties"] = props
-            popup_key = "_guile_popup"
+            keys[name] = prop
         return {"type": "geojson", "data": data, "style": self.style,
-                "popup": popup_key, "cid": self._cid}
-
+                "popup": keys["popup"], "label": keys["label"],
+                "cid": self._cid, "hover_cid": self._hover_cid}
 
 class _Map(_Leaf):
     """
@@ -1771,6 +1796,18 @@ class _Map(_Leaf):
         ImageOverlay — a PNG/JPG stretched over a lat/lon box
         TileOverlay  — a pre-tiled pyramid (large drone mosaics)
         GeoJSON      — vector features with style, popup and on_click
+
+    Drawn shapes owned by Python (drawn=):
+        Pass drawn=[{"id", "type", "coords", "style"?, "label"?}, ...] and
+        guile rebuilds the editable draw layer from your list on every
+        change, instead of keeping its own copy. Entries are exactly what
+        on_shape delivers, plus an id you assign. Edit/delete through the
+        toolbar report back via on_shape_edit(id, type, coords) and
+        on_shape_delete(id); on_shape_click(id) / on_shape_hover(id|None)
+        make shapes selectable. draw_style= styles all of them, a per-shape
+        "style" overrides it, "label" pins a text pill on the shape.
+        drawn=[] clears; drawn=None (default) keeps the legacy behaviour
+        where the JS layer owns what was drawn.
     """
     _DRAW_ALL = ["rectangle", "polygon", "polyline", "circle", "marker"]
 
@@ -1852,6 +1889,26 @@ class _Map(_Leaf):
             return layers or list(cls._TILE_PRESETS["street"])
         return _one(tiles)
 
+    @staticmethod
+    def _normalize_drawn(drawn):
+        """Validate drawn= entries; None means the JS layer owns shapes."""
+        if drawn is None:
+            return None
+        out = []
+        for i, sh in enumerate(drawn):
+            if not isinstance(sh, dict) or "type" not in sh or "coords" not in sh:
+                raise ValueError(
+                    "drawn= entries must be dicts with 'type' and 'coords' "
+                    f"(as delivered by on_shape), got {sh!r}")
+            d = {"id": str(sh.get("id", i)), "type": sh["type"],
+                 "coords": sh["coords"]}
+            if sh.get("style"):
+                d["style"] = _path_style(sh["style"])
+            if sh.get("label") is not None:
+                d["label"] = str(sh["label"])
+            out.append(d)
+        return out
+
     def __init__(self, *, center: tuple = (0.0, 0.0), zoom: int = 10,
                  height: int = 380, markers: Optional[list] = None,
                  on_click: Optional[Callable] = None,
@@ -1859,12 +1916,20 @@ class _Map(_Leaf):
                  on_shape: Optional[Callable] = None,
                  draw: Any = False, tiles: Any = "street",
                  layers: Optional[list] = None,
+                 drawn: Optional[list] = None,
+                 draw_style: Optional[dict] = None,
+                 on_shape_edit:   Optional[Callable] = None,
+                 on_shape_delete: Optional[Callable] = None,
+                 on_shape_click:  Optional[Callable] = None,
+                 on_shape_hover:  Optional[Callable] = None,
                  style: str = "", key: Optional[str] = None):
         self._center   = center
         self._zoom     = zoom
         self._height   = height
         self._markers  = markers or []
         self._layers   = layers or []
+        self._drawn      = self._normalize_drawn(drawn)
+        self._draw_style = _path_style(draw_style)
         self._on_click = on_click
         self._on_move  = on_move
         self._on_shape = on_shape
@@ -1903,6 +1968,25 @@ class _Map(_Leaf):
         else:
             self._on_shape_cid = None
 
+        def _shape_cid(name, fn, unpack):
+            if not fn:
+                return None
+            cid = self.id + "-" + name
+            _reg(cid, unpack)
+            return cid
+        self._on_shape_edit_cid = _shape_cid(
+            "shape-edit", on_shape_edit,
+            lambda v: on_shape_edit(v["id"], v["type"], v["coords"]))
+        self._on_shape_delete_cid = _shape_cid(
+            "shape-delete", on_shape_delete,
+            lambda v: on_shape_delete(v["id"]))
+        self._on_shape_click_cid = _shape_cid(
+            "shape-click", on_shape_click,
+            lambda v: on_shape_click(v["id"]))
+        self._on_shape_hover_cid = _shape_cid(
+            "shape-hover", on_shape_hover,
+            lambda v: on_shape_hover(v["id"] if v else None))
+
     def render(self) -> str:
         import json
         cfg = {
@@ -1913,7 +1997,13 @@ class _Map(_Leaf):
             "on_click_cid": self._on_click_cid,
             "on_move_cid":  self._on_move_cid,
             "on_shape_cid": self._on_shape_cid,
+            "on_shape_edit_cid":   self._on_shape_edit_cid,
+            "on_shape_delete_cid": self._on_shape_delete_cid,
+            "on_shape_click_cid":  self._on_shape_click_cid,
+            "on_shape_hover_cid":  self._on_shape_hover_cid,
             "draw":         self._draw,
+            "drawn":        self._drawn,
+            "draw_style":   self._draw_style,
             "tiles":        self._tiles,
             "layers":       [l.to_dict() if hasattr(l, "to_dict") else l
                              for l in self._layers],

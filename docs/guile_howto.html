@@ -136,6 +136,14 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
   <div class="nav-cat">App lifecycle</div>
   <a href="#after-run">When the window closes</a>
   <a href="#dev-mode">Dev mode — hot reload</a>
+  <div class="nav-cat">Maps</div>
+  <a href="#map-basics">An interactive map</a>
+  <a href="#map-overlays">Draping imagery</a>
+  <a href="#map-geojson">GeoJSON, labels, hover</a>
+  <a href="#map-areas">Drawing &amp; editing areas</a>
+  <div class="nav-cat">Sharing your app</div>
+  <a href="#share-package">Build an executable</a>
+  <a href="#share-distribute">Avoiding install warnings</a>
 </nav>
 
 <main>
@@ -1506,4 +1514,354 @@ Dev mode is for building. For normal use — and always for
 <code>gui.package()</code> builds — call plain <code>gui.run()</code>.
 </div>
 </div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="map-basics">
+<h2>An interactive map</h2>
+
+<p><code>gui.leaflet()</code> embeds a Leaflet map that behaves like any
+other widget: it reads state, and its callbacks write state. Two things
+make maps different from a button. The map <em>keeps</em> the user's pan
+and zoom across re-renders, and it needs a stable <code>key=</code> to do
+so — always pass one.</p>
+
+<pre>import guile as gui
+
+stations = [("Manhattan", 39.19, -96.58), ("Salina", 38.84, -97.61)]
+picked   = gui.state(None)            # name of the clicked station
+view     = gui.state("satellite")     # bound to a select → live base-map switch
+
+@gui.app("Stations", width=820, height=560)
+def ui():
+    with gui.col(padding=20, gap=12):
+        gui.select(["street", "satellite", "hybrid", "terrain"], "Base map",
+                   value=view, on_change=view.set, key="view")
+
+        gui.leaflet(
+            center=(39.0, -97.0), zoom=8, height=420,
+            tiles=view.value,                          # preset name or XYZ URL
+            markers=[gui.Marker((lat, lon), tooltip=name,
+                                on_click=lambda n=name: picked.set(n))
+                     for name, lat, lon in stations],
+            on_click=lambda lat, lon: picked.set(f"{lat:.3f}, {lon:.3f}"),
+            key="map",                                 # required
+        )
+        gui.text(picked.value or "Click a marker or the map", muted=True, size="sm")
+
+gui.run()</pre>
+
+<div class="note">
+Tiles come from public servers, so maps need an internet connection.
+<code>on_click(lat, lon)</code> fires on the background; a marker's own
+<code>on_click</code> fires instead when a marker is hit. Bind
+<code>tiles=</code> to a state, as above, to switch imagery without
+rebuilding the map.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="map-overlays">
+<h2>Draping imagery: image and tile overlays</h2>
+
+<p>Overlay layers go in <code>layers=[...]</code> and draw in list order
+between the base tiles and the markers. There are two ways to drape a
+raster, and the choice is purely about size.</p>
+
+<h3>Small rasters — <code>gui.ImageOverlay</code></h3>
+
+<p>A PNG or JPG plus the lat/lon box it covers. guile embeds the file in
+the page, so this is right for a field map or a plot mosaic of a few MB,
+and wrong for a 2&nbsp;GB drone orthomosaic. guile never reads GeoTIFFs —
+you export the PNG and its corner coordinates from your own pipeline.</p>
+
+<pre>opacity = gui.state(0.7)
+
+@gui.app("NDVI", width=860, height=600)
+def ui():
+    with gui.col(padding=20, gap=12):
+        gui.slider("Opacity", min=0, max=1, step=0.05,
+                   value=opacity, on_change=opacity.set, key="op")
+        gui.leaflet(
+            center=(39.19, -96.5875), zoom=15, height=480, tiles="satellite",
+            layers=[
+                gui.ImageOverlay("ndvi.png",
+                                 bounds=((39.180, -96.600), (39.200, -96.575)),  # (S,W),(N,E)
+                                 opacity=opacity.value),
+            ],
+            key="map")
+
+gui.run()</pre>
+
+<h3>Large rasters (drone mosaics) — <code>gui.TileOverlay</code></h3>
+
+<p>Don't embed a big image: tile it once, serve the folder locally, and
+let Leaflet stream only the tiles in view. guile stays out of the way — it
+just takes a tile URL. Tiling is a one-off command:</p>
+
+<pre>gdal2tiles.py --xyz -z 14-21 mosaic.tif tiles/</pre>
+
+<p>Serving can happen inside the app, on a background thread, with
+nothing but the standard library:</p>
+
+<pre>import functools, threading
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+
+def serve_folder(folder, port=8765):
+    """Serve `folder` on localhost from a daemon thread; returns the base URL."""
+    handler = functools.partial(SimpleHTTPRequestHandler, directory=folder)
+    srv = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{port}"
+
+TILES  = serve_folder("tiles")                     # once, at module level
+BOUNDS = ((39.180, -96.600), (39.200, -96.575))    # extent of the mosaic
+
+@gui.app("Orthomosaic", width=900, height=640)
+def ui():
+    gui.leaflet(center=(39.19, -96.5875), zoom=16, height=560, tiles="satellite",
+                layers=[gui.TileOverlay(TILES + "/{z}/{x}/{y}.png",
+                                        max_zoom=21, bounds=BOUNDS, opacity=0.9)],
+                key="map")
+
+gui.run()</pre>
+
+<div class="note">
+<strong>max_zoom</strong> is the deepest level you tiled to; zooming
+past it upscales the last level instead of blanking the layer.
+<strong>bounds</strong> stops requests for tiles outside the mosaic, so
+the server log isn't full of 404s. If you ran <code>gdal2tiles</code>
+without <code>--xyz</code>, add <code>tms=True</code>.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="map-geojson">
+<h2>GeoJSON: style, labels, click and hover</h2>
+
+<p><code>gui.GeoJSON</code> draws vector features from a dict, a JSON
+string, or a file path. Each feature can carry a permanent label, show a
+popup, and report clicks and hovers back to Python with its
+<code>properties</code> dict — which is all you need to drive a sidebar
+from the map.</p>
+
+<pre>selected = gui.state(None)     # properties of the clicked plot
+hovered  = gui.state(None)
+
+@gui.app("Plots", width=900, height=640)
+def ui():
+    with gui.row(gap=14, padding=20):
+        with gui.col(fill=True):
+            gui.leaflet(
+                center=(39.19, -96.5875), zoom=15, height=560, tiles="satellite",
+                layers=[
+                    # A wide dark stroke under a thin bright one reads as a glow,
+                    # because layers stack in list order.
+                    gui.GeoJSON("plots.geojson", color="#0a2a0a", weight=7,
+                                opacity=0.6, fill_opacity=0),
+                    gui.GeoJSON("plots.geojson", color="#39ff14", weight=2,
+                                fill_opacity=0.05,
+                                label=lambda p: f"{p['cover_pct']:.0f}%",   # pinned on the shape
+                                popup="plot_id",                            # on click
+                                on_click=selected.set,
+                                on_hover=hovered.set),                      # props, or None on leave
+                ],
+                key="map")
+
+        with gui.col(gap=8, style="width:220px;flex-shrink:0"):
+            with gui.card(gap=6):
+                gui.text("Selected", bold=True, size="sm")
+                p = selected.value
+                gui.text(p["plot_id"] if p else "—")
+                gui.text(f"{p['cover_pct']:.1f} % cover" if p else "", muted=True, size="sm")
+            if hovered.value:
+                gui.badge(hovered.value["plot_id"], variant="neutral")
+
+gui.run()</pre>
+
+<div class="note">
+<code>label=</code> and <code>popup=</code> take either a property name
+or a callable <code>props → str</code>. <code>on_hover</code> fires a
+render on every enter and leave, so keep that callback to a single
+<code>.set()</code>. To restyle the hovered feature, put it in a separate
+layer rather than rebuilding the whole file each time.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="map-areas">
+<h2>Drawing and editing areas</h2>
+
+<p>The draw toolbar (<code>draw=[...]</code>) lets users outline areas
+in-app. The pattern that makes this work well is <strong>one list of
+areas owned by Python</strong>: shapes drawn with the toolbar are
+appended to it, the toolbar's edit and delete tools update it, clicking
+selects from it, and the same list is what you export. Pass the list back
+as <code>drawn=</code> and guile rebuilds the editable layer from it —
+there is no separate JS copy, so nothing gets out of sync and nothing is
+drawn twice.</p>
+
+<p>Each entry is exactly what <code>on_shape</code> hands you, plus an id
+you assign:</p>
+
+<pre>import guile as gui, itertools
+
+areas    = gui.state([])       # [{"id", "type", "coords"}, ...]
+selected = gui.state(None)     # id of the selected area
+_ids     = itertools.count(1)
+
+# The three toolbar events keep the list current ───────────────────────
+def add_area(shape_type, coords):                # a shape was drawn
+    areas.update(lambda a: a + [{"id": f"A{next(_ids)}",
+                                 "type": shape_type, "coords": coords}])
+
+def edit_area(area_id, shape_type, coords):      # edit toolbar → Save
+    areas.update(lambda a: [dict(x, coords=coords) if x["id"] == area_id else x
+                            for x in a])
+
+def delete_area(area_id):                        # delete toolbar → Save
+    areas.update(lambda a: [x for x in a if x["id"] != area_id])
+
+@gui.app("Areas", width=940, height=660)
+def ui():
+    # Decorate for display: a label on every shape, a highlight on the
+    # selected one. The per-shape "style" overrides draw_style.
+    shapes = [dict(a, label=a["id"],
+                   style={"color": "#ffdd00", "weight": 4, "fill_opacity": 0.25}
+                         if a["id"] == selected.value else None)
+              for a in areas.value]
+
+    with gui.row(gap=14, padding=20):
+        with gui.col(fill=True):
+            gui.leaflet(
+                center=(39.19, -96.5875), zoom=15, height=560, tiles="satellite",
+                draw=["polygon", "rectangle", "circle"],
+                drawn=shapes,
+                draw_style={"color": "#39ff14", "weight": 3, "fill_opacity": 0.05},
+                on_shape=add_area,
+                on_shape_edit=edit_area,
+                on_shape_delete=delete_area,
+                on_shape_click=selected.set,
+                key="map")
+
+        with gui.col(gap=6, style="width:220px;flex-shrink:0"):
+            gui.text("Areas", bold=True, size="sm")
+            for a in areas.value:
+                gui.button(f"{a['id']} · {a['type']}", variant="ghost", size="sm",
+                           on_click=lambda i=a["id"]: selected.set(i),
+                           key=f"sel-{a['id']}")
+
+gui.run()</pre>
+
+<h3>Plot boundaries from a file, into the same list</h3>
+
+<p>Because <code>drawn=</code> entries are plain dicts, a GeoJSON file
+loads into the same list — and is then editable with the toolbar like
+anything drawn by hand. Note that GeoJSON stores <code>[lon, lat]</code>
+while guile's shapes use <code>[lat, lon]</code>:</p>
+
+<pre>import json
+
+def areas_from_geojson(path):
+    out = []
+    for i, f in enumerate(json.load(open(path))["features"]):
+        g = f["geometry"]
+        if g["type"] == "Polygon":
+            ring = g["coordinates"][0][:-1]                  # drop the closing point
+            out.append({"id": f["properties"].get("id", f"P{i + 1}"),
+                        "type": "polygon",
+                        "coords": [[lat, lon] for lon, lat in ring]})
+    return out
+
+def to_geojson(area_list):                                   # the inverse, for export
+    feats = []
+    for a in area_list:
+        if a["type"] in ("polygon", "rectangle"):
+            ring = [[lon, lat] for lat, lon in a["coords"]]
+            feats.append({"type": "Feature", "properties": {"id": a["id"]},
+                          "geometry": {"type": "Polygon",
+                                       "coordinates": [ring + [ring[0]]]}})
+    return {"type": "FeatureCollection", "features": feats}
+
+# in a file-picker callback:   areas.set(areas_from_geojson(path))
+# in an export callback:       json.dump(to_geojson(areas.value), open("plots.geojson", "w"))</pre>
+
+<div class="note">
+<strong>Ids are yours.</strong> Give every entry a stable id; an entry
+without one gets its list index, which shifts when you delete.
+<strong>on_shape must append.</strong> A freshly drawn shape stays on
+screen by itself until the list next changes, then only what is in your
+list survives. <strong>Circles</strong> arrive as
+<code>{"lat", "lng", "radius"}</code> with the radius in metres — buffer
+them in a projected CRS on the analysis side. <code>drawn=</code> also
+works with <code>draw=False</code> for a read-only view.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="share-package">
+<h2>Build an executable</h2>
+
+<p><code>gui.package()</code> wraps PyInstaller so a colleague without
+Python can run your app. It is a build step: put it in a separate
+<code>build.py</code>, never inside <code>ui()</code>.</p>
+
+<pre># build.py — run once from the environment your app runs in
+import guile as gui
+
+gui.package("my_app.py", name="Field Mapper",
+            icon="app.ico",                       # .ico on Windows, .icns on macOS
+            add_data=[("presets.yaml", ".")])     # runtime data files only; code is found automatically</pre>
+
+<p>By default this produces a <strong>folder</strong>
+(<code>package_mode="onedir"</code>): the executable next to its
+libraries, under <code>dist/Field Mapper/</code>. Pass
+<code>package_mode="onefile"</code> for a single self-contained
+executable instead. The folder is the better default for two reasons
+that matter when you hand the app to someone else: it starts faster, and
+it trips far fewer antivirus and SmartScreen heuristics — a one-file
+build unpacks itself into a temp directory at launch, which is exactly
+what malware droppers do, so scanners are suspicious of it.</p>
+
+<div class="note">
+While a build misbehaves, pass <code>windowed=False</code> to keep a
+console open so tracebacks are visible. PyInstaller must be installed in
+the same environment as the app (<code>pip install pyinstaller</code>, or
+<code>install_missing=True</code>). On Windows the built app relies on the
+WebView2 runtime, which ships with Windows 10/11.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="share-distribute">
+<h2>Avoiding install warnings</h2>
+
+<p>The bullet-proof answer is code signing (a Windows certificate, an
+Apple Developer ID plus notarization). Short of that, these are the
+steps that work in most situations, roughly in order of impact:</p>
+
+<ul style="color:var(--text-2);font-size:14px;line-height:1.9;padding-left:20px">
+  <li><strong style="color:var(--text)">Ship the folder inside an installer, not as a loose exe.</strong>
+      On Windows, <a href="https://jrsoftware.org/isinfo.php">Inno Setup</a>
+      (free) turns the <code>onedir</code> folder into a normal
+      <code>Setup.exe</code> that installs to Program Files and adds a
+      Start-menu entry. On macOS, a <code>.dmg</code>. Users trust an
+      installer far more than a bare executable, and it removes the
+      "what do I click?" problem of a folder.</li>
+  <li><strong style="color:var(--text)">Keep the name and publisher stable.</strong>
+      SmartScreen reputation is earned: once enough people have run the
+      same unsigned installer without incident, the warning goes away on
+      its own. Renaming the exe every release starts that clock over.</li>
+  <li><strong style="color:var(--text)">Tell macOS users about right-click → Open.</strong>
+      Gatekeeper blocks unsigned apps by default and there is no
+      reputation path. Right-clicking the app and choosing Open, once,
+      whitelists it. Put that sentence in your README.</li>
+  <li><strong style="color:var(--text)">Signing is cheaper than it sounds, later.</strong>
+      A standard Windows code-signing certificate costs on the order of
+      a hundred dollars a year and removes most friction; an EV
+      certificate clears SmartScreen immediately. Apple's program is
+      $99/year. Both are an upgrade you can add without changing the
+      build.</li>
+</ul>
+</div>
+
 </main>

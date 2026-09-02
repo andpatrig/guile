@@ -79,6 +79,7 @@ While building a UI, use `gui.run(dev=True)`: guile watches your script and relo
 | `canopeo.py`              | Image analysis                               |
 | `map_draw.py`             | Leaflet with draw tools                      |
 | `map_overlays.py`         | Image overlay + GeoJSON on a map             |
+| `map_areas.py`            | Draw, edit, label and select areas           |
 
 ---
 
@@ -121,6 +122,11 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.4**
+- Drawn shapes owned by Python: `gui.leaflet(drawn=[...], draw_style=...)` rebuilds the editable draw layer from your list, so file-loaded plots and in-app drawings live in one list with no doubled outlines. New callbacks `on_shape_edit(id, type, coords)` and `on_shape_delete(id)` report the toolbar's edit/delete saves; `on_shape_click(id)` and `on_shape_hover(id | None)` make shapes selectable. Per-shape `style` and `label`. See `examples/map_areas.py`.
+- `gui.GeoJSON`: new `label=` (permanent text pill on each feature, property name or callable) and `on_hover=` (properties on enter, `None` on leave).
+- Docs: the how-to gains a Maps chapter (interactive map, draping imagery, GeoJSON labels/hover, drawing and editing areas) and a Sharing chapter (building an executable, avoiding install warnings). `llms-full.txt` gains a worked mapping example and new pitfalls; both LLM files are current for AI-assisted coding.
+
 **v0.8.3**
 - Map fix: switching a `TileOverlay` URL or an `ImageOverlay` no longer flashes the base map. New overlay layers are added first and the previous ones are removed once the new rasters have loaded (2 s fallback), so the swap is a cross-fade.
 

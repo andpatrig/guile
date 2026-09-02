@@ -1,4 +1,4 @@
-# guile — complete reference for AI assistants (v0.7.0)
+# guile — complete reference for AI assistants (v0.8.4)
 
 guile is a lightweight Python framework for desktop apps. One Python process
 opens a native window (pywebview: WebView2 on Windows, WKWebView on macOS).
@@ -197,7 +197,9 @@ gui.figure(fig, dpi=96, width="100%", caption=None, transparent=True,
     # Use matplotlib.use("Agg") before pyplot import.
 gui.leaflet(center=(lat, lon), zoom=10, height=380, markers=[...],
             on_click=None, on_move=None, on_shape=None, draw=False,
-            tiles="street", layers=None, key="map")
+            tiles="street", layers=None, drawn=None, draw_style=None,
+            on_shape_edit=None, on_shape_delete=None,
+            on_shape_click=None, on_shape_hover=None, key="map")
     # Interactive map (needs internet for tiles). ALWAYS set key=.
     # markers: [gui.Marker((lat, lon), popup="...", tooltip="...",
     #                      on_click=fn)]  — construct Markers inside ui().
@@ -207,6 +209,15 @@ gui.leaflet(center=(lat, lon), zoom=10, height=380, markers=[...],
     # tiles: "street"|"satellite"|"hybrid"|"terrain"|"light"|"dark"|url|dict
     # layers: overlay list drawn in order between base tiles and markers —
     #   base tiles < TileOverlay < ImageOverlay < GeoJSON < markers
+    # drawn: Python-OWNED shapes [{"id","type","coords","style"?,"label"?}]
+    #   — exactly what on_shape delivers plus an id you assign. guile
+    #   rebuilds the editable layer from it; [] clears; None = JS owns
+    #   (legacy). Keep it in a State: on_shape appends, on_shape_edit
+    #   (id, type, coords) replaces coords, on_shape_delete(id) removes,
+    #   on_shape_click(id) selects, on_shape_hover(id | None). Per-shape
+    #   "style" overrides draw_style (highlight the selection); "label"
+    #   pins a text pill on the shape. Works with draw=False (read-only).
+    # draw_style: {"color","weight","opacity","fill_color","fill_opacity"}
 gui.ImageOverlay(source, bounds=((south, west), (north, east)), opacity=1.0)
     # Drape a PNG/JPG (path, URL, or bytes) over a lat/lon box. Must be
     # north-up. Embedded as base64 and re-sent each render — keep it modest
@@ -219,9 +230,12 @@ gui.TileOverlay(url, opacity=1.0, tms=False, min_zoom=0, max_zoom=22,
     # max_zoom = deepest level built (past it the last level upscales).
     # tms=True if gdal2tiles ran without --xyz. bounds= avoids 404s outside it.
 gui.GeoJSON(data, color="#3388ff", weight=2, opacity=1.0, fill_color=None,
-            fill_opacity=0.2, popup=None, on_click=None)
+            fill_opacity=0.2, popup=None, label=None, on_click=None,
+            on_hover=None)
     # Vector features from a dict, JSON string, or .geojson path.
     # popup: property name, or callable props -> HTML str.
+    # label: property name or callable — permanent text pill on the feature.
+    # on_hover(props) on enter, on_hover(None) on leave (each call renders).
     # on_click(properties) fires with the clicked feature's properties dict
     # (map on_click is NOT also fired). Construct inside ui() like Markers.
 gui.notify(message, variant="success", duration=3.0)
@@ -307,6 +321,71 @@ gui.package("my_app.py", name="MyApp", package_mode="onedir", windowed=True,
 # add_data bundles runtime data files as (src, dest) pairs.
 ```
 
+## Maps — worked example (imagery + areas + selection)
+
+The pattern for mapping apps: ONE list of areas owned by Python. Drawn
+shapes are appended by on_shape, the toolbar's edit/delete update it,
+clicking selects from it, and the same list is exported. Pass it back as
+drawn= so guile rebuilds the editable layer from it (no JS-side copy, no
+doubled outlines). Large imagery is pre-tiled and served, never embedded.
+
+```python
+import guile as gui, itertools, functools, threading
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+
+def serve_folder(folder, port=8765):          # stream pre-tiled imagery
+    handler = functools.partial(SimpleHTTPRequestHandler, directory=folder)
+    srv = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{port}"
+
+TILES  = serve_folder("tiles")                # gdal2tiles.py --xyz -z 14-21 mosaic.tif tiles/
+BOUNDS = ((39.180, -96.600), (39.200, -96.575))
+
+areas    = gui.state([])                      # [{"id","type","coords"}, ...]
+selected = gui.state(None)                    # id of the selected area
+_ids     = itertools.count(1)
+
+def add_area(shape_type, coords):             # on_shape: APPEND with a stable id
+    areas.update(lambda a: a + [{"id": f"A{next(_ids)}", "type": shape_type, "coords": coords}])
+
+def edit_area(area_id, shape_type, coords):   # edit toolbar → Save
+    areas.update(lambda a: [dict(x, coords=coords) if x["id"] == area_id else x for x in a])
+
+def delete_area(area_id):                     # delete toolbar → Save
+    areas.update(lambda a: [x for x in a if x["id"] != area_id])
+
+@gui.app("Field mapper", width=940, height=660)
+def ui():
+    # Decorate for display only; the source of truth stays in areas.value.
+    shapes = [dict(a, label=a["id"],
+                   style={"color": "#ffdd00", "weight": 4} if a["id"] == selected.value else None)
+              for a in areas.value]
+    with gui.row(gap=14, padding=20):
+        with gui.col(fill=True):
+            gui.leaflet(
+                center=(39.19, -96.5875), zoom=16, height=560, tiles="satellite",
+                layers=[gui.TileOverlay(TILES + "/{z}/{x}/{y}.png", max_zoom=21, bounds=BOUNDS),
+                        gui.GeoJSON("field_boundary.geojson", color="#ffffff", weight=1, fill_opacity=0)],
+                draw=["polygon", "rectangle", "circle"],
+                drawn=shapes,
+                draw_style={"color": "#39ff14", "weight": 3, "fill_opacity": 0.05},
+                on_shape=add_area, on_shape_edit=edit_area, on_shape_delete=delete_area,
+                on_shape_click=selected.set,
+                key="map")                    # ALWAYS keyed
+        with gui.col(gap=6, style="width:220px;flex-shrink:0"):
+            for a in areas.value:
+                gui.button(f"{a['id']} · {a['type']}", variant="ghost", size="sm",
+                           on_click=lambda i=a["id"]: selected.set(i), key=f"sel-{a['id']}")
+
+gui.run()
+```
+
+Shape coords: polygon/rectangle/polyline = [[lat, lon], ...]; circle =
+{"lat", "lng", "radius"} (metres); marker = {"lat", "lng"}. GeoJSON files
+store [lon, lat] — swap when converting either way. For a small raster use
+gui.ImageOverlay(png, bounds=((S, W), (N, E))) instead of TileOverlay.
+
 ## Complete example — list app with persistence (load → run → save)
 
 ```python
@@ -368,3 +447,7 @@ if notes.value:                          # 3. window closed: persist
 - [ ] matplotlib figures are created inside ui() (fresh each render)
 - [ ] `gui.notify()` only called from callbacks, never from ui()
 - [ ] `gui.leaflet()` and anything with callbacks has a stable `key=`
+- [ ] `drawn=` entries carry a stable id you assign; `on_shape` appends the new shape
+- [ ] `ImageOverlay` files are modest (a few MB); big imagery is tiled + `TileOverlay`
+- [ ] `on_hover` handlers do one `.set()` and nothing else (they render on enter and leave)
+- [ ] `gui.package()` lives in a separate build script, never inside ui()

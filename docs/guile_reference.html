@@ -303,7 +303,7 @@ pre {
 <nav id="sidebar">
   <div class="logo">
     <div class="logo-name">gui<span>le</span></div>
-    <div class="logo-sub">API reference v0.8.3</div>
+    <div class="logo-sub">API reference v0.8.4</div>
   </div>
   <div id="nav-links"></div>
 </nav>
@@ -627,6 +627,12 @@ const WIDGETS = [
      ["on_move","Callable = None","on_move(center, zoom) — fires after pan/zoom ends (debounced 150 ms)"],
      ["on_shape","Callable = None","on_shape(type, coords) — fires when a shape is drawn (requires draw=)"],
      ["draw","list|bool = False","Enable drawing tools: True for all, or list e.g. ['rectangle','polygon']"],
+     ["drawn","list = None","Python-owned drawn shapes: [{id, type, coords, style?, label?}, ...] — exactly what on_shape delivers plus an id you assign. guile rebuilds the editable layer from this list; [] clears; None keeps the legacy JS-owned behaviour. Also displays with draw=False."],
+     ["draw_style","dict = None","Path style for all drawn shapes, e.g. {'color': '#39ff14', 'weight': 3, 'fill_opacity': 0.05}; a per-shape 'style' overrides it"],
+     ["on_shape_edit","Callable = None","on_shape_edit(id, type, coords) — fires per shape when the edit toolbar is saved"],
+     ["on_shape_delete","Callable = None","on_shape_delete(id) — fires per shape when the delete toolbar is saved"],
+     ["on_shape_click","Callable = None","on_shape_click(id) — a drawn shape was clicked (map on_click is not also fired)"],
+     ["on_shape_hover","Callable = None","on_shape_hover(id) on pointer enter, on_shape_hover(None) on leave"],
      ["tiles","str|dict|list = 'street'","Base map: 'street','satellite','hybrid','terrain','light','dark', a custom XYZ URL, or a {url, attribution, max_zoom} dict. Bind to a State to switch views live."],
      ["layers","list = None","Overlay layers drawn in list order between the base tiles and markers: gui.ImageOverlay, gui.TileOverlay, gui.GeoJSON"],
      ["style","str = ''","Raw CSS on the map wrapper div"],
@@ -666,7 +672,9 @@ const WIDGETS = [
      ["fill_color","str = None","Fill colour; defaults to color"],
      ["fill_opacity","float = 0.2","Fill opacity"],
      ["popup","str|Callable = None","Property name to show when a feature is clicked, or a callable props -> str/HTML for custom content"],
+     ["label","str|Callable = None","Property name, or callable props -> str, shown permanently as a small pill centred on each feature"],
      ["on_click","Callable = None","on_click(properties) — fires with the clicked feature's properties dict"],
+     ["on_hover","Callable = None","on_hover(properties) on pointer enter, on_hover(None) on leave. Each call renders — keep it light."],
    ],
    },
 
