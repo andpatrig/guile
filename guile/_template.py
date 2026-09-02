@@ -169,7 +169,7 @@ body {
 
 /* ── Progress bar ───────────────────────────────────────────────────────── */
 .guile-progress-track {
-    height: 6px; background: var(--border); border-radius: 99px; overflow: hidden;
+    height: 6px; flex-shrink: 0; background: var(--border); border-radius: 99px; overflow: hidden;
 }
 .guile-progress-fill {
     height: 100%; background: var(--primary); border-radius: 99px;

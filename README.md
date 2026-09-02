@@ -122,6 +122,9 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.7**
+- Fix: a progress bar inside a height-constrained column could shrink to nothing; the track now has `flex-shrink: 0`.
+
 **v0.8.6**
 - `gui.package()` now bundles only the native pywebview backend for the platform, so a machine with PyQt or PySide installed no longer drags all of Qt into the build (`native_only=`, `exclude_modules=`).
 - `gui.package()` warns when building from the Anaconda base and suggests a clean venv; the docs no longer claim a separate environment is unnecessary.

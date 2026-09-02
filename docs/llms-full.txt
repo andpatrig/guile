@@ -1,4 +1,4 @@
-# guile — complete reference for AI assistants (v0.8.6)
+# guile — complete reference for AI assistants (v0.8.7)
 
 guile is a lightweight Python framework for desktop apps. One Python process
 opens a native window (pywebview: WebView2 on Windows, WKWebView on macOS).

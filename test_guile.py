@@ -624,6 +624,19 @@ def test_package_conda_dll_path():
     return "conda Library/bin prepended for the build"
 
 
+def test_progress_track_does_not_collapse():
+    """The progress bar track must carry flex-shrink:0. Every gui.col is a
+    flex column; without it a bar inside a height-constrained column shrinks
+    to 0px and silently disappears (reported from a real app, v0.8.6)."""
+    import re
+    from guile import _template as T
+    src = T.__dict__.get("TEMPLATE") or T.__dict__.get("HTML") or open(T.__file__, encoding="utf-8").read()
+    m = re.search(r"\.guile-progress-track\s*\{([^}]*)\}", src)
+    assert m, "progress track rule not found"
+    assert re.search(r"flex-shrink:\s*0", m.group(1)), m.group(1)
+    return "progress track has flex-shrink:0"
+
+
 def test_console_output_is_ascii():
     """Every print()/SystemExit message in guile must be ASCII. With stdout
     redirected to a file, Windows encodes prints with the locale codepage
@@ -648,6 +661,7 @@ CORE_TESTS = [
     test_package_native_backend_flags,
     test_package_environment_hint,
     test_package_conda_dll_path,
+    test_progress_track_does_not_collapse,
     test_console_output_is_ascii,
     test_batching_one_render,
     test_no_double_dispatch_on_typeerror,
