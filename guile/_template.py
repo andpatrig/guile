@@ -638,10 +638,20 @@ function _guileApplyTiles(entry, tiles) {
 //   base tiles (tilePane, zIndex 1) < tile overlays (tilePane, zIndex 10)
 //   < images (guile-image pane) < GeoJSON (overlayPane) < markers.
 function _guileApplyOverlays(entry, layers) {
-    (entry.overlayLayers || []).forEach(function(l) {
-        entry.map.removeLayer(l);
-    });
+    // Cross-fade: add the new layers first and remove the previous ones only
+    // once the new raster layers (tiles, images) have loaded — or after a
+    // short fallback — so switching a TileOverlay URL or an ImageOverlay
+    // never flashes the base map through the gap. Vector-only changes have
+    // nothing to wait for and swap immediately. Removing a layer that is
+    // already gone is a no-op in Leaflet, so overlapping calls are safe.
+    var oldLayers = entry.overlayLayers || [];
     entry.overlayLayers = [];
+    var pending = 0, removed = false;
+    function removeOld() {
+        if (removed) return;
+        removed = true;
+        oldLayers.forEach(function(l) { entry.map.removeLayer(l); });
+    }
     (layers || []).forEach(function(cfg) {
         var layer = null;
         if (cfg.type === 'image') {
@@ -671,10 +681,19 @@ function _guileApplyOverlays(entry, layers) {
             });
         }
         if (layer) {
+            if (cfg.type === 'tiles' || cfg.type === 'image') {
+                pending++;
+                layer.once('load', function() {
+                    if (--pending <= 0) removeOld();
+                });
+            }
             layer.addTo(entry.map);
             entry.overlayLayers.push(layer);
         }
     });
+    if (!oldLayers.length) return;
+    if (pending === 0) removeOld();
+    else setTimeout(removeOld, 2000);   // fallback if 'load' never fires
 }
 
 function _guileApplyMarkers(lg, markers) {

@@ -121,6 +121,9 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.3**
+- Map fix: switching a `TileOverlay` URL or an `ImageOverlay` no longer flashes the base map. New overlay layers are added first and the previous ones are removed once the new rasters have loaded (2 s fallback), so the swap is a cross-fade.
+
 **v0.8.2**
 - Map fix: a keyed map no longer goes blank when an *unkeyed* ancestor is replaced (e.g. a sidebar element appearing or disappearing shifts auto-numbered ids). The registry now detects the orphaned Leaflet instance, disposes it, and rebuilds the map in place, keeping the user's current pan/zoom.
 
