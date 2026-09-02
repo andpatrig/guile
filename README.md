@@ -121,6 +121,9 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.2**
+- Map fix: a keyed map no longer goes blank when an *unkeyed* ancestor is replaced (e.g. a sidebar element appearing or disappearing shifts auto-numbered ids). The registry now detects the orphaned Leaflet instance, disposes it, and rebuilds the map in place, keeping the user's current pan/zoom.
+
 **v0.8.1**
 - Map overlay layers: `gui.leaflet(layers=[...])` accepts `gui.ImageOverlay(png, bounds=...)` to drape a georeferenced PNG/JPG, `gui.TileOverlay(url)` for a pre-tiled pyramid (the practical route for large drone mosaics — tile with gdal2tiles, serve with `python -m http.server`), and `gui.GeoJSON(data, popup=, on_click=)` for vector features with a per-feature click callback. See `examples/map_overlays.py`.
 

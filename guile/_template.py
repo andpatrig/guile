@@ -552,10 +552,28 @@ function _guileSyncMaps() {
         var cfg     = JSON.parse(el.getAttribute('data-guile-map'));
         var cfgJson = JSON.stringify(cfg);
 
+        // Orphan guard. The patcher replaces a whole subtree when an
+        // ancestor's id changes (e.g. an unkeyed sidebar element appears or
+        // disappears, shifting auto-numbered ids). The map element keeps its
+        // keyed id, but its canvas is now a fresh clone while the registry
+        // still points at a Leaflet instance on the detached node — blank
+        // map, and updates go to the orphan. Detect it, dispose, and rebuild
+        // below, carrying the user's current view across.
+        var keepView = null;
+        if (_guileMaps[id] &&
+                !document.body.contains(_guileMaps[id].map.getContainer())) {
+            var oldMap = _guileMaps[id].map;
+            keepView = {center: oldMap.getCenter(), zoom: oldMap.getZoom()};
+            oldMap.remove();
+            delete _guileMaps[id];
+        }
+
         if (!_guileMaps[id]) {
             var canvas = el.querySelector('.guile-map-canvas');
             if (!canvas) return;
-            var map = L.map(canvas, {zoomControl: true}).setView(cfg.center, cfg.zoom);
+            var map = L.map(canvas, {zoomControl: true});
+            if (keepView) map.setView(keepView.center, keepView.zoom);
+            else          map.setView(cfg.center, cfg.zoom);
             // Image overlays get their own pane between the tile pane (200)
             // and the overlay pane (400) so they always sit under GeoJSON
             // vectors and markers, whatever order the layers were created.
