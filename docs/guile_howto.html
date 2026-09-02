@@ -1822,6 +1822,29 @@ it trips far fewer antivirus and SmartScreen heuristics — a one-file
 build unpacks itself into a temp directory at launch, which is exactly
 what malware droppers do, so scanners are suspicious of it.</p>
 
+<h3>Build from a clean environment</h3>
+
+<p>This is the step that decides whether packaging is painless or a
+struggle. PyInstaller bundles the environment it runs in, and it follows
+<em>optional</em> imports: from a full Anaconda install, a trivial app
+comes out at several gigabytes (torch, tensorflow, dask and friends ride
+along) or fails to build at all. <code>gui.package()</code> prints a note
+when it detects that situation. The cure is a small virtual environment
+holding only what the app needs:</p>
+
+<pre>python -m venv build-env
+build-env\Scripts\pip install guile pyinstaller pandas   # plus whatever the app imports
+build-env\Scripts\python build.py</pre>
+
+<p>On macOS and Linux the paths are <code>build-env/bin/pip</code> and
+<code>build-env/bin/python</code>. Keep the environment around; rebuilding
+is then a single command. A <code>venv</code> made from Anaconda's Python
+works too: guile puts Anaconda's DLL folder on the build's PATH, which
+PyInstaller otherwise cannot find. One gotcha: install your own packages normally,
+not with <code>pip install -e</code>. Editable installs work through an
+import hook that PyInstaller's analysis cannot follow, and the built app
+fails at launch with <code>ModuleNotFoundError</code>.</p>
+
 <div class="note">
 While a build misbehaves, pass <code>windowed=False</code> to keep a
 console open so tracebacks are visible. PyInstaller must be installed in

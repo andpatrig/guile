@@ -122,6 +122,13 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.6**
+- `gui.package()` now bundles only the native pywebview backend for the platform, so a machine with PyQt or PySide installed no longer drags all of Qt into the build (`native_only=`, `exclude_modules=`).
+- `gui.package()` warns when building from the Anaconda base and suggests a clean venv; the docs no longer claim a separate environment is unnecessary.
+- Fix: PyInstaller `RecursionError` on Anaconda machines, caused by matplotlib's optional IPython import chain, which is now excluded.
+- Fix: apps built from a venv made with Anaconda's Python failed at launch with `DLL load failed while importing _ctypes`.
+- Fix: `gui.package()` crashed with `UnicodeEncodeError` when its output was redirected to a file.
+
 **v0.8.5**
 - **Fix: v0.8.4 is broken — do not use it.** Its inline JavaScript contained a stray `}` (a splice error in the draw-tools rewrite), so the script never parsed, `window._guile` was undefined, and every app rendered blank. The test suite now syntax-checks the inline script (`node --check`, with a bracket-balance fallback) so this cannot ship again.
 

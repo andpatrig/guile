@@ -1,4 +1,4 @@
-# guile — complete reference for AI assistants (v0.8.5)
+# guile — complete reference for AI assistants (v0.8.6)
 
 guile is a lightweight Python framework for desktop apps. One Python process
 opens a native window (pywebview: WebView2 on Windows, WKWebView on macOS).
@@ -313,8 +313,23 @@ callback prints a traceback and shows a danger toast.
 import guile as gui
 gui.package("my_app.py", name="MyApp", package_mode="onedir", windowed=True,
             icon=None, add_data=[("presets.yaml", ".")],
-            hidden_imports=None, output_dir="dist", install_missing=False)
+            hidden_imports=None, exclude_modules=None, native_only=True,
+            output_dir="dist", install_missing=False)
 # Wraps PyInstaller; requires `pip install pyinstaller` in the same env.
+# BUILD FROM A CLEAN VENV holding only the app's packages: PyInstaller
+# follows optional imports, so from a full Anaconda install the bundle can
+# reach several GB or fail (package() prints a note when it detects that).
+#   python -m venv build-env && build-env\Scripts\pip install guile pyinstaller <deps>
+#   build-env\Scripts\python build.py
+# Install packages normally there, never `pip install -e`: PyInstaller cannot
+# follow editable installs and the built app fails with ModuleNotFoundError.
+# native_only=True bundles only this platform's pywebview backend and
+# excludes the rest (and the Qt bindings on Windows/macOS) — otherwise a
+# machine with PyQt/PySide installed drags all of Qt in or the build fails
+# with "multiple Qt bindings". exclude_modules=["tkinter"] etc. slims further.
+# IPython/jedi/parso/docutils/sphinx/babel are always excluded (matplotlib
+# drags them in; their depth crashes PyInstaller with a RecursionError) and
+# PyInstaller runs with a raised recursion limit.
 # package_mode="onedir" (default) builds a folder — fewer antivirus false
 # positives, faster start; zip it or wrap it in an installer to share.
 # package_mode="onefile" builds a single self-contained executable instead.

@@ -303,7 +303,7 @@ pre {
 <nav id="sidebar">
   <div class="logo">
     <div class="logo-name">gui<span>le</span></div>
-    <div class="logo-sub">API reference v0.8.5</div>
+    <div class="logo-sub">API reference v0.8.6</div>
   </div>
   <div id="nav-links"></div>
 </nav>
@@ -744,6 +744,8 @@ const WIDGETS = [
      ["icon","str = None","Path to a .ico (Windows) or .icns (macOS)"],
      ["add_data","list = None","Extra runtime data files to bundle, as (src, dest) pairs"],
      ["hidden_imports","list = None","Modules imported dynamically that static analysis can't see"],
+     ["native_only","bool = True","Bundle only this platform's native pywebview backend (WebView2 / Cocoa / GTK-Qt) and exclude the others plus, on Windows and macOS, the Qt bindings. Prevents a machine with PyQt/PySide installed from dragging all of Qt into the build or failing with 'multiple Qt bindings'. False = PyInstaller's --collect-all webview."],
+     ["exclude_modules","list = None","Extra modules to leave out of the build, e.g. ['tkinter', 'scipy']. IPython, jedi, parso, docutils, sphinx and babel are always excluded: matplotlib drags them in, no desktop app uses them, and their import depth crashes PyInstaller's analysis with a RecursionError. PyInstaller is run with a raised recursion limit as well."],
      ["output_dir","str = 'dist'","Folder the executable is written to"],
      ["clean","bool = True","Pass --clean --noconfirm for a fresh unattended build"],
      ["install_missing","bool = False","pip install PyInstaller if absent instead of raising"],

@@ -543,8 +543,112 @@ def test_template_js_parses():
     return "bracket balance OK (node not found)"
 
 
+def test_package_native_backend_flags():
+    """gui.package() bundles only this platform's pywebview backend and
+    excludes the others (plus Qt bindings off Linux); native_only=False
+    restores --collect-all webview; exclude_modules pass through."""
+    import sys
+    cmd = gui.package("README.md", name="X", run=False)
+    pairs = lambda flag: [cmd[i + 1] for i, a in enumerate(cmd) if a == flag]
+    hidden, excl = pairs("--hidden-import"), pairs("--exclude-module")
+
+    assert "--collect-all" not in cmd
+    assert "webview" in pairs("--collect-data") and "webview" in pairs("--collect-binaries")
+    if sys.platform == "win32":
+        assert {"webview.platforms.winforms", "webview.platforms.edgechromium"} <= set(hidden)
+        assert {"webview.platforms.qt", "webview.platforms.cocoa",
+                "webview.platforms.gtk", "PyQt5", "PySide6"} <= set(excl)
+    elif sys.platform == "darwin":
+        assert "webview.platforms.cocoa" in hidden and "webview.platforms.winforms" in excl
+        assert "PyQt5" in excl
+    else:
+        assert {"webview.platforms.gtk", "webview.platforms.qt"} <= set(hidden)
+        assert "PyQt5" not in excl, "Linux may need Qt as its backend"
+    assert not (set(hidden) & set(excl)), "a backend is both kept and excluded"
+
+    # PyInstaller runs through a bootstrap that raises the recursion limit,
+    # and the matplotlib -> IPython -> sphinx chain is always excluded.
+    assert cmd[0] == sys.executable and cmd[1] == "-c"
+    assert "setrecursionlimit" in cmd[2] and "PyInstaller.__main__" in cmd[2]
+    assert {"IPython", "jedi", "sphinx", "docutils"} <= set(excl)
+
+    cmd2 = gui.package("README.md", name="X", run=False, native_only=False,
+                       exclude_modules=["tkinter"])
+    assert cmd2[cmd2.index("--collect-all") + 1] == "webview"
+    assert "--exclude-module" in cmd2 and "tkinter" in cmd2
+    assert "PyQt5" not in cmd2 and "IPython" in cmd2
+    return f"{len(hidden)} native backends kept, {len(excl)} modules excluded"
+
+
+def test_package_environment_hint():
+    """package() warns (without blocking) when building from a fat
+    environment - several heavy packages importable, or the Anaconda base -
+    and stays quiet in a clean venv. The note names the venv commands."""
+    from guile import _package as P
+    saved_heavy, saved_env = P._HEAVY, os.environ.get("CONDA_DEFAULT_ENV")
+    try:
+        os.environ["CONDA_DEFAULT_ENV"] = "not-base"    # not the conda base
+        P._HEAVY = ["os", "json"]                         # two "heavy" packages found
+        hint = P._environment_hint()
+        assert hint and "venv" in hint and "os, json" in hint, hint
+        assert all(ord(c) < 128 for c in hint), "hint must be ASCII"
+        P._HEAVY = ["no_such_package_xyz"]                # clean venv: nothing found
+        assert P._environment_hint() is None
+    finally:
+        P._HEAVY = saved_heavy
+        if saved_env is None:
+            os.environ.pop("CONDA_DEFAULT_ENV", None)
+        else:
+            os.environ["CONDA_DEFAULT_ENV"] = saved_env
+    return "hint shown for fat env, silent for clean venv"
+
+
+def test_package_conda_dll_path():
+    """On Windows, when the interpreter is conda-derived, the PyInstaller
+    subprocess gets <conda>\\Library\\bin on PATH so _ctypes/_lzma/_bz2 DLLs
+    resolve (a venv made from Anaconda's Python omits it and the built app
+    dies with 'DLL load failed while importing _ctypes')."""
+    import sys
+    from guile import _package as P
+    env = P._subprocess_env()
+    assert "PATH" in env
+    if os.name != "nt":
+        return "non-Windows: PATH untouched"
+    lib_bins = [os.path.join(p, "Library", "bin") for p in (sys.prefix, sys.base_prefix)
+                if os.path.isdir(os.path.join(p, "conda-meta"))]
+    if not lib_bins:
+        assert env["PATH"] == os.environ.get("PATH", "")
+        return "not a conda interpreter: PATH untouched"
+    head = env["PATH"].split(os.pathsep)[0]
+    assert head in lib_bins, f"expected conda Library\\bin first on PATH, got {head!r}"
+    return "conda Library/bin prepended for the build"
+
+
+def test_console_output_is_ascii():
+    """Every print()/SystemExit message in guile must be ASCII. With stdout
+    redirected to a file, Windows encodes prints with the locale codepage
+    (cp1252), and a character outside it raises UnicodeEncodeError — which is
+    how gui.package() crashed on its own progress line in v0.8.5 whenever a
+    build was logged to a file."""
+    import glob, re
+    bad = []
+    for f in glob.glob(os.path.join(_here, "guile", "*.py")):
+        for n, line in enumerate(open(f, encoding="utf-8"), 1):
+            s = line.strip()
+            if s.startswith("#"):
+                continue
+            if re.search(r"\b(print|SystemExit)\(", s) and any(ord(c) > 127 for c in s):
+                bad.append(f"{os.path.basename(f)}:{n}")
+    assert not bad, "non-ASCII in console output: " + ", ".join(bad)
+    return "all console strings ASCII"
+
+
 CORE_TESTS = [
     test_template_js_parses,
+    test_package_native_backend_flags,
+    test_package_environment_hint,
+    test_package_conda_dll_path,
+    test_console_output_is_ascii,
     test_batching_one_render,
     test_no_double_dispatch_on_typeerror,
     test_concurrent_events_serialize,
