@@ -556,27 +556,41 @@ function _guileSyncMaps() {
             var canvas = el.querySelector('.guile-map-canvas');
             if (!canvas) return;
             var map = L.map(canvas, {zoomControl: true}).setView(cfg.center, cfg.zoom);
+            // Image overlays get their own pane between the tile pane (200)
+            // and the overlay pane (400) so they always sit under GeoJSON
+            // vectors and markers, whatever order the layers were created.
+            map.createPane('guile-image');
+            map.getPane('guile-image').style.zIndex = 350;
             var lg = L.layerGroup().addTo(map);
             var entry = {
                 map: map, layerGroup: lg, cfgJson: cfgJson,
                 onClickCid: null, onMoveCid: null,
                 drawControl: null, drawnItems: null,
-                tileLayers: [], tilesJson: null
+                tileLayers: [], tilesJson: null,
+                overlayLayers: [], overlaysJson: null
             };
             _guileMaps[id] = entry;
             _guileApplyTiles(entry, cfg.tiles);
             entry.tilesJson = JSON.stringify(cfg.tiles || []);
+            _guileApplyOverlays(entry, cfg.layers);
+            entry.overlaysJson = JSON.stringify(cfg.layers || []);
             _guileAttachMapEvents(entry, cfg);
             _guileApplyMarkers(lg, cfg.markers || []);
         } else if (_guileMaps[id].cfgJson !== cfgJson) {
             var entry = _guileMaps[id];
             entry.map.setView(cfg.center, cfg.zoom);
-            // Rebuild tiles only when they actually changed, so panning /
-            // adding markers doesn't flash the base map.
+            // Rebuild tiles / overlays only when they actually changed, so
+            // panning or adding markers doesn't flash the base map or
+            // re-decode an embedded image.
             var newTilesJson = JSON.stringify(cfg.tiles || []);
             if (entry.tilesJson !== newTilesJson) {
                 _guileApplyTiles(entry, cfg.tiles);
                 entry.tilesJson = newTilesJson;
+            }
+            var newOverlaysJson = JSON.stringify(cfg.layers || []);
+            if (entry.overlaysJson !== newOverlaysJson) {
+                _guileApplyOverlays(entry, cfg.layers);
+                entry.overlaysJson = newOverlaysJson;
             }
             entry.layerGroup.clearLayers();
             _guileAttachMapEvents(entry, cfg);
@@ -598,6 +612,50 @@ function _guileApplyTiles(entry, tiles) {
         var layer = L.tileLayer(t.url, t.options || {});
         layer.addTo(entry.map);
         entry.tileLayers.push(layer);
+    });
+}
+
+// Replace an entry's overlay layers (gui.ImageOverlay / TileOverlay /
+// GeoJSON). Drawn in list order. Stacking is fixed by pane:
+//   base tiles (tilePane, zIndex 1) < tile overlays (tilePane, zIndex 10)
+//   < images (guile-image pane) < GeoJSON (overlayPane) < markers.
+function _guileApplyOverlays(entry, layers) {
+    (entry.overlayLayers || []).forEach(function(l) {
+        entry.map.removeLayer(l);
+    });
+    entry.overlayLayers = [];
+    (layers || []).forEach(function(cfg) {
+        var layer = null;
+        if (cfg.type === 'image') {
+            layer = L.imageOverlay(cfg.src, cfg.bounds,
+                                   {opacity: cfg.opacity, pane: 'guile-image'});
+        } else if (cfg.type === 'tiles') {
+            // zIndex 10 keeps the overlay above base tiles even after a
+            // base-map switch re-adds them.
+            layer = L.tileLayer(cfg.url,
+                                Object.assign({zIndex: 10}, cfg.options || {}));
+        } else if (cfg.type === 'geojson') {
+            layer = L.geoJSON(cfg.data, {
+                style: function() { return cfg.style || {}; },
+                onEachFeature: function(feature, lyr) {
+                    var props = feature.properties || {};
+                    if (cfg.popup && props[cfg.popup] !== undefined
+                            && props[cfg.popup] !== null) {
+                        lyr.bindPopup(String(props[cfg.popup]));
+                    }
+                    if (cfg.cid) {
+                        lyr.on('click', function(e) {
+                            L.DomEvent.stopPropagation(e); // not also map click
+                            _guile.trigger(cfg.cid, props);
+                        });
+                    }
+                }
+            });
+        }
+        if (layer) {
+            layer.addTo(entry.map);
+            entry.overlayLayers.push(layer);
+        }
     });
 }
 

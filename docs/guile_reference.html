@@ -303,7 +303,7 @@ pre {
 <nav id="sidebar">
   <div class="logo">
     <div class="logo-name">gui<span>le</span></div>
-    <div class="logo-sub">API reference v0.8.0</div>
+    <div class="logo-sub">API reference v0.8.1</div>
   </div>
   <div id="nav-links"></div>
 </nav>
@@ -628,8 +628,45 @@ const WIDGETS = [
      ["on_shape","Callable = None","on_shape(type, coords) — fires when a shape is drawn (requires draw=)"],
      ["draw","list|bool = False","Enable drawing tools: True for all, or list e.g. ['rectangle','polygon']"],
      ["tiles","str|dict|list = 'street'","Base map: 'street','satellite','hybrid','terrain','light','dark', a custom XYZ URL, or a {url, attribution, max_zoom} dict. Bind to a State to switch views live."],
+     ["layers","list = None","Overlay layers drawn in list order between the base tiles and markers: gui.ImageOverlay, gui.TileOverlay, gui.GeoJSON"],
      ["style","str = ''","Raw CSS on the map wrapper div"],
      ["key","str","Required — preserves map state between renders"],
+   ],
+   },
+
+  {cat:"Media", id:"ImageOverlay", name:"gui.ImageOverlay()", tag:"media",
+   desc:"A georeferenced raster draped on gui.leaflet(): a PNG/JPG plus the lat/lon box it covers. The image is stretched to fit the box, so it must be north-up. Local files are embedded in the page as base64 and re-sent on every render — keep them modest (a few MB). For large drone mosaics, pre-tile the image and use gui.TileOverlay instead.",
+   args:[
+     ["source","str|bytes","File path, URL, or raw PNG/JPG bytes"],
+     ["bounds","tuple","((south, west), (north, east)) corners in degrees"],
+     ["opacity","float = 1.0","0 = invisible, 1 = opaque. Bind to a State for a live slider."],
+   ],
+   },
+
+  {cat:"Media", id:"TileOverlay", name:"gui.TileOverlay()", tag:"media",
+   desc:"A pre-tiled image pyramid (XYZ/TMS tiles) drawn over the base map — the practical route for large drone mosaics. Tile once (gdal2tiles.py --xyz -z 14-21 mosaic.tif tiles/), serve the folder locally (python -m http.server 8000), and Leaflet streams only the tiles in view; guile never touches the full image.",
+   args:[
+     ["url","str","XYZ template with {z}/{x}/{y}, e.g. 'http://localhost:8000/tiles/{z}/{x}/{y}.png'"],
+     ["opacity","float = 1.0","Layer opacity"],
+     ["tms","bool = False","True if tiles use TMS row order (gdal2tiles' default when --xyz is omitted)"],
+     ["min_zoom","int = 0","Shallowest zoom level the tiles cover"],
+     ["max_zoom","int = 22","Deepest level the tiles were built to; zooming past it upscales the last level instead of blanking the layer"],
+     ["bounds","tuple = None","Optional ((south, west), (north, east)) — stops requests for tiles outside the mosaic"],
+     ["attribution","str = ''","Attribution text shown in the map corner"],
+   ],
+   },
+
+  {cat:"Media", id:"GeoJSON", name:"gui.GeoJSON()", tag:"media",
+   desc:"Vector features (points, lines, polygons) from GeoJSON drawn on gui.leaflet(). Each feature can show a popup and fire a Python callback with its properties when clicked (propagation to the map's own on_click is stopped).",
+   args:[
+     ["data","dict|str","A GeoJSON dict, a JSON string, or a path to a .geojson / .json file"],
+     ["color","str = '#3388ff'","Stroke colour"],
+     ["weight","float = 2","Stroke width in px"],
+     ["opacity","float = 1.0","Stroke opacity"],
+     ["fill_color","str = None","Fill colour; defaults to color"],
+     ["fill_opacity","float = 0.2","Fill opacity"],
+     ["popup","str|Callable = None","Property name to show when a feature is clicked, or a callable props -> str/HTML for custom content"],
+     ["on_click","Callable = None","on_click(properties) — fires with the clicked feature's properties dict"],
    ],
    },
 

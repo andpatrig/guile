@@ -1568,6 +1568,166 @@ class Marker:
                 "tooltip": self.tooltip, "cid": self._cid}
 
 
+# ── Map overlay layers — gui.leaflet(layers=[...]) ─────────────────────────
+# Each layer serialises to a dict with a "type" the JS map registry switches
+# on. Layers draw in list order, stacked between the base tiles and markers:
+#     base tiles < TileOverlay < ImageOverlay < GeoJSON < markers
+
+def _image_src(source) -> str:
+    """
+    Resolve an image source to something an <img> can load.
+
+    URLs and data: URIs pass through. Local paths and raw bytes become a
+    base64 data URI — the same route gui.figure() takes — because the
+    WebView page is loaded from a string and cannot fetch file:// paths.
+    """
+    import os, base64, mimetypes
+    if isinstance(source, (bytes, bytearray)):
+        raw  = bytes(source)
+        mime = "image/jpeg" if raw[:2] == b"\xff\xd8" else "image/png"
+        return f"data:{mime};base64," + base64.b64encode(raw).decode()
+    s = str(source)
+    if s.startswith(("http://", "https://", "data:")):
+        return s
+    if not os.path.isfile(s):
+        raise FileNotFoundError(f"ImageOverlay: image not found: {s}")
+    mime = mimetypes.guess_type(s)[0] or "image/png"
+    with open(s, "rb") as f:
+        return f"data:{mime};base64," + base64.b64encode(f.read()).decode()
+
+
+def _bounds(bounds) -> list:
+    """Validate ((south, west), (north, east)) and return it as floats."""
+    try:
+        (s, w), (n, e) = bounds
+        return [[float(s), float(w)], [float(n), float(e)]]
+    except (TypeError, ValueError):
+        raise ValueError(
+            "bounds must be ((south, west), (north, east)) in degrees, "
+            f"got {bounds!r}") from None
+
+
+class ImageOverlay:
+    """
+    A georeferenced raster draped on gui.leaflet(): a PNG/JPG plus the
+    lat/lon box it covers. Good for modest images (a field, a plot map);
+    for large drone mosaics pre-tile the image and use TileOverlay.
+
+        ImageOverlay("ndvi.png", bounds=((39.18, -96.60), (39.20, -96.56)),
+                     opacity=0.7)
+
+    source  file path, URL, or raw PNG/JPG bytes. Local files are embedded
+            in the page as base64 and re-sent on every render, so keep them
+            modest (a few MB at most).
+    bounds  ((south, west), (north, east)) corners in degrees — the image is
+            stretched to fit this box, so it must be north-up.
+    """
+    def __init__(self, source, bounds, *, opacity: float = 1.0):
+        self.source  = source
+        self.bounds  = _bounds(bounds)
+        self.opacity = opacity
+
+    def to_dict(self) -> dict:
+        return {"type": "image", "src": _image_src(self.source),
+                "bounds": self.bounds, "opacity": self.opacity}
+
+
+class TileOverlay:
+    """
+    A pre-tiled image pyramid (XYZ / TMS tiles) drawn over the base map.
+    This is the practical route for large drone mosaics: tile once with
+    gdal2tiles, serve the folder locally, and Leaflet streams only the
+    tiles in view — guile never touches the full image.
+
+        # once, in a terminal:
+        #     gdal2tiles.py --xyz -z 14-21 mosaic.tif tiles/
+        # in the app (or a separate terminal):
+        #     python -m http.server 8000
+        TileOverlay("http://localhost:8000/tiles/{z}/{x}/{y}.png",
+                    max_zoom=21, opacity=0.9,
+                    bounds=((39.18, -96.60), (39.20, -96.56)))
+
+    url          XYZ template with {z}/{x}/{y}. Any web server works,
+                 including Python's built-in http.server.
+    tms          True if the tiles use TMS row order (gdal2tiles' default
+                 when --xyz is omitted).
+    max_zoom     Deepest level your tiles were built to; zooming past it
+                 upscales the last level instead of blanking the layer.
+    bounds       Optional ((south, west), (north, east)) — stops Leaflet
+                 requesting tiles outside the mosaic (no 404 noise).
+    """
+    def __init__(self, url: str, *, opacity: float = 1.0, tms: bool = False,
+                 min_zoom: int = 0, max_zoom: int = 22,
+                 bounds=None, attribution: str = ""):
+        self.url = url
+        self.options = {"opacity": opacity, "tms": tms,
+                        "minZoom": min_zoom, "maxNativeZoom": max_zoom,
+                        "maxZoom": 24, "attribution": attribution}
+        if bounds is not None:
+            self.options["bounds"] = _bounds(bounds)
+
+    def to_dict(self) -> dict:
+        return {"type": "tiles", "url": self.url, "options": self.options}
+
+
+class GeoJSON:
+    """
+    Vector features (points, lines, polygons) from GeoJSON on gui.leaflet().
+
+        GeoJSON("plots.geojson", color="#e63946", fill_opacity=0.15,
+                popup="plot_id", on_click=lambda props: selected.set(props))
+
+    data       dict, JSON string, or path to a .geojson / .json file.
+    popup      property name shown when a feature is clicked, or a callable
+               props -> str/HTML for custom content.
+    on_click   on_click(properties) — the clicked feature's properties dict.
+               Propagation to the map's own on_click is stopped.
+    color, weight, opacity, fill_color, fill_opacity — Leaflet path style.
+    """
+    def __init__(self, data, *, color: str = "#3388ff", weight: float = 2,
+                 opacity: float = 1.0, fill_color: Optional[str] = None,
+                 fill_opacity: float = 0.2, popup=None,
+                 on_click: Optional[Callable] = None):
+        self.data  = self._load(data)
+        self.style = {"color": color, "weight": weight, "opacity": opacity,
+                      "fillColor": fill_color or color,
+                      "fillOpacity": fill_opacity}
+        self.popup = popup
+        self._cid  = None
+        if on_click:
+            self._cid = _next_id()
+            _reg(self._cid, on_click)
+
+    @staticmethod
+    def _load(data) -> dict:
+        import os, json
+        if isinstance(data, dict):
+            return data
+        s = str(data).strip()
+        if s.startswith(("{", "[")):
+            return json.loads(s)
+        if not os.path.isfile(s):
+            raise FileNotFoundError(f"GeoJSON: file not found: {s}")
+        with open(s, encoding="utf-8") as f:
+            return json.load(f)
+
+    def to_dict(self) -> dict:
+        data, popup_key = self.data, self.popup
+        if callable(self.popup):
+            # Pre-render popups in Python and stash one on each feature so
+            # the JS side only has to read a property.
+            import copy
+            data  = copy.deepcopy(self.data)
+            feats = data.get("features", [data])
+            for f in feats:
+                props = f.get("properties") or {}
+                props["_guile_popup"] = self.popup(props)
+                f["properties"] = props
+            popup_key = "_guile_popup"
+        return {"type": "geojson", "data": data, "style": self.style,
+                "popup": popup_key, "cid": self._cid}
+
+
 class _Map(_Leaf):
     """
     Interactive Leaflet map. Requires internet for tile loading.
@@ -1605,6 +1765,12 @@ class _Map(_Leaf):
 
     All presets use keyless public tile servers (no API token needed) and
     require internet. Switch views live by binding tiles to a State.
+
+    Overlay layers (drawn in list order, between base tiles and markers):
+        layers=[ImageOverlay(...), TileOverlay(...), GeoJSON(...)]
+        ImageOverlay — a PNG/JPG stretched over a lat/lon box
+        TileOverlay  — a pre-tiled pyramid (large drone mosaics)
+        GeoJSON      — vector features with style, popup and on_click
     """
     _DRAW_ALL = ["rectangle", "polygon", "polyline", "circle", "marker"]
 
@@ -1692,11 +1858,13 @@ class _Map(_Leaf):
                  on_move:  Optional[Callable] = None,
                  on_shape: Optional[Callable] = None,
                  draw: Any = False, tiles: Any = "street",
+                 layers: Optional[list] = None,
                  style: str = "", key: Optional[str] = None):
         self._center   = center
         self._zoom     = zoom
         self._height   = height
         self._markers  = markers or []
+        self._layers   = layers or []
         self._on_click = on_click
         self._on_move  = on_move
         self._on_shape = on_shape
@@ -1747,6 +1915,8 @@ class _Map(_Leaf):
             "on_shape_cid": self._on_shape_cid,
             "draw":         self._draw,
             "tiles":        self._tiles,
+            "layers":       [l.to_dict() if hasattr(l, "to_dict") else l
+                             for l in self._layers],
         }
         cfg_json = _esc(json.dumps(cfg))
         return (f'<div id="{self.id}" class="guile-map"'

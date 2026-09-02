@@ -46,7 +46,7 @@ from .ui import (
     _Button, _Input, _NumberInput, _TextArea, _Checkbox, _Select, _MultiSelect, _Slider,
     _DateInput, _DateTimeInput, _FilePicker, _Tabs,
     # Media
-    _Figure, _Map, Marker,
+    _Figure, _Map, Marker, ImageOverlay, TileOverlay, GeoJSON,
     # Data
     _Table,
     # Overlay
@@ -432,9 +432,24 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
             on_move:   Optional[Callable] = None,
             on_shape:  Optional[Callable] = None,
             draw: Any = False, tiles: Any = "street",
+            layers: Optional[list] = None,
             style: str = "", key: Optional[str] = None) -> _Map:
     """
     Embed an interactive Leaflet map. Requires internet for tile loading.
+
+    Overlay layers — drawn in list order between the base tiles and markers:
+        layers=[
+            gui.ImageOverlay("ndvi.png",            # PNG/JPG over a lat/lon box
+                             bounds=((39.18, -96.60), (39.20, -96.56)),
+                             opacity=0.7),
+            gui.TileOverlay("http://localhost:8000/tiles/{z}/{x}/{y}.png",
+                            max_zoom=21),           # pre-tiled drone mosaic
+            gui.GeoJSON("plots.geojson", color="#e63946", popup="plot_id",
+                        on_click=lambda props: selected.set(props)),
+        ]
+    ImageOverlay embeds the file in the page — keep it modest. For large
+    imagery tile it once (gdal2tiles) and serve the folder with
+    `python -m http.server`; TileOverlay then streams only the tiles in view.
 
     Callbacks:
         on_click(lat, lon)      — fires when the user clicks the map background
@@ -484,7 +499,7 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
     return _Map(center=center, zoom=zoom, height=height,
                 markers=markers, on_click=on_click, on_move=on_move,
                 on_shape=on_shape, draw=draw, tiles=tiles,
-                style=style, key=key)
+                layers=layers, style=style, key=key)
 
 
 

@@ -373,6 +373,58 @@ def test_llms_docs_in_sync():
     return f"{len(blocks)} blocks compile; 2 examples exec + render"
 
 
+def test_map_layers_render():
+    """gui.leaflet(layers=[...]) serialises ImageOverlay / TileOverlay /
+    GeoJSON into the map config, and a GeoJSON on_click receives the
+    clicked feature's properties."""
+    import json, html as _h
+
+    clicked = []
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16      # header is enough to encode
+    geo = {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "properties": {"plot_id": "P1"},
+         "geometry": {"type": "Point", "coordinates": [-96.58, 39.19]}}]}
+
+    def build():
+        gui.leaflet(center=(39.19, -96.58), key="m", layers=[
+            gui.ImageOverlay(png, bounds=((39.18, -96.60), (39.20, -96.56)),
+                             opacity=0.5),
+            gui.TileOverlay("http://localhost:8000/{z}/{x}/{y}.png",
+                            max_zoom=21, tms=True),
+            gui.GeoJSON(geo, popup=lambda p: f"<b>{p['plot_id']}</b>",
+                        on_click=clicked.append),
+        ])
+
+    reset_globals()
+    html, cids = render_ui(build)
+    m = __import__("re").search(r'data-guile-map="([^"]+)"', html)
+    assert m, "map config attribute missing"
+    cfg = json.loads(_h.unescape(m.group(1)))
+    types = [l["type"] for l in cfg["layers"]]
+    assert types == ["image", "tiles", "geojson"], types
+
+    img, tiles, gj = cfg["layers"]
+    assert img["src"].startswith("data:image/png;base64,"), img["src"][:30]
+    assert img["bounds"] == [[39.18, -96.6], [39.2, -96.56]]
+    assert tiles["options"]["tms"] is True
+    assert tiles["options"]["maxNativeZoom"] == 21
+    assert gj["popup"] == "_guile_popup"
+    assert gj["data"]["features"][0]["properties"]["_guile_popup"] == "<b>P1</b>"
+    assert "_guile_popup" not in geo["features"][0]["properties"], \
+        "callable popup must not mutate the caller's GeoJSON"
+
+    dispatch(gj["cid"], {"plot_id": "P1"})
+    assert clicked == [{"plot_id": "P1"}], clicked
+
+    # Bad bounds fail loudly at construction, not at render.
+    try:
+        gui.ImageOverlay(png, bounds=(1, 2, 3, 4))
+        assert False, "expected ValueError for malformed bounds"
+    except ValueError:
+        pass
+    return "3 layer types serialised; GeoJSON click delivers properties"
+
+
 CORE_TESTS = [
     test_batching_one_render,
     test_no_double_dispatch_on_typeerror,
@@ -383,6 +435,7 @@ CORE_TESTS = [
     test_task_keeps_ui_responsive,
     test_dev_hot_reload,
     test_llms_docs_in_sync,
+    test_map_layers_render,
 ]
 
 
@@ -522,6 +575,7 @@ EXAMPLES = [
     "soils_lab.py",
     "soil_water_retention.py",
     "field_notes.py",
+    "map_overlays.py",
 ]
 
 

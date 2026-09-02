@@ -197,7 +197,7 @@ gui.figure(fig, dpi=96, width="100%", caption=None, transparent=True,
     # Use matplotlib.use("Agg") before pyplot import.
 gui.leaflet(center=(lat, lon), zoom=10, height=380, markers=[...],
             on_click=None, on_move=None, on_shape=None, draw=False,
-            tiles="street", key="map")
+            tiles="street", layers=None, key="map")
     # Interactive map (needs internet for tiles). ALWAYS set key=.
     # markers: [gui.Marker((lat, lon), popup="...", tooltip="...",
     #                      on_click=fn)]  — construct Markers inside ui().
@@ -205,6 +205,25 @@ gui.leaflet(center=(lat, lon), zoom=10, height=380, markers=[...],
     # on_shape(type, coords) with draw=True or draw=["rectangle","polygon",
     # "polyline","circle","marker"].
     # tiles: "street"|"satellite"|"hybrid"|"terrain"|"light"|"dark"|url|dict
+    # layers: overlay list drawn in order between base tiles and markers —
+    #   base tiles < TileOverlay < ImageOverlay < GeoJSON < markers
+gui.ImageOverlay(source, bounds=((south, west), (north, east)), opacity=1.0)
+    # Drape a PNG/JPG (path, URL, or bytes) over a lat/lon box. Must be
+    # north-up. Embedded as base64 and re-sent each render — keep it modest
+    # (a few MB). Bring your own PNG: guile does not read GeoTIFFs.
+gui.TileOverlay(url, opacity=1.0, tms=False, min_zoom=0, max_zoom=22,
+                bounds=None, attribution="")
+    # Pre-tiled pyramid for LARGE imagery (drone mosaics). Tile once with
+    # `gdal2tiles.py --xyz -z 14-21 mosaic.tif tiles/`, serve the folder with
+    # `python -m http.server 8000`, then url="http://localhost:8000/tiles/{z}/{x}/{y}.png".
+    # max_zoom = deepest level built (past it the last level upscales).
+    # tms=True if gdal2tiles ran without --xyz. bounds= avoids 404s outside it.
+gui.GeoJSON(data, color="#3388ff", weight=2, opacity=1.0, fill_color=None,
+            fill_opacity=0.2, popup=None, on_click=None)
+    # Vector features from a dict, JSON string, or .geojson path.
+    # popup: property name, or callable props -> HTML str.
+    # on_click(properties) fires with the clicked feature's properties dict
+    # (map on_click is NOT also fired). Construct inside ui() like Markers.
 gui.notify(message, variant="success", duration=3.0)
     # Toast notification. Call from CALLBACKS only, never inside ui().
     # variant: success|danger|warning|primary|neutral

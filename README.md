@@ -55,7 +55,7 @@ While building a UI, use `gui.run(dev=True)`: guile watches your script and relo
 - `with gui.card():` / `with gui.col():` / `with gui.row():` — layout containers; everything indented goes inside
 - `gui.button()`, `gui.slider()`, `gui.input()`, `gui.table()` — widgets that take `on_click=` or return their current value
 - `gui.figure(fig)` — embed a matplotlib figure inline
-- `gui.leaflet(center, markers=...)` — embed an interactive map
+- `gui.leaflet(center, markers=..., layers=...)` — embed an interactive map; drape a georeferenced image (`gui.ImageOverlay`), a pre-tiled drone mosaic (`gui.TileOverlay`), or vector features (`gui.GeoJSON`) over it
 - `gui.task(fn, on_done=...)` — run slow work on a background thread; the window stays responsive
 - `gui.run()` — opens the window; `gui.run(dev=True)` adds hot reload while you build
 - `gui.package("my_app.py")` — build a shareable executable in one call
@@ -78,6 +78,7 @@ While building a UI, use `gui.run(dev=True)`: guile watches your script and relo
 | `upload_weather_data.py`  | File picker, DataFrame, table                |
 | `canopeo.py`              | Image analysis                               |
 | `map_draw.py`             | Leaflet with draw tools                      |
+| `map_overlays.py`         | Image overlay + GeoJSON on a map             |
 
 ---
 
@@ -120,6 +121,9 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.1**
+- Map overlay layers: `gui.leaflet(layers=[...])` accepts `gui.ImageOverlay(png, bounds=...)` to drape a georeferenced PNG/JPG, `gui.TileOverlay(url)` for a pre-tiled pyramid (the practical route for large drone mosaics — tile with gdal2tiles, serve with `python -m http.server`), and `gui.GeoJSON(data, popup=, on_click=)` for vector features with a per-feature click callback. See `examples/map_overlays.py`.
+
 **v0.8.0**
 - `gui.package()` now defaults to `package_mode="onedir"` (a folder holding the executable and its libraries) instead of a single file. Onedir draws fewer antivirus/SmartScreen false positives and starts faster — zip it or wrap it in an installer to share. Pass `package_mode="onefile"` for the old single-executable behavior. This replaces the `onefile=` argument.
 
