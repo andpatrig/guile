@@ -127,10 +127,8 @@ class _App:
         # loader in _template.py.
         try:
             _reset_render()
-            root = self._make_root()
-            root.__enter__()
-            self._build()
-            root.__exit__(None, None, None)
+            with self._make_root():
+                self._build()
         except Exception:
             pass
 
@@ -235,14 +233,13 @@ class _App:
             return
         try:
             _reset_render()
-            root = self._make_root()
-            root.__enter__()
-            self._loop_guard = False
-            self._in_render  = True
-            try:
-                self._build()
-            finally:
-                self._in_render = False
+            with self._make_root() as root:
+                self._loop_guard = False
+                self._in_render  = True
+                try:
+                    self._build()
+                finally:
+                    self._in_render = False
             if self._loop_guard:
                 raise RuntimeError(
                     "A state value was changed inside ui() — a .set(), "
@@ -250,7 +247,6 @@ class _App:
                     "ui() should only read state and build widgets; move the "
                     "change into an on_click= or on_change= callback instead."
                 )
-            root.__exit__(None, None, None)
             _commit_callbacks()
             js = f"window._guile.update({json.dumps(root.render())})"
             self._window.evaluate_js(js)

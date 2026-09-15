@@ -122,6 +122,9 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.8**
+- Improved root-container cleanup
+
 **v0.8.7**
 - Fix: a progress bar inside a height-constrained column could shrink to nothing; the track now has `flex-shrink: 0`.
 
