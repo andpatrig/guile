@@ -1316,8 +1316,10 @@ class _FilePicker(_Leaf):
         dis_attr  = ' disabled' if self._disabled else ""
         dis_style = (self._style + ";opacity:.45;cursor:not-allowed"
                      if self._disabled else self._style)
+        folder = _svg_shell(_ICON_FOLDER, size=16)
         return (f'<button id="{self.id}" class="guile-btn guile-btn-secondary"'
-                f' style="{dis_style}" onclick="{js}"{dis_attr}>📁 {lbl_html}</button>')
+                f' style="{dis_style}" onclick="{js}"{dis_attr}>'
+                f'{folder}{lbl_html}</button>')
 
 
 class _Tabs(_Leaf):
@@ -1383,6 +1385,27 @@ class _Tabs(_Leaf):
 
 # ── Icons ────────────────────────────────────────────────────────────────────
 
+def _svg_shell(inner: str, *, size: int = 24, stroke: float = 2.0,
+               style: str = "") -> str:
+    """Wrap Lucide inner markup in the standard <svg> shell (currentColor,
+    24x24 viewBox). Shared by gui.icon() and the built-in chrome icons."""
+    _sz = _px(size)
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" class="guile-icon" '
+            f'width="{_sz}" height="{_sz}" viewBox="0 0 24 24" fill="none" '
+            f'stroke="currentColor" stroke-width="{stroke}" '
+            f'stroke-linecap="round" stroke-linejoin="round" '
+            f'style="{style}">{inner}</svg>')
+
+
+# A handful of Lucide paths inlined for guile's own chrome (file picker button,
+# modal close). Kept literal — not looked up through _lucide_data — so those
+# widgets never pull the full ~2100-icon dataset into memory.
+_ICON_FOLDER = ('<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 '
+                '1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 '
+                '0 0 2 2Z" />')
+_ICON_X = '<path d="M18 6 6 18" /><path d="m6 6 12 12" />'
+
+
 def _icon_svg(name: str, *, size: int = 24, stroke: float = 2.0,
               style: str = "") -> str:
     """Return the inline SVG markup for a bundled Lucide icon.
@@ -1400,12 +1423,7 @@ def _icon_svg(name: str, *, size: int = 24, stroke: float = 2.0,
         suffix = f" Did you mean: {', '.join(hint)}?" if hint else ""
         raise ValueError(f"unknown icon {name!r}.{suffix} "
                          f"See https://lucide.dev/icons for the full set.")
-    _sz = _px(size)
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" class="guile-icon" '
-            f'width="{_sz}" height="{_sz}" viewBox="0 0 24 24" fill="none" '
-            f'stroke="currentColor" stroke-width="{stroke}" '
-            f'stroke-linecap="round" stroke-linejoin="round" '
-            f'style="{style}">{inner}</svg>')
+    return _svg_shell(inner, size=size, stroke=stroke, style=style)
 
 
 # ── Button rail ──────────────────────────────────────────────────────────────
@@ -2128,7 +2146,7 @@ class _Modal(_Container):
     Use as a context manager — put any guile widgets inside, including buttons.
 
     When visible=False the modal is not rendered (zero DOM footprint).
-    Always supply on_close= so the backdrop click and ✕ button work.
+    Always supply on_close= so the backdrop click and close button work.
 
         confirm = gui.state(False)
 
@@ -2164,8 +2182,9 @@ class _Modal(_Container):
                       if self._on_close else "")
         close_btn  = (f'<button onclick="{close_js}" '
                       f'style="background:none;border:none;cursor:pointer;'
-                      f'font-size:18px;color:var(--text-2);padding:0;'
-                      f'line-height:1">✕</button>') if self._on_close else ""
+                      f'display:flex;align-items:center;color:var(--text-2);'
+                      f'padding:0">{_svg_shell(_ICON_X, size=18)}</button>'
+                      ) if self._on_close else ""
         title_html = (f'<div style="display:flex;justify-content:space-between;'
                       f'align-items:center;margin-bottom:16px">'
                       f'<span style="font-size:16px;font-weight:600">'
