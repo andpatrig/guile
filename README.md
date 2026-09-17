@@ -122,6 +122,9 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.8.9**
+- Map fix: with `drawn=` and `on_shape_click`, clicking a shape while the draw toolbar's delete (or edit) tool was active also fired the click callback; if that re-render changed the list (e.g. a selection style), every shape was rebuilt, so the shape just deleted popped back and edit handles were lost. Rebuilds are now held while a tool is active and the latest list is applied on Save or Cancel, and shape clicks made while a tool is active belong to the tool and no longer fire `on_shape_click`.
+
 **v0.8.8**
 - Improved root-container cleanup
 

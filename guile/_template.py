@@ -534,6 +534,29 @@ function _guileAttachMapEvents(entry, cfg) {
                 _guile.trigger(entry.shapeDeleteCid, {id: l._guileId || null});
             });
         });
+        // While the edit / delete toolbar is active Leaflet.draw owns the
+        // layers: it tracks pending edits / removals until Save or Cancel.
+        // Rebuilding drawn= in that window (any re-render that changes the
+        // list, e.g. a selection style set from on_shape_click) makes a shape
+        // the user just deleted pop back and throws away edit handles.
+        // _guileApplyDrawn parks the list while drawBusy is set; the latest
+        // one is applied when the tool ends.
+        map.on('draw:editstart draw:deletestart', function() {
+            entry.drawBusy = true;
+        });
+        map.on('draw:editstop draw:deletestop', function() {
+            entry.drawBusy = false;
+            // On Save, draw:edited / draw:deleted fired just before this and
+            // Python's re-render is on its way; it supersedes the parked list
+            // (which still holds the deleted shapes). Wait briefly so those
+            // shapes do not flicker back; on Cancel the parked list applies.
+            setTimeout(function() {
+                if (entry.drawBusy || !entry.pendingDrawn) return;
+                var parked = entry.pendingDrawn;
+                entry.pendingDrawn = null;
+                _guileApplyDrawn(entry, parked);
+            }, 300);
+        });
     }
 }
 
@@ -587,6 +610,11 @@ function _guileLabel(layer, text) {
 // Rebuild the drawn layer from Python's list (drawn=). Called only when
 // the list or draw_style actually changed.
 function _guileApplyDrawn(entry, cfg) {
+    if (entry.drawBusy) {            // edit / delete tool active: see above
+        entry.pendingDrawn = cfg;
+        return;
+    }
+    entry.pendingDrawn = null;
     var items = _guileDrawnItems(entry);
     items.clearLayers();
     (cfg.drawn || []).forEach(function(shape) {
@@ -597,6 +625,7 @@ function _guileApplyDrawn(entry, cfg) {
         layer._guileType = shape.type;
         if (shape.label) _guileLabel(layer, shape.label);
         layer.on('click', function(e) {
+            if (entry.drawBusy) return;            // the draw tool owns this click
             if (!entry.shapeClickCid) return;      // let map on_click fire
             L.DomEvent.stopPropagation(e);
             _guile.trigger(entry.shapeClickCid, {id: shape.id});
