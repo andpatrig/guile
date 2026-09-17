@@ -1,4 +1,4 @@
-# guile — complete reference for AI assistants (v0.8.7)
+# guile — complete reference for AI assistants (v0.9.0)
 
 guile is a lightweight Python framework for desktop apps. One Python process
 opens a native window (pywebview: WebView2 on Windows, WKWebView on macOS).
@@ -139,6 +139,12 @@ gui.badge(text, variant="primary", style="", key=None)
     # variant: primary|success|danger|warning|neutral
 gui.progress(value, max=100, color=None)  # bar from 0..max; max=0 shows empty
 gui.html(raw)                             # raw HTML escape hatch (also <style>)
+svg = gui.icon("home", size=24, stroke=2.0, style="")
+    # Returns inline SVG for one of ~2100 bundled Lucide icons (lucide.dev/icons;
+    # vendored, no CDN). Strokes in currentColor, so it inherits text colour.
+    # Renders ONLY inside a gui.rail() item or wrapped in gui.html() — text
+    # widgets (gui.text/gui.button) escape content. Raises ValueError on a bad
+    # name. Pass your own <svg> string anywhere an icon is expected.
 ```
 
 ## Input widgets
@@ -182,6 +188,15 @@ tab = gui.tabs(["Overview", "Data"], value=None, on_change=None, key="tabs")
     #   if tab == "Overview": ...
     # For programmatic switching bind a State: gui.tabs([...], value=active,
     # on_change=active.set, key="t") then read active.value in conditions.
+page = gui.rail([{"label": "Home", "icon": gui.icon("home")},
+                 {"label": "Data", "icon": gui.icon("table")}],
+                orientation="vertical", border=False,
+                value=None, on_change=None, key="nav")
+    # Icon+label navigation rail — a compact tab alternative for cramped
+    # sidebars. Same contract as gui.tabs(): returns the active value as a
+    # plain string, if/elif on it. orientation "vertical" (default) or
+    # "horizontal"; border=True wraps it in a subtle themed panel. Items may be
+    # bare label strings; give an explicit "value" if labels would collide.
 ```
 
 ## Data, media, overlays

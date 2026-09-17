@@ -122,6 +122,11 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.9.0**
+- **`gui.rail()` — icon + label button rail.** A compact navigation control for fitting many destinations in a narrow sidebar (`orientation="vertical"`, the default) or a toolbar (`orientation="horizontal"`). Works like `gui.tabs()` — returns the active item's value, manages its own state (pass `key=`), and binds to a `State` via `value=` for programmatic switching. Each item is a dict with a `label` and optional `icon`. Pass `border=True` to wrap it in a subtle themed panel. See `examples/icon_rail.py`.
+- **`gui.icon()` — bundled Lucide icon set.** Returns inline SVG markup for any of ~2100 [Lucide](https://lucide.dev/icons) icons (`gui.icon("home")`), for use in a rail item, a button label, a title, or `gui.html()`. Icons stroke in `currentColor`, so they inherit the surrounding text colour. No CDN and no runtime dependency — the icon data is vendored and imported lazily, so apps that never call `icon()` pay nothing. You can still pass your own `<svg>` string anywhere an icon is expected.
+- Added a `LICENSE` file (guile is MIT); it also carries the ISC/MIT attribution for the vendored Lucide/Feather icons.
+
 **v0.8.9**
 - Map fix: with `drawn=` and `on_shape_click`, clicking a shape while the draw toolbar's delete (or edit) tool was active also fired the click callback; if that re-render changed the list (e.g. a selection style), every shape was rebuilt, so the shape just deleted popped back and edit handles were lost. Rebuilds are now held while a tool is active and the latest list is applied on Save or Cancel, and shape clicks made while a tool is active belong to the tool and no longer fire `on_shape_click`.
 

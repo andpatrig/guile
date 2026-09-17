@@ -262,7 +262,7 @@ tr:last-child td { border-bottom: none; }
     <div class="title-desc">Build lightweight desktop apps with plain Python.</div>
     <div class="title-meta">
       <div class="row"><span class="k">install</span><code>pip install guile</code></div>
-      <div class="row"><span class="k">version</span><span>v0.8.8</span></div>
+      <div class="row"><span class="k">version</span><span>v0.9.0</span></div>
       <div class="row"><span class="k">requires</span><span>Python ≥ 3.9</span></div>
     </div>
     <div class="title-meta">
@@ -515,6 +515,16 @@ gui.<span class="fn">theme</span>(<span class="st">"light"</span>, primary=<span
         <td class="dim">returns active tab as <code>str</code> — always add <code>key=</code></td>
       </tr>
       <tr>
+        <td><code>gui.rail()</code></td>
+        <td><code>items</code> <code>orientation</code> <code>border</code> <code>value</code> <code>on_change</code> <code>key</code></td>
+        <td class="dim">icon+label nav for cramped sidebars; <code>items=[{"label","icon"}]</code> → active <code>str</code></td>
+      </tr>
+      <tr>
+        <td><code>gui.icon()</code></td>
+        <td><code>name</code> <code>size=24</code> <code>stroke=2.0</code> <code>style</code></td>
+        <td class="dim">inline SVG for a Lucide icon; use in a rail item or <code>gui.html()</code></td>
+      </tr>
+      <tr>
         <td><code>gui.table()</code></td>
         <td><code>data</code> <code>columns</code> <code>max_rows=2000</code></td>
         <td class="dim">DataFrame / list of dicts / 2-D list / numpy array</td>
@@ -543,7 +553,7 @@ gui.<span class="fn">theme</span>(<span class="st">"light"</span>, primary=<span
 
 <div class="footer">
   <span>guile — lightweight Python desktop UI &nbsp;·&nbsp; <strong>pip install guile</strong></span>
-  <span>v0.8.8</span>
+  <span>v0.9.0</span>
 </div>
 
 </body>

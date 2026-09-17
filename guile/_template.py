@@ -208,6 +208,31 @@ body {
 .guile-tab-active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 .guile-tab-btn:focus-visible { box-shadow: inset 0 0 0 2px rgba(99,102,241,.3); }
 
+/* ── Icon ───────────────────────────────────────────────────────────────── */
+.guile-icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+
+/* ── Button rail (icon + label navigation) ──────────────────────────────── */
+.guile-rail { display: flex; gap: 4px; }
+.guile-rail-horizontal { flex-direction: row; overflow-x: auto; }
+.guile-rail-vertical   { flex-direction: column; }
+.guile-rail-bordered {
+    border: 1px solid var(--border); border-radius: var(--r); padding: 6px;
+    background: var(--surface);
+}
+.guile-rail-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 8px 10px; min-width: 60px;
+    background: none; border: none; border-radius: var(--r-sm);
+    color: var(--text-2); cursor: pointer; font-family: inherit;
+    white-space: nowrap; user-select: none; outline: none;
+    transition: color var(--t), background var(--t);
+}
+.guile-rail-btn svg { width: 22px; height: 22px; }
+.guile-rail-label { font-size: 11px; font-weight: 500; line-height: 1.15; }
+.guile-rail-btn:hover:not(.guile-rail-active) { color: var(--text); background: var(--surface-2); }
+.guile-rail-active { color: var(--primary); background: var(--primary-light); font-weight: 600; }
+.guile-rail-btn:focus-visible { box-shadow: inset 0 0 0 2px rgba(99,102,241,.3); }
+
 /* ── Leaflet map container ──────────────────────────────────────────────── */
 /* Imperative toast injected by gui.notify() — no render cycle */
 .guile-notify {

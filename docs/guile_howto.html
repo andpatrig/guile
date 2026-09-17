@@ -132,6 +132,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);
   <a href="#callbacks-args">Passing arguments</a>
   <div class="nav-cat">Patterns</div>
   <a href="#pattern-tabs">Tabs</a>
+  <a href="#pattern-rail">Button rails &amp; icons</a>
   <a href="#pattern-structure">Structuring larger UIs</a>
   <div class="nav-cat">App lifecycle</div>
   <a href="#after-run">When the window closes</a>
@@ -1348,6 +1349,82 @@ gui.run()</pre>
 <p>When using an external state, read <code>active.value</code> in the
 panel conditions (not the return value of <code>gui.tabs()</code>, which
 is only the initial value in that render).</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" id="pattern-rail">
+<h2>Button rails &amp; icons</h2>
+
+<p>When a tab strip has too many destinations for the width you have —
+a common squeeze in a sidebar — reach for <code>gui.rail()</code>. It
+stacks an icon over a short label and works exactly like
+<code>gui.tabs()</code>: it returns the active item's value as a plain
+string and manages its own state, so a plain <code>if/elif</code> block
+switches the panel. Pass <code>orientation="vertical"</code> (the default)
+for a sidebar, or <code>"horizontal"</code> for a toolbar.</p>
+
+<p>Each item is a dict with a <code>label</code> and an optional
+<code>icon</code>. The icon is any SVG string; <code>gui.icon("name")</code>
+returns one from the bundled <a href="https://lucide.dev/icons">Lucide</a>
+set (~2100 icons, vendored — no network, no dependency).</p>
+
+<pre>import guile as gui
+
+@gui.app("Rail demo", width=720, height=480)
+def ui():
+    with gui.row(gap=0, style="height:100vh"):
+
+        # A vertical rail makes a compact sidebar.
+        with gui.col(padding=10, style="background:var(--surface-2);"
+                                        "border-right:1px solid var(--border)"):
+            page = gui.rail([
+                {"label": "Home", "icon": gui.icon("home")},
+                {"label": "Data", "icon": gui.icon("table")},
+                {"label": "Map",  "icon": gui.icon("map")},
+            ], key="nav")
+
+        # The main panel is a plain if/elif on the active value.
+        with gui.col(padding=24, gap=14, fill=True):
+            if page == "Home":
+                gui.title("Home")
+            elif page == "Data":
+                gui.table(records)
+            elif page == "Map":
+                gui.leaflet(center=(39.2, -96.6), key="m")
+
+gui.run()</pre>
+
+<div class="note">
+  <code>gui.icon()</code> returns raw SVG markup, so it renders only where
+  markup is inserted verbatim: inside a <code>gui.rail()</code> item, or
+  wrapped in <code>gui.html()</code>. Text widgets such as
+  <code>gui.text()</code> and <code>gui.button()</code> escape their
+  content, so an icon passed there would appear as literal markup.
+</div>
+
+<h3>Sizing, colour, and a subtle border</h3>
+
+<p>Icons stroke in <code>currentColor</code>, so they inherit the
+surrounding text colour — an active rail item automatically turns the
+theme's primary colour. Recolour or resize a standalone icon through
+<code>size=</code>, <code>stroke=</code>, and <code>style=</code>. Pass
+<code>border=True</code> to wrap a rail in a subtle themed panel (handy for
+a standalone rail that isn't already inside a bordered sidebar).</p>
+
+<pre># A horizontal toolbar with a border, plus bare-string items (no icon)
+view = gui.rail(["Bars", "Lines", "Area"],
+                orientation="horizontal", border=True, key="view")
+
+# A standalone icon, resized and recoloured, via gui.html()
+gui.html(gui.icon("triangle-alert", size=18,
+                  style="color:var(--danger)"))</pre>
+
+<p>For programmatic switching, bind <code>value=</code> to a
+<code>State</code> and read <code>state.value</code> in the panel
+conditions — the same pattern as <a href="#pattern-tabs">tabs</a>. If two
+items would share a label (for example, icon-only items), give each an
+explicit <code>value</code> key. See <code>examples/icon_rail.py</code> for
+a full showcase with an icon gallery.</p>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->

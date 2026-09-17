@@ -1381,6 +1381,108 @@ class _Tabs(_Leaf):
                 f'</div>')
 
 
+# ── Icons ────────────────────────────────────────────────────────────────────
+
+def _icon_svg(name: str, *, size: int = 24, stroke: float = 2.0,
+              style: str = "") -> str:
+    """Return the inline SVG markup for a bundled Lucide icon.
+
+    The icon data (guile/_lucide_data.py) is imported lazily on first use, so
+    apps that never call gui.icon() pay nothing at import time. Icons draw with
+    stroke="currentColor", so they inherit the surrounding text colour — pass
+    style="color:#e11" (or let a parent set it) to recolour.
+    """
+    from ._lucide_data import ICONS          # lazy: ~420 KB parsed once
+    inner = ICONS.get(name)
+    if inner is None:
+        import difflib
+        hint = difflib.get_close_matches(name, ICONS.keys(), n=3)
+        suffix = f" Did you mean: {', '.join(hint)}?" if hint else ""
+        raise ValueError(f"unknown icon {name!r}.{suffix} "
+                         f"See https://lucide.dev/icons for the full set.")
+    _sz = _px(size)
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" class="guile-icon" '
+            f'width="{_sz}" height="{_sz}" viewBox="0 0 24 24" fill="none" '
+            f'stroke="currentColor" stroke-width="{stroke}" '
+            f'stroke-linecap="round" stroke-linejoin="round" '
+            f'style="{style}">{inner}</svg>')
+
+
+# ── Button rail ──────────────────────────────────────────────────────────────
+
+class _Rail(_Leaf):
+    """
+    Icon + label navigation rail — a compact alternative to a tab strip when
+    many destinations must fit a narrow sidebar (vertical) or a toolbar
+    (horizontal). Manages its own state like _Tabs; returns .value, the active
+    item's value (its label unless an explicit ``value`` key is given).
+
+        page = gui.rail([
+            {"label": "Home",     "icon": gui.icon("home")},
+            {"label": "Data",     "icon": gui.icon("table")},
+            {"label": "Settings", "icon": gui.icon("settings")},
+        ], orientation="vertical", key="nav")
+        if page == "Home": ...
+    """
+    @staticmethod
+    def _norm(item: Any) -> dict:
+        if isinstance(item, dict):
+            label = str(item.get("label", ""))
+            return {"label": label,
+                    "icon":  item.get("icon") or "",
+                    "value": str(item.get("value", label))}
+        label = str(item)
+        return {"label": label, "icon": "", "value": label}
+
+    def __init__(self, items: list, *,
+                 orientation: str = "vertical",
+                 border: bool = False,
+                 value: Optional[Union[str, State]] = None,
+                 on_change: Optional[Callable] = None,
+                 style: str = "", key: Optional[str] = None):
+        self._items  = [self._norm(it) for it in items]
+        self._orient = "horizontal" if orientation == "horizontal" else "vertical"
+        self._border = border
+        self._style  = style
+        _key         = _auto_key(key)
+        first        = self._items[0]["value"] if self._items else ""
+        initial      = (value.value if isinstance(value, State)
+                        else (value if value is not None else first))
+        self._state  = (value if isinstance(value, State)
+                        else _get_or_create_state(_key, initial))
+        super().__init__(key)
+        def _handler(v):
+            self._state.set(v)
+            if on_change: on_change(v)
+        _reg(self.id, _handler)
+
+    @property
+    def value(self) -> str: return self._state.value
+    def set(self, v: str):   self._state.set(str(v))
+    def update(self, fn):    self._state.update(fn)
+
+    def render(self) -> str:
+        active = self._state.value
+        # As in _Tabs, the item value travels in data-val (escaped), never a JS
+        # string literal, so an apostrophe in a label can't break the onclick.
+        # The icon is raw SVG (ours or the caller's) and is inserted verbatim.
+        btns = []
+        for it in self._items:
+            val, label, ic = it["value"], it["label"], it["icon"]
+            acls  = " guile-rail-active" if val == active else ""
+            icon  = f'<span class="guile-rail-icon">{ic}</span>' if ic else ""
+            lab   = f'<span class="guile-rail-label">{_txt(label)}</span>' if label else ""
+            btns.append(
+                f'<button class="guile-rail-btn{acls}"'
+                f' data-cid="{_esc(self.id)}" data-val="{_esc(val)}"'
+                f' title="{_esc(label)}"'
+                f' onclick="window._guile.trigger(this.dataset.cid,this.dataset.val)">'
+                f'{icon}{lab}</button>')
+        bcls = " guile-rail-bordered" if self._border else ""
+        return (f'<div id="{self.id}" class="guile-rail guile-rail-{self._orient}{bcls}"'
+                f' style="{self._style}">{"".join(btns)}</div>')
+
+
 # ── Data widget ────────────────────────────────────────────────────────────
 
 class _Table(_Leaf):

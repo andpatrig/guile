@@ -44,7 +44,9 @@ from .ui import (
     _Text, _Title, _Badge, _Spacer, _Divider, _ProgressBar, _Html,
     # Inputs
     _Button, _Input, _NumberInput, _TextArea, _Checkbox, _Select, _MultiSelect, _Slider,
-    _DateInput, _DateTimeInput, _FilePicker, _Tabs,
+    _DateInput, _DateTimeInput, _FilePicker, _Tabs, _Rail,
+    # Icons
+    _icon_svg,
     # Media
     _Figure, _Map, Marker, ImageOverlay, TileOverlay, GeoJSON,
     # Data
@@ -394,6 +396,70 @@ def tabs(labels: list, *, value: Optional[Union[str, State]] = None,
     """
     return _Tabs(labels, value=value, on_change=on_change,
                  style=style, key=key).value
+
+
+def icon(name: str, *, size: int = 24, stroke: float = 2.0,
+         style: str = "") -> str:
+    """
+    Return inline SVG markup for a bundled `Lucide <https://lucide.dev/icons>`_
+    icon, ready to drop into any element that takes raw markup — a rail item, a
+    button label, a title, or gui.html().
+
+        gui.rail([{"label": "Home", "icon": gui.icon("home")}], key="nav")
+        gui.html(gui.icon("trash-2", size=18, style="color:var(--danger)"))
+
+    Use it directly in a gui.rail() item; anywhere else, wrap it in gui.html()
+    (text widgets such as gui.button()/gui.text() escape their content, so an
+    icon string passed there would show as markup, not render).
+
+    Icons stroke in ``currentColor``, so they take on the surrounding text
+    colour automatically (an active rail item turns the primary colour, etc.).
+    Raise ValueError with close-match suggestions if the name is unknown. The
+    ~2100-icon dataset is imported lazily, so apps that never call icon() incur
+    no cost. You can always pass your own ``<svg>…</svg>`` string instead.
+    """
+    return _icon_svg(name, size=size, stroke=stroke, style=style)
+
+
+def rail(items: list, *, orientation: str = "vertical",
+         border: bool = False,
+         value: Optional[Union[str, State]] = None,
+         on_change: Optional[Callable] = None,
+         style: str = "", key: Optional[str] = None) -> str:
+    """
+    Icon + label button rail — a compact navigation control for fitting many
+    destinations in a narrow sidebar (``orientation="vertical"``, the default)
+    or a toolbar (``orientation="horizontal"``). Returns the active item's
+    value as a plain string; manages its own state like gui.tabs(), so always
+    pass key= to keep the selection across re-renders.
+
+    Each item is a dict with a ``label`` and an optional ``icon`` (any SVG
+    string — use gui.icon() for the bundled set):
+
+        page = gui.rail([
+            {"label": "Home",     "icon": gui.icon("home")},
+            {"label": "Data",     "icon": gui.icon("table")},
+            {"label": "Map",      "icon": gui.icon("map")},
+            {"label": "Settings", "icon": gui.icon("settings")},
+        ], key="nav")
+
+        if page == "Home":
+            gui.text("Welcome")
+        elif page == "Data":
+            gui.table(records)
+
+    An item may also be a bare string (label only, no icon). Give an item an
+    explicit ``value`` when two items would otherwise share a label (e.g.
+    icon-only items). Bind ``value=`` to a State for programmatic switching,
+    exactly as with gui.tabs().
+
+    Pass ``border=True`` to wrap the rail in a subtle themed panel (a 1px
+    border, rounded corners, a little padding) — handy for a standalone rail
+    that isn't already inside a bordered sidebar. For full control, set the
+    outer element directly via ``style=`` instead.
+    """
+    return _Rail(items, orientation=orientation, border=border, value=value,
+                 on_change=on_change, style=style, key=key).value
 
 
 # ── Data ───────────────────────────────────────────────────────────────────

@@ -373,6 +373,54 @@ def test_llms_docs_in_sync():
     return f"{len(blocks)} blocks compile; 2 examples exec + render"
 
 
+def test_icon_and_rail():
+    """gui.icon() returns themeable Lucide SVG (and rejects unknown names with
+    a suggestion); gui.rail() renders an icon+label nav that tracks its active
+    item and escapes labels the same injection-safe way gui.tabs() does."""
+    import html as _h
+
+    # icon(): known name -> currentColor SVG; unknown -> helpful ValueError.
+    svg = gui.icon("home")
+    assert svg.startswith("<svg") and 'stroke="currentColor"' in svg
+    assert "<path" in svg, "icon markup lost its path data"
+    try:
+        gui.icon("huose")                       # typo of "house"/"home"
+        assert False, "unknown icon should raise"
+    except ValueError as e:
+        assert "Did you mean" in str(e), f"no suggestion in: {e}"
+
+    # rail(): active item, orientation class, and a label with an apostrophe
+    # must travel in data-val (not the onclick JS), exactly like _Tabs.
+    active = gui.state("Data")
+
+    def build():
+        gui.rail(
+            [
+                {"label": "O'Brien", "icon": gui.icon("home")},
+                {"label": "Data",    "icon": gui.icon("table")},
+                "Plain",                         # bare string = label-only item
+            ],
+            orientation="horizontal", border=True, value=active,
+            on_change=active.set, key="rail",
+        )
+
+    reset_globals()
+    html, cids = render_ui(build)
+    assert "guile-rail-horizontal" in html, "orientation class missing"
+    assert "guile-rail-bordered" in html, "border=True class missing"
+    assert html.count("guile-rail-btn") == 3, "expected three rail buttons"
+    assert "guile-rail-active" in html and 'data-val="Data"' in html
+    # The apostrophe label is escaped in the attribute, never emitted as a raw
+    # ' inside the onclick handler (which would be a JS syntax error / injection).
+    assert "O&#x27;Brien" in html, "label not attribute-escaped"
+    assert "trigger(this.dataset.cid,this.dataset.val)" in html
+
+    # Clicking the third item updates the bound State through the callback.
+    dispatch(cids[0], "Plain")
+    assert active.value == "Plain", f"rail click didn't update state: {active.value}"
+    return "icon() themeable + guarded; rail() active/escape/dispatch"
+
+
 def test_map_layers_render():
     """gui.leaflet(layers=[...]) serialises ImageOverlay / TileOverlay /
     GeoJSON into the map config, and a GeoJSON on_click receives the
@@ -672,6 +720,7 @@ CORE_TESTS = [
     test_task_keeps_ui_responsive,
     test_dev_hot_reload,
     test_llms_docs_in_sync,
+    test_icon_and_rail,
     test_map_layers_render,
     test_map_drawn_and_labels,
 ]
@@ -815,6 +864,7 @@ EXAMPLES = [
     "field_notes.py",
     "map_overlays.py",
     "map_areas.py",
+    "icon_rail.py",
 ]
 
 
