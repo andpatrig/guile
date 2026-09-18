@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import os
 import threading
-import time
 import traceback
 
 
@@ -123,8 +122,7 @@ def start_watcher(app, path: str, interval: float = 0.5) -> None:
             last = os.path.getmtime(path)
         except OSError:
             last = 0.0
-        while True:
-            time.sleep(interval)
+        while not app._closing.wait(interval):
             try:
                 m = os.path.getmtime(path)
             except OSError:

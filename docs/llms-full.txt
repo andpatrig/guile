@@ -1,4 +1,4 @@
-# guile — complete reference for AI assistants (v0.9.2)
+# guile — complete reference for AI assistants (v1.0.0)
 
 guile is a lightweight Python framework for desktop apps. One Python process
 opens a native window (pywebview: WebView2 on Windows, WKWebView on macOS).
@@ -141,7 +141,7 @@ gui.progress(value, max=100, color=None)  # bar from 0..max; max=0 shows empty
 gui.html(raw)                             # raw HTML escape hatch (also <style>)
 svg = gui.icon("home", size=24, stroke=2.0, style="")
     # Returns inline SVG for one of ~2100 bundled Lucide icons (lucide.dev/icons;
-    # vendored, no CDN). Strokes in currentColor, so it inherits text colour.
+    # vendored, no CDN). Strokes in currentColor, so it inherits text color.
     # Renders ONLY inside a gui.rail() item or wrapped in gui.html() — text
     # widgets (gui.text/gui.button) escape content. Raises ValueError on a bad
     # name. Pass your own <svg> string anywhere an icon is expected.
@@ -208,7 +208,8 @@ gui.table(data, columns=None, max_rows=2000, key=None)
 gui.figure(fig, dpi=96, width="100%", caption=None, transparent=True,
            static=False, key=None)
     # Embeds a matplotlib Figure as inline PNG. Create the figure fresh in
-    # ui() each render (guile closes it after drawing). static=True caches.
+    # ui() each render (guile closes it after drawing). static=True caches by
+    # figure object and image settings: reuse the same unchanged Figure.
     # Use matplotlib.use("Agg") before pyplot import.
 gui.leaflet(center=(lat, lon), zoom=10, height=380, markers=[...],
             on_click=None, on_move=None, on_shape=None, draw=False,
@@ -312,7 +313,8 @@ gui.run(dev=True)  # hot reload: save the script file → app reloads inside the
                    # Errors show in-window; previous UI keeps running.
                    # Use plain gui.run() for normal use and packaged apps.
 
-# Code AFTER gui.run() executes when the window closes; gui.state() values
+# Code AFTER gui.run() executes after the window closes and started tasks
+# and their completion callbacks finish; gui.state() values
 # still hold what the user left in them. Use for: save-on-exit, cleanup
 # (close ports/connections), continuing a pipeline with the user's choices,
 # exit summaries. (In dev mode, after-run code fires only at final close.)

@@ -1,7 +1,7 @@
 """
 guile.state — Reactive value containers.
 
-Two flavours:
+Two flavors:
   state(value)           — explicit, like React useState
   [auto via gui.input()]  — inputs return their own internal State
 
@@ -110,7 +110,7 @@ class State:
     def __eq__(self, other):
         # Python's default would silently compare identity (`state == 5`
         # → False, always), which is a stealth bug for code migrating
-        # from the old proxy behaviour. Raise with guidance instead.
+        # from the old proxy behavior. Raise with guidance instead.
         # `state is None` / `is not None` are unaffected.
         raise TypeError(
             "Compare the value, not the State object: "

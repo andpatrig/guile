@@ -8,7 +8,7 @@ Two layers, run in order:
 
   PART 1 — core unit tests
     Drive the worker-queue directly through a fake window that just records
-    evaluate_js() calls. No real WebView. These pin down the behaviours the
+    evaluate_js() calls. No real WebView. These pin down the behaviors the
     batching/threading refactor was about: one render per burst, exactly-once
     dispatch, safe concurrency, silent-before-render ordering, and errors
     surfacing in the window instead of a blank page.
@@ -62,6 +62,11 @@ class FakeWindow:
 def reset_globals():
     """Clear the module-level listener/state registries between tests, so a
     stale app can't steal render requests off the shared registry."""
+    previous = _App._current
+    if previous is not None:
+        previous._on_closed()
+        previous._worker.join(3)
+        assert not previous._worker.is_alive(), "previous test left a running task"
     with _state._lock:
         _state._listeners.clear()
     _state_store.clear()
@@ -148,7 +153,7 @@ def test_no_double_dispatch_on_typeerror():
 
 def test_concurrent_events_serialize():
     """Many events fired from many threads: no lost updates, no corrupt
-    render payloads (the worker serialises everything)."""
+    render payloads (the worker serializes everything)."""
     counter = gui.state(0)
     def build():
         gui.text(str(counter.value))
@@ -422,7 +427,7 @@ def test_icon_and_rail():
 
 
 def test_map_layers_render():
-    """gui.leaflet(layers=[...]) serialises ImageOverlay / TileOverlay /
+    """gui.leaflet(layers=[...]) serializes ImageOverlay / TileOverlay /
     GeoJSON into the map config, and a GeoJSON on_click receives the
     clicked feature's properties."""
     import json, html as _h
@@ -470,11 +475,11 @@ def test_map_layers_render():
         assert False, "expected ValueError for malformed bounds"
     except ValueError:
         pass
-    return "3 layer types serialised; GeoJSON click delivers properties"
+    return "3 layer types serialized; GeoJSON click delivers properties"
 
 
 def test_map_drawn_and_labels():
-    """drawn= shapes serialise with ids and Leaflet-style keys; the shape
+    """drawn= shapes serialize with ids and Leaflet-style keys; the shape
     callbacks unpack their payloads; GeoJSON label/on_hover round-trip."""
     import json, re, html as _h
 
@@ -669,7 +674,7 @@ console.log(JSON.stringify(messages));
     result = subprocess.run([node, "-"], input=setup + T._JS + checks,
                             capture_output=True, text=True, encoding="utf-8", timeout=10)
     assert result.returncode == 0, result.stderr
-    for cid, value, event_gen in json.loads(result.stdout):
+    for cid, value, event_gen, *_ in json.loads(result.stdout):
         dispatch(cid, value, event_gen)
     assert calls == ["map", "marker", "geo", "move"], calls
     return "map callbacks survive redraw; stale move dropped; popup text stays literal"

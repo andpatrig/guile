@@ -181,7 +181,7 @@ def input(label: str = "", *, placeholder: str = "",
 
     .value is kept current on every keystroke, but the UI only re-renders
     (and on_change only fires) when the field commits — Enter or focus
-    leave. Pass live=True to re-render on every keystroke; avoid that next
+    leave. Pass live=True to also re-render on every keystroke; avoid that next
     to large tables or figures, where each keystroke re-serializes the page.
     """
     return _Input(label, placeholder=placeholder, value=value, type=type,
@@ -244,7 +244,7 @@ def textarea(label: str = "", *, placeholder: str = "",
     Multi-line text input. Returns .value (str). Always provide key=.
 
     Like gui.input(): .value stays current per keystroke, UI re-renders on
-    commit (focus leave). live=True re-renders on every keystroke.
+    commit (focus leave). live=True also re-renders on every keystroke.
     """
     return _TextArea(label, placeholder=placeholder, value=value, rows=rows,
                      disabled=disabled, on_change=on_change, live=live,
@@ -413,7 +413,7 @@ def icon(name: str, *, size: int = 24, stroke: float = 2.0,
     icon string passed there would show as markup, not render).
 
     Icons stroke in ``currentColor``, so they take on the surrounding text
-    colour automatically (an active rail item turns the primary colour, etc.).
+    color automatically (an active rail item turns the primary color, etc.).
     Raise ValueError with close-match suggestions if the name is unknown. The
     ~2100-icon dataset is imported lazily, so apps that never call icon() incur
     no cost. You can always pass your own ``<svg>…</svg>`` string instead.
@@ -625,17 +625,17 @@ def notify(message: str, *,
     import html as _h
     import json as _json
     app = _App._current
-    if not app or not app._window:
+    if not app or not app._window or not app._ready:
         return
 
-    COLOURS = {
+    COLORS = {
         "success": ("#16a34a", "#dcfce7"),
         "danger":  ("#dc2626", "#fee2e2"),
         "warning": ("#d97706", "#fef3c7"),
         "primary": ("#6366f1", "#ede9fe"),
         "neutral": ("#6b7280", "#f3f4f6"),
     }
-    fg, bg = COLOURS.get(variant, COLOURS["primary"])
+    fg, bg = COLORS.get(variant, COLORS["primary"])
     # NOTE: no manual quote-escaping needed — the message is embedded
     # below via json.dumps(), the canonical way to produce a JS string
     # literal from Python (handles quotes, backslashes, and unicode).
@@ -724,20 +724,30 @@ def task(fn: Callable, *,
     from ._app import _App
     app = _App._current
 
+    if app is not None:
+        app._start_task()
     if busy is not None:
         busy.set(True)
 
     def _deliver(cb):
         """Run cb on the worker thread when there is an app, else inline."""
         if app is not None:
-            app._queue.put(("call", cb, None))
+            def complete():
+                try:
+                    cb()
+                except BaseException:
+                    from .ui import _report_callback_error
+                    _report_callback_error()
+                finally:
+                    app._task_finished()
+            app._queue.put(("call", complete, None))
         else:
             cb()
 
     def _runner():
         try:
             result = fn()
-        except Exception as exc:
+        except BaseException as exc:
             def _fail(exc=exc):
                 if busy is not None:
                     busy.set(False)
@@ -746,7 +756,7 @@ def task(fn: Callable, *,
                 else:
                     try:
                         raise exc
-                    except Exception:
+                    except BaseException:
                         from .ui import _report_callback_error
                         _report_callback_error()
             _deliver(_fail)
@@ -758,8 +768,15 @@ def task(fn: Callable, *,
                     on_done(result)
             _deliver(_ok)
 
-    _threading.Thread(target=_runner, daemon=True,
-                      name="guile-task").start()
+    try:
+        _threading.Thread(target=_runner, daemon=True,
+                          name="guile-task").start()
+    except BaseException:
+        if busy is not None:
+            busy.set(False)
+        if app is not None:
+            app._task_finished()
+        raise
 
 
 # ── Overlays ────────────────────────────────────────────────────────────────
@@ -818,18 +835,18 @@ def theme(
     key:       Optional[str] = None,
 ) -> _Theme:
     """
-    Apply a colour theme to the entire app.
+    Apply a color theme to the entire app.
 
     Call this as the FIRST thing inside your ui() function so it takes
     effect before any widgets are rendered.
 
     Built-in presets (8 values each, all others derived automatically):
-        "light"  — indigo on light grey (default)
+        "light"  — indigo on light gray (default)
         "dark"   — indigo on near-black
         "neon"   — cyan on deep navy
         "rose"   — red on warm white
         "forest" — green on soft green
-        "slate"  — grey on off-white
+        "slate"  — gray on off-white
 
     Any argument overrides just that one value in the preset:
         gui.theme("dark", primary="#f43f5e")   # dark theme, rose accent
@@ -837,17 +854,17 @@ def theme(
 
     Arguments:
         preset    — name of a built-in theme
-        primary   — accent colour for buttons, sliders, focus rings (#hex)
+        primary   — accent color for buttons, sliders, focus rings (#hex)
         bg        — page/window background (#hex)
         surface   — card and input background (#hex)
         surface_2 — secondary surface, hover rows (#hex)
-        text      — primary text colour (#hex)
-        text_2    — secondary / muted text colour (#hex)
-        border    — border and separator colour (#hex)
+        text      — primary text color (#hex)
+        text_2    — secondary / muted text color (#hex)
+        border    — border and separator color (#hex)
         radius    — base border radius for cards and inputs (int, px)
 
-    All other colours (hover, tints, shadows, danger/success/warning) are
-    derived automatically from these 8 values using HLS colour math.
+    All other colors (hover, tints, shadows, danger/success/warning) are
+    derived automatically from these 8 values using HLS color math.
 
     To see all built-in preset values:
         import guile; print(guile.THEMES)
@@ -904,7 +921,7 @@ def app(title_: str = "Guile App", *, width: int = 800, height: int = 600,
     ordinary Python module: importing it does not open a window, and code
     after gui.run() executes once the window is closed (see gui.run).
 
-    center=True fills the window and centres your content on both axes, so a
+    center=True fills the window and centers your content on both axes, so a
     small single-card app needs no wrapping gui.col().
 
     If several functions are decorated, the last one defined is the app.
@@ -957,6 +974,11 @@ def run(dev: bool = False) -> None:
     UI running — fix the file and save again. Code after gui.run() does
     NOT execute on reloads, only when you finally close the window.
     Turn dev off for normal use and packaged apps.
+
+    Closing the window stops new interactions. Already-started gui.task()
+    jobs and their completion callbacks finish before run() returns, so the
+    save-on-exit code below it sees their final results. Long-running jobs
+    therefore delay return; task functions must eventually finish.
     """
     global _run_called
     if _pending_app is None:

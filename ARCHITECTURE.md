@@ -1,4 +1,4 @@
-# Guile — How the code is organised
+# Guile — How the code is organized
 
 This document explains what each file does and how they work together.
 It's aimed at someone comfortable with Python who wants to understand
@@ -40,7 +40,7 @@ It is pure Python and has no dependencies on the rest of guile.
 ### `ui.py` — render engine + all widgets
 
 This is the largest file and does two jobs. They are separated into
-clearly labelled sections at the top of the file.
+clearly labeled sections at the top of the file.
 
 **Section 1 — Render engine (~150 lines)**
 
@@ -89,7 +89,7 @@ This file creates and manages the native desktop window using
    re-render
 3. On `_on_loaded` (page is ready): calls `_render()` for the first time
 4. On `_render()`: runs the user's `ui()` function, collects all the
-   widgets into a tree, serialises them to HTML, and sends the HTML to
+   widgets into a tree, serializes them to HTML, and sends the HTML to
    the browser via `evaluate_js()`
 5. On `_on_closed`: cleans up listeners and resets input states
 
@@ -117,7 +117,7 @@ window at startup. It is a single Python string with three parts
 embedded inside it:
 
 **CSS** (~200 lines) — a complete design system with:
-- CSS custom properties (variables) for colours, spacing, and fonts
+- CSS custom properties (variables) for colors, spacing, and fonts
 - Light and dark mode via `prefers-color-scheme`
 - Styles for every widget class (`guile-btn`, `guile-card`, etc.)
 

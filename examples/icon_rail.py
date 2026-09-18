@@ -7,8 +7,8 @@ Lucide icon over a one- or two-word label. This app demonstrates:
   * a VERTICAL rail as a sidebar (the common case) that switches the main panel
   * a HORIZONTAL rail used as an in-page sub-toolbar
   * gui.icon() — the bundled ~2100-icon Lucide set — in a gallery, and at
-    different sizes and colours (icons stroke in currentColor, so they inherit
-    the surrounding text colour)
+    different sizes and colors (icons stroke in currentColor, so they inherit
+    the surrounding text color)
 
 gui.rail() works like gui.tabs(): it returns the active item's value as a
 plain string and manages its own state — just give it a key=.
@@ -124,9 +124,9 @@ def ui():
                     gui.html(icon_grid(names))
 
             elif page == "Sizing":
-                gui.title("Sizes & colour")
+                gui.title("Sizes & color")
                 gui.text("Pass size= for pixels; icons stroke in currentColor, "
-                         "so a style= colour (or a coloured parent) recolours them.",
+                         "so a style= color (or a colored parent) recolors them.",
                          muted=True)
 
                 with gui.card(gap=12):
@@ -142,7 +142,7 @@ def ui():
                     )
 
                 with gui.card(gap=12):
-                    gui.text("colour via style=", bold=True, size="sm")
+                    gui.text("color via style=", bold=True, size="sm")
                     gui.html(
                         '<div style="display:flex;align-items:center;gap:20px">'
                         + gui.icon("droplet",  size=32, style="color:var(--primary)")

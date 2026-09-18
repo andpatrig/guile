@@ -85,6 +85,9 @@ class _App:
         #                             serialized with all other events
         # One daemon worker drains it; see _worker_loop().
         self._queue = queue.Queue()
+        self._closing = threading.Event()
+        self._task_lock = threading.Lock()
+        self._pending_tasks = 0
         self._in_render = False   # True while ui() runs inside _render()
         self._worker = threading.Thread(target=self._worker_loop, daemon=True,
                                         name="guile-worker")
@@ -106,6 +109,15 @@ class _App:
 
     def run(self, build_fn: Callable):
         """Start the app. Blocks until the window is closed."""
+        try:
+            self._run_window(build_fn)
+        finally:
+            self._on_closed()
+            # Do not join from the native closed event: callbacks may still
+            # be returning from a native dialog. The GUI loop has ended here.
+            self._worker.join()
+
+    def _run_window(self, build_fn: Callable):
         try:
             import webview
         except ImportError:
@@ -152,18 +164,50 @@ class _App:
 
     def _on_loaded(self):
         """Fires when the HTML page finishes loading. Trigger first render."""
+        if self._closing.is_set():
+            return
         self._ready = True
         _set_window(self._window)   # give _FilePicker access to the window
         self._queue.put(("render", None, None))
 
     def _on_closed(self):
-        """Fires when the user closes the window. Clean up."""
+        """Stop accepting UI work; finish existing tasks before shutdown."""
+        with self._task_lock:
+            if self._closing.is_set():
+                return
+            self._closing.set()
         self._ready = False
         _set_window(None)
         _unreg_listener(self._rerender)
+        self._queue.put(("call", self._finish_when_idle, None))
+
+    def _start_task(self):
+        with self._task_lock:
+            if self._closing.is_set():
+                raise RuntimeError("Cannot start a task after the window has closed.")
+            self._pending_tasks += 1
+
+    def _task_finished(self):
+        with self._task_lock:
+            self._pending_tasks -= 1
+        self._finish_when_idle()
+
+    def _finish_when_idle(self):
+        with self._task_lock:
+            if self._closing.is_set() and self._pending_tasks == 0:
+                self._queue.put(("stop", None, None))
+
+    def _cleanup(self):
         _clear_state_store()
-        from .ui import _Figure
+        from .ui import _Figure, _callbacks, _live_callbacks, _silent_callbacks
         _Figure._cache.clear()   # static-figure cache dies with the window
+        _callbacks.clear()
+        _live_callbacks.clear()
+        _silent_callbacks.clear()
+        if _App._current is self:
+            _App._current = None
+        self._window = None
+        self._build = None
 
     # ── Worker loop + render ──────────────────────────────────────────────
 
@@ -179,6 +223,8 @@ class _App:
         into a clear error. The thread check keeps legitimate background-thread
         .set() calls — which may race with a render — on the normal path.
         """
+        if self._closing.is_set():
+            return
         if self._in_render and threading.current_thread() is self._worker:
             self._loop_guard = True
             return
@@ -204,12 +250,21 @@ class _App:
                 # the event was emitted on; render/call items are 3-tuples.
                 kind, cid, value = item[0], item[1], item[2]
                 gen = item[3] if len(item) > 3 else None
-                if kind == "event":
+                if kind == "stop":
+                    self._cleanup()
+                    return
+                elif kind == "event":
                     # .set() calls inside the callback queue "render" items
                     # that land in the next batch and coalesce into one render.
                     _dispatch(cid, value, gen)
                 elif kind == "silent":
                     _dispatch_silent(cid, value, gen)
+                elif kind == "batch":
+                    # One browser operation, e.g. saving several shape edits.
+                    # State changes may queue renders, but none can run until
+                    # every member of this operation has been dispatched.
+                    for member in value:
+                        _dispatch(cid, member, gen)
                 elif kind == "render":
                     needs_render = True
                 elif kind == "call":
@@ -293,8 +348,28 @@ class _Bridge:
 
     def __init__(self, app: _App):
         self._app = app
+        self._event_lock = threading.Lock()
+        self._next_event = 1
+        self._pending_events = {}
 
-    def handle(self, cid: str, value=None, gen=None):
+    def _enqueue(self, item, seq):
+        # pywebview invokes API calls on independent threads. Restore the
+        # browser's order before handing events to the single worker.
+        with self._event_lock:
+            if self._app._closing.is_set():
+                self._pending_events.clear()
+                return
+            if seq is None:  # direct Python callers
+                self._app._queue.put(item)
+                return
+            if not isinstance(seq, int) or seq < self._next_event:
+                return
+            self._pending_events[seq] = item
+            while self._next_event in self._pending_events:
+                self._app._queue.put(self._pending_events.pop(self._next_event))
+                self._next_event += 1
+
+    def handle(self, cid: str, value=None, gen=None, seq=None):
         """
         Called by JS when the user interacts with a widget.
         Must return immediately — doing work here blocks the WebView
@@ -303,12 +378,16 @@ class _Bridge:
         gen is the render generation the page carried when the event fired;
         it travels to dispatch(), which drops events from a superseded page.
         """
-        self._app._queue.put(("event", cid, value, gen))
+        self._enqueue(("event", cid, value, gen), seq)
 
-    def silent_update(self, cid: str, value=None, gen=None):
+    def silent_update(self, cid: str, value=None, gen=None, seq=None):
         """
         Called by JS to update state without triggering a re-render.
         Used by multiselect (and text inputs) while the user is
         mid-interaction: state stays current, DOM is left alone.
         """
-        self._app._queue.put(("silent", cid, value, gen))
+        self._enqueue(("silent", cid, value, gen), seq)
+
+    def handle_batch(self, cid: str, values, gen=None, seq=None):
+        """Deliver one multi-item UI operation without intervening renders."""
+        self._enqueue(("batch", cid, values, gen), seq)

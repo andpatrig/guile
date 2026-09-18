@@ -2,7 +2,7 @@
 examples/soil_water_retention.py — Soil water retention curve explorer.
 
 Demonstrates:
-  - Dropdown that initialises sliders with soil-specific defaults
+  - Dropdown that initializes sliders with soil-specific defaults
   - Sliders that update a matplotlib figure in real time
   - gui.state() coordinating multiple widgets
 

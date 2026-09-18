@@ -303,7 +303,7 @@ pre {
 <nav id="sidebar">
   <div class="logo">
     <div class="logo-name">gui<span>le</span></div>
-    <div class="logo-sub">API reference v0.9.2</div>
+    <div class="logo-sub">API reference v1.0.0</div>
   </div>
   <div id="nav-links"></div>
 </nav>
@@ -401,7 +401,7 @@ const WIDGETS = [
    args:[
      ["content","Any","Heading text — State, str, int all work"],
      ["size","str = 'xl'","xs (11px) | sm (13px) | md (15px) | lg (18px) | xl (24px) | 2xl (32px) | 3xl (44px)"],
-     ["muted","bool = False","Renders in secondary text colour"],
+     ["muted","bool = False","Renders in secondary text color"],
      ["style","str = ''","Raw CSS"],
      ["key","str = None","Stable DOM ID"],
    ],
@@ -414,7 +414,7 @@ const WIDGETS = [
      ["size","str = 'md'","xs | sm | md | lg | xl | 2xl | 3xl"],
      ["bold","bool = False","font-weight: 700"],
      ["italic","bool = False","font-style: italic"],
-     ["muted","bool = False","Secondary text colour"],
+     ["muted","bool = False","Secondary text color"],
      ["underline","bool = False","text-decoration: underline"],
      ["mono","bool = False","Monospace font"],
      ["color","str = None","Any CSS color value"],
@@ -443,7 +443,7 @@ const WIDGETS = [
    args:[
      ["value","Any","Current progress value"],
      ["max","int = 100","Maximum value"],
-     ["color","str = None","Bar fill colour as a CSS value. Defaults to --primary."],
+     ["color","str = None","Bar fill color as a CSS value. Defaults to --primary."],
      ["style","str = ''","Raw CSS on the track element"],
      ["key","str = None","Stable DOM ID"],
    ],
@@ -458,12 +458,12 @@ const WIDGETS = [
    },
 
   {cat:"Display", id:"icon", name:"gui.icon()", tag:"text",
-   desc:"Returns inline SVG markup for one of ~2100 bundled Lucide icons (lucide.dev/icons) — no CDN, vendored and lazily imported. Use it in a gui.rail() item, or wrap it in gui.html() (text widgets escape their content, so an icon passed to gui.text()/gui.button() would show as markup). Icons stroke in currentColor, so they inherit the surrounding text colour. Raises ValueError with suggestions on an unknown name. You can always pass your own &lt;svg&gt; string instead.",
+   desc:"Returns inline SVG markup for one of ~2100 bundled Lucide icons (lucide.dev/icons) — no CDN, vendored and lazily imported. Use it in a gui.rail() item, or wrap it in gui.html() (text widgets escape their content, so an icon passed to gui.text()/gui.button() would show as markup). Icons stroke in currentColor, so they inherit the surrounding text color. Raises ValueError with suggestions on an unknown name. You can always pass your own &lt;svg&gt; string instead.",
    args:[
      ["name","str","Lucide icon name, e.g. 'home', 'table', 'settings'"],
      ["size","int = 24","Width / height in px"],
      ["stroke","float = 2.0","Stroke width"],
-     ["style","str = ''","Raw CSS — e.g. 'color:var(--danger)' to recolour"],
+     ["style","str = ''","Raw CSS — e.g. 'color:var(--danger)' to recolor"],
    ],
    },
 
@@ -474,7 +474,7 @@ const WIDGETS = [
      ["on_click","Callable = None","Called with zero arguments when clicked"],
      ["variant","str = 'primary'","primary | secondary | ghost | danger"],
      ["size","str = 'md'","sm | md | lg"],
-     ["disabled","bool = False","Greys out and blocks interaction"],
+     ["disabled","bool = False","Grays out and blocks interaction"],
      ["style","str = ''","Raw CSS"],
      ["key","str = None","Stable DOM ID — always set in loops"],
    ],
@@ -484,7 +484,7 @@ const WIDGETS = [
    desc:"Single-line text input. Returns an object with .value (str) and .set(). key= is required — it persists the input state across re-renders so text isn't lost on every keypress.",
    args:[
      ["label","str = ''","Label rendered above the field"],
-     ["placeholder","str = ''","Grey placeholder text when empty"],
+     ["placeholder","str = ''","Gray placeholder text when empty"],
      ["value","str|State = None","Initial text, or a State for two-way binding"],
      ["type","str = 'text'","text | password | number | email | search | url"],
      ["disabled","bool = False","Read-only appearance"],
@@ -608,7 +608,7 @@ const WIDGETS = [
      ["file_types","tuple = ()","Dialog filter. Accepts bare extensions e.g. ('yaml','yml','toml') or full strings e.g. ('CSV Files (*.csv)',). Empty = all files; an 'All files' entry is always appended so nothing is ever hidden."],
      ["save","bool = False","False = Open dialog  |  True = Save dialog"],
      ["on_change","Callable = None","Called with the selected path string when the dialog closes"],
-     ["disabled","bool = False","Greys out the button"],
+     ["disabled","bool = False","Grays out the button"],
      ["style","str = ''","Raw CSS on the button"],
      ["key","str = None","Stable DOM ID"],
    ],
@@ -642,7 +642,7 @@ const WIDGETS = [
   {cat:"Media", id:"leaflet", name:"gui.leaflet()", tag:"media",
    desc:"Interactive Leaflet map with selectable tile layers (street, satellite, hybrid, terrain, light, dark, or a custom URL). Requires an internet connection. Pan/zoom state is preserved across re-renders. Supports click, pan/zoom, and drawing callbacks.",
    args:[
-     ["center","tuple","(lat, lon) centre point as floats"],
+     ["center","tuple","(lat, lon) center point as floats"],
      ["zoom","int = 10","Initial zoom level: 1 = world, 10 = city, 15 = street"],
      ["height","int = 380","Map height in px"],
      ["markers","list = None","List of gui.Marker objects"],
@@ -650,7 +650,7 @@ const WIDGETS = [
      ["on_move","Callable = None","on_move(center, zoom) — fires after pan/zoom ends (debounced 150 ms)"],
      ["on_shape","Callable = None","on_shape(type, coords) — fires when a shape is drawn (requires draw=)"],
      ["draw","list|bool = False","Enable drawing tools: True for all, or list e.g. ['rectangle','polygon']"],
-     ["drawn","list = None","Python-owned drawn shapes: [{id, type, coords, style?, label?}, ...] — exactly what on_shape delivers plus an id you assign. guile rebuilds the editable layer from this list; [] clears; None keeps the legacy JS-owned behaviour. Also displays with draw=False."],
+     ["drawn","list = None","Python-owned drawn shapes: [{id, type, coords, style?, label?}, ...] — exactly what on_shape delivers plus an id you assign. guile rebuilds the editable layer from this list; [] clears; None keeps the legacy JS-owned behavior. Also displays with draw=False."],
      ["draw_style","dict = None","Path style for all drawn shapes, e.g. {'color': '#39ff14', 'weight': 3, 'fill_opacity': 0.05}; a per-shape 'style' overrides it"],
      ["on_shape_edit","Callable = None","on_shape_edit(id, type, coords) — fires per shape when the edit toolbar is saved"],
      ["on_shape_delete","Callable = None","on_shape_delete(id) — fires per shape when the delete toolbar is saved"],
@@ -689,13 +689,13 @@ const WIDGETS = [
    desc:"Vector features (points, lines, polygons) from GeoJSON drawn on gui.leaflet(). Each feature can show a popup and fire a Python callback with its properties when clicked (propagation to the map's own on_click is stopped).",
    args:[
      ["data","dict|str","A GeoJSON dict, a JSON string, or a path to a .geojson / .json file"],
-     ["color","str = '#3388ff'","Stroke colour"],
+     ["color","str = '#3388ff'","Stroke color"],
      ["weight","float = 2","Stroke width in px"],
      ["opacity","float = 1.0","Stroke opacity"],
-     ["fill_color","str = None","Fill colour; defaults to color"],
+     ["fill_color","str = None","Fill color; defaults to color"],
      ["fill_opacity","float = 0.2","Fill opacity"],
      ["popup","str|Callable = None","Property name to show when a feature is clicked, or a callable props -> str for custom plain-text content (HTML is displayed literally)"],
-     ["label","str|Callable = None","Property name, or callable props -> str, shown permanently as a small pill centred on each feature"],
+     ["label","str|Callable = None","Property name, or callable props -> str, shown permanently as a small pill centered on each feature"],
      ["on_click","Callable = None","on_click(properties) — fires with the clicked feature's properties dict"],
      ["on_hover","Callable = None","on_hover(properties) on pointer enter, on_hover(None) on leave. Each call renders — keep it light."],
    ],
@@ -715,13 +715,13 @@ const WIDGETS = [
    desc:"Imperative notification toast. Injects a message directly into the DOM without touching the render cycle or needing a state variable. Call from callbacks only — not inside ui(). The window must be open. Auto-dismisses after duration seconds.",
    args:[
      ["message","str","The notification text"],
-     ["variant","str = 'success'","Colour: 'success', 'danger', 'warning', 'primary', 'neutral'"],
+     ["variant","str = 'success'","Color: 'success', 'danger', 'warning', 'primary', 'neutral'"],
      ["duration","float = 3.0","Seconds before auto-dismiss"],
    ],
    },
 
   {cat:"Overlays", id:"modal", name:"gui.modal()", tag:"overlay",
-   desc:"Blocking modal dialog. Use as a context manager — any guile widgets go inside, including buttons with callbacks. Renders a semi-transparent full-screen backdrop with a centred card when visible=True. Renders nothing when visible=False. Always supply on_close= so the backdrop click and ✕ button work.",
+   desc:"Blocking modal dialog. Use as a context manager — any guile widgets go inside, including buttons with callbacks. Renders a semi-transparent full-screen backdrop with a centered card when visible=True. Renders nothing when visible=False. Always supply on_close= so the backdrop click and ✕ button work.",
    args:[
      ["title","str = ''","Title shown in the card header"],
      ["visible","bool = True","Show or hide. Tip: bind to a gui.state(False) variable."],

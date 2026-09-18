@@ -43,7 +43,7 @@ def ui():
 gui.run()
 ```
 
-`@gui.app()` defines the app; `gui.run()` opens the window and blocks until it is closed. Code written after `gui.run()` executes once the window closes — a natural place to save the session or continue a processing pipeline (see `examples/field_notes.py`).
+`@gui.app()` defines the app; `gui.run()` opens the window and blocks until it is closed and any already-started `gui.task()` jobs and their completion callbacks finish. Code written after `gui.run()` can save the final session or continue a processing pipeline (see `examples/field_notes.py`). Long-running jobs delay return; task functions must eventually finish.
 
 While building a UI, use `gui.run(dev=True)`: guile watches your script and reloads the app inside the open window every time you save the file. Errors show in the window without killing the session; each reload resets state to its initial values.
 
@@ -122,16 +122,24 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v1.0.0**
+- **`gui.run()` now waits for in-flight work before returning.** Closing the window stops new interaction, but any already-started `gui.task()` jobs and their completion callbacks now finish before `run()` returns — so save-on-exit code written after `gui.run()` sees their final results instead of racing them. Long-running jobs therefore delay return; task functions must eventually finish. The dev-mode file watcher also stops promptly on close instead of lingering.
+- **Events dispatch in the order the user made them.** pywebview delivers browser API calls on independent threads, so rapid interactions could be processed out of order; each event now carries a sequence number and is restored to browser order before dispatch.
+- **Multi-shape edits save atomically.** Saving several edits or deletes at once from the Leaflet draw toolbar is delivered as a single operation, so no render runs partway through a batch.
+- **Committed fields reflect Python's corrections.** A text field, number field, checkbox, or dropdown you've committed (Enter or focus-leave) now shows the value your callback set — clamped, cleared, upper-cased, etc. — while text you're still typing, and the caret, are preserved as before. `live=True` inputs fire `on_change` once on commit without repeating it.
+- **`gui.select()` / `gui.multiselect()` accept non-string option values.** Dict keys/values and initial values are coerced to strings, so numeric or falsy options (`0`, `False`) select and round-trip correctly.
+- **`static=True` figures cache by figure object, not layout position.** A cached static figure no longer shows a stale image after the surrounding layout shifts, and discarded figures (with their cached images) are garbage-collected.
+
 **v0.9.2**
-- **Security: map data is no longer interpreted as HTML.** Leaflet renders a string popup/tooltip/label as HTML, so a `gui.leaflet()` layer built from untrusted GeoJSON (or a marker with an untrusted `popup`/`tooltip`) could run injected markup or script in the app. Feature popups, marker popups/tooltips, and permanent labels now render as plain text. **Behaviour change:** a callable `popup=`/`label=` that returned HTML (e.g. `lambda p: f"<b>{p['id']}</b>"`) is now shown literally rather than formatted. If you need rich content, that must be an explicit, sanitised opt-in — open an issue if you rely on it.
+- **Security: map data is no longer interpreted as HTML.** Leaflet renders a string popup/tooltip/label as HTML, so a `gui.leaflet()` layer built from untrusted GeoJSON (or a marker with an untrusted `popup`/`tooltip`) could run injected markup or script in the app. Feature popups, marker popups/tooltips, and permanent labels now render as plain text. **Behavior change:** a callable `popup=`/`label=` that returned HTML (e.g. `lambda p: f"<b>{p['id']}</b>"`) is now shown literally rather than formatted. If you need rich content, that must be an explicit, sanitised opt-in — open an issue if you rely on it.
 - **Fix: a click during a redraw can no longer trigger the wrong action.** Auto-generated widget ids are positional, so an unkeyed button at a given spot could be "Cancel" in one layout and "Delete" in the next, and callbacks go live a moment before the page repaints. A click left over from the old layout could reach the newly-assigned callback. Every render is now stamped with a generation that rides along with each event; an event from a superseded page is dropped instead of dispatched. This is conservative — a rapid click that spans a redraw can be discarded — but it can never invoke the wrong action. (Keys give a widget stable state, but do not by themselves make its events safe.)
 
 **v0.9.1**
-- The built-in chrome now uses matching Lucide glyphs: the file-picker button's `📁` emoji is a `folder` icon, and the modal close's `✕` is an `x` — both stroke in `currentColor`, so they take the theme colour like everything else. (Their paths are inlined, so file pickers and modals don't load the icon dataset.) The `gui.select()` dropdown chevron was already a matching SVG and is unchanged.
+- The built-in chrome now uses matching Lucide glyphs: the file-picker button's `📁` emoji is a `folder` icon, and the modal close's `✕` is an `x` — both stroke in `currentColor`, so they take the theme color like everything else. (Their paths are inlined, so file pickers and modals don't load the icon dataset.) The `gui.select()` dropdown chevron was already a matching SVG and is unchanged.
 
 **v0.9.0**
 - **`gui.rail()` — icon + label button rail.** A compact navigation control for fitting many destinations in a narrow sidebar (`orientation="vertical"`, the default) or a toolbar (`orientation="horizontal"`). Works like `gui.tabs()` — returns the active item's value, manages its own state (pass `key=`), and binds to a `State` via `value=` for programmatic switching. Each item is a dict with a `label` and optional `icon`. Pass `border=True` to wrap it in a subtle themed panel. See `examples/icon_rail.py`.
-- **`gui.icon()` — bundled Lucide icon set.** Returns inline SVG markup for any of ~2100 [Lucide](https://lucide.dev/icons) icons (`gui.icon("home")`), for use in a rail item or wrapped in `gui.html()`. Icons stroke in `currentColor`, so they inherit the surrounding text colour. No CDN and no runtime dependency — the icon data is vendored and imported lazily, so apps that never call `icon()` pay nothing. You can still pass your own `<svg>` string anywhere an icon is expected.
+- **`gui.icon()` — bundled Lucide icon set.** Returns inline SVG markup for any of ~2100 [Lucide](https://lucide.dev/icons) icons (`gui.icon("home")`), for use in a rail item or wrapped in `gui.html()`. Icons stroke in `currentColor`, so they inherit the surrounding text color. No CDN and no runtime dependency — the icon data is vendored and imported lazily, so apps that never call `icon()` pay nothing. You can still pass your own `<svg>` string anywhere an icon is expected.
 - Added a `LICENSE` file (guile is MIT); it also carries the ISC/MIT attribution for the vendored Lucide/Feather icons.
 
 **v0.8.9**

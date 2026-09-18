@@ -22,9 +22,10 @@ Usage:
 from __future__ import annotations
 import threading
 import html as _html
+import weakref
 from typing import Any, Callable, List, Optional, Union
 
-from .state import State
+from .state import State, _fire
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -117,7 +118,7 @@ def _commit_callbacks():
     _silent_callbacks.update({k[:-8]: v for k, v in _callbacks.items()
                               if k.endswith('__silent')})
     # The just-built page becomes the live one: events tagged with this
-    # generation are now the only ones dispatch() will honour.
+    # generation are now the only ones dispatch() will honor.
     _live_generation = _generation
 
 def _render_generation() -> int:
@@ -623,7 +624,7 @@ class _Theme(_Leaf):
     """
     Injects a <style> block that overrides the design token CSS variables.
 
-    All colours are derived from 8 core values using proper HLS colour math,
+    All colors are derived from 8 core values using proper HLS color math,
     so you never have to set hover shades, tints, or borders manually.
     """
 
@@ -733,6 +734,8 @@ class _Input(_Leaf):
         _reg(self.id, _handler)
         if not live:
             _reg(self.id + "__silent", self._state.set_silent)
+        else:
+            _reg(self.id + "-commit", _fire)
 
     @property
     def value(self) -> str: return self._state.value
@@ -743,7 +746,8 @@ class _Input(_Leaf):
         val     = self._state.value
         trigger = _trigger_js(self.id, "this.value")
         if self._live:
-            events = f' oninput="{trigger}"'
+            commit = _trigger_js(self.id + "-commit")
+            events = f' oninput="{trigger}" onchange="{commit}"'
         else:
             silent = _silent_js(self.id, "this.value")
             events = f' oninput="{silent}" onchange="{trigger}"'
@@ -905,6 +909,8 @@ class _TextArea(_Leaf):
         _reg(self.id, _handler)
         if not live:
             _reg(self.id + "__silent", self._state.set_silent)
+        else:
+            _reg(self.id + "-commit", _fire)
 
     @property
     def value(self) -> str: return self._state.value
@@ -915,7 +921,8 @@ class _TextArea(_Leaf):
         val     = self._state.value
         trigger = _trigger_js(self.id, "this.value")
         if self._live:
-            events = f' oninput="{trigger}"'
+            commit = _trigger_js(self.id + "-commit")
+            events = f' oninput="{trigger}" onchange="{commit}"'
         else:
             silent = _silent_js(self.id, "this.value")
             events = f' oninput="{silent}" onchange="{trigger}"'
@@ -975,14 +982,15 @@ class _Select(_Leaf):
         self._style    = style
         # Normalize options to list of (value, label) pairs
         if isinstance(options, dict):
-            self._opts = list(options.items())
+            self._opts = [(str(v), str(l)) for v, l in options.items()]
         elif options and isinstance(options[0], (list, tuple)):
             self._opts = [(str(v), str(l)) for v, l in options]
         else:
             self._opts = [(str(o), str(o)) for o in options]
         _key        = _auto_key(key)
         initial     = (value.value if isinstance(value, State)
-                       else (value or (self._opts[0][0] if self._opts else "")))
+                       else (str(value) if value is not None
+                             else (self._opts[0][0] if self._opts else "")))
         self._state = value if isinstance(value, State) \
                       else _get_or_create_state(_key, initial)
         super().__init__(key)
@@ -1039,7 +1047,7 @@ class _MultiSelect(_Leaf):
 
         # Normalize options to list of (value, label) pairs
         if isinstance(options, dict):
-            self._opts = list(options.items())
+            self._opts = [(str(v), str(l)) for v, l in options.items()]
         elif options and isinstance(options[0], (list, tuple)):
             self._opts = [(str(v), str(l)) for v, l in options]
         else:
@@ -1466,8 +1474,8 @@ def _icon_svg(name: str, *, size: int = 24, stroke: float = 2.0,
 
     The icon data (guile/_lucide_data.py) is imported lazily on first use, so
     apps that never call gui.icon() pay nothing at import time. Icons draw with
-    stroke="currentColor", so they inherit the surrounding text colour — pass
-    style="color:#e11" (or let a parent set it) to recolour.
+    stroke="currentColor", so they inherit the surrounding text color — pass
+    style="color:#e11" (or let a parent set it) to recolor.
     """
     from ._lucide_data import ICONS          # lazy: ~420 KB parsed once
     inner = ICONS.get(name)
@@ -1564,7 +1572,7 @@ class _Table(_Leaf):
     Use columns= to select or reorder which keys are shown.
     """
     @staticmethod
-    def _normalise(data: Any) -> list:
+    def _normalize(data: Any) -> list:
         """
         Convert common data structures to list[dict] for rendering.
 
@@ -1614,7 +1622,7 @@ class _Table(_Leaf):
     def __init__(self, data: Any, *, columns: Optional[list] = None,
                  max_rows: int = 2000,
                  style: str = "", key: Optional[str] = None):
-        self._data     = self._normalise(data)
+        self._data     = self._normalize(data)
         self._columns  = columns or (list(self._data[0].keys()) if self._data else [])
         self._max_rows = max_rows
         self._style    = style
@@ -1658,9 +1666,13 @@ class _Figure(_Leaf):
     """
     Embeds a matplotlib Figure as a base64 PNG image.
     transparent=True blends the plot background with the app theme.
-    static=True caches the result — use for figures that never change.
+    static=True caches by figure object and image settings. Reuse the same
+    unchanged figure object to reuse its image; a different figure gets its
+    own image regardless of its widget key or layout position.
     """
-    _cache: dict = {}
+    # Cache the actual figure, not its position in a changing layout. Weak
+    # keys let discarded figures (and their cached images) be collected.
+    _cache = weakref.WeakKeyDictionary()
 
     def __init__(self, fig, *, dpi: int = 96, width: Optional[str] = "100%",
                  caption: Optional[str] = None, transparent: bool = True,
@@ -1702,12 +1714,14 @@ class _Figure(_Leaf):
         return base64.b64encode(buf.getvalue()).decode()
 
     def render(self) -> str:
-        if self._static and self.id in _Figure._cache:
-            b64 = _Figure._cache[self.id]
+        cache = _Figure._cache.setdefault(self._fig, {}) if self._static else {}
+        options = (self._dpi, self._transparent)
+        if options in cache:
+            b64 = cache[options]
         else:
             b64 = self._to_base64()
             if self._static:
-                _Figure._cache[self.id] = b64
+                cache[options] = b64
 
         caption_html = (
             f'<figcaption style="font-size:13px;color:var(--text-2);'
@@ -1744,7 +1758,7 @@ class Marker:
 
 
 # ── Map overlay layers — gui.leaflet(layers=[...]) ─────────────────────────
-# Each layer serialises to a dict with a "type" the JS map registry switches
+# Each layer serializes to a dict with a "type" the JS map registry switches
 # on. Layers draw in list order, stacked between the base tiles and markers:
 #     base tiles < TileOverlay < ImageOverlay < GeoJSON < markers
 
@@ -1869,7 +1883,7 @@ class GeoJSON:
                is displayed literally, not rendered, so untrusted feature data
                can't inject markup or script.
     label      property name, or callable props -> str, shown permanently
-               as a small pill centred on each feature.
+               as a small pill centered on each feature.
     on_click   on_click(properties) — the clicked feature's properties dict.
                Propagation to the map's own on_click is stopped.
     on_hover   on_hover(properties) when the pointer enters a feature and
@@ -1983,7 +1997,7 @@ class _Map(_Leaf):
         on_shape_delete(id); on_shape_click(id) / on_shape_hover(id|None)
         make shapes selectable. draw_style= styles all of them, a per-shape
         "style" overrides it, "label" pins a text pill on the shape.
-        drawn=[] clears; drawn=None (default) keeps the legacy behaviour
+        drawn=[] clears; drawn=None (default) keeps the legacy behavior
         where the JS layer owns what was drawn.
     """
     _DRAW_ALL = ["rectangle", "polygon", "polyline", "circle", "marker"]
@@ -2113,7 +2127,7 @@ class _Map(_Leaf):
         self._style    = style
         self._tiles    = self._normalize_tiles(tiles)
 
-        # Normalise draw tools
+        # Normalize draw tools
         if draw is True:
             self._draw = self._DRAW_ALL[:]
         elif not draw:
@@ -2204,7 +2218,7 @@ class _Map(_Leaf):
 
 class _Modal(_Container):
     """
-    Blocking modal dialog. Renders a full-screen overlay with a centred card.
+    Blocking modal dialog. Renders a full-screen overlay with a centered card.
     Use as a context manager — put any guile widgets inside, including buttons.
 
     When visible=False the modal is not rendered (zero DOM footprint).
@@ -2343,7 +2357,7 @@ def _compute_theme_css(primary, bg, surface, surface_2,
     primary_h     = _darken(primary)
     primary_light = _tint(primary, 0.15, surface)
 
-    # Status colours are fixed across all themes
+    # Status colors are fixed across all themes
     danger,  dl = "#ef4444", _tint("#ef4444", 0.15, surface)
     success, sl = "#22c55e", _tint("#22c55e", 0.15, surface)
     warning, wl = "#f59e0b", _tint("#f59e0b", 0.15, surface)

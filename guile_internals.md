@@ -73,7 +73,7 @@ Leaflet loader in `_template.py`.
 The queue in `_Bridge` exists because `evaluate_js()` and the pywebview
 message thread share a lock. If `handle()` did work synchronously it
 would deadlock. Enqueueing to the single worker thread sidesteps that —
-and serialises all callbacks and renders as a bonus.
+and serializes all callbacks and renders as a bonus.
 
 ---
 
@@ -103,7 +103,7 @@ raise a guiding TypeError rather than being silently always-True /
 always-False; `state is None` and hashing (identity) still work.
 
 **Nothing to change here unless** you need a new mutation method (e.g.
-`append`, `pop`) or want persistent/serialised state.
+`append`, `pop`) or want persistent/serialized state.
 
 ---
 
@@ -218,7 +218,7 @@ both shapes.
 | `_on_loaded()` | fires when page loads → queues the first real render |
 | `_on_closed()` | cleans up listeners and state store |
 | `_worker_loop()` | the single worker thread: drains the queue in batches |
-| `_render()` | runs `ui()`, serialises to HTML, pushes via `evaluate_js` |
+| `_render()` | runs `ui()`, serializes to HTML, pushes via `evaluate_js` |
 | `_rerender()` | registered as a `State` listener; queues a render request |
 | `_make_root()` | builds the root `Column` (centered or default) |
 
@@ -254,7 +254,7 @@ This file is one long Python string. It has three sections:
 
 ### `_CSS` — design tokens and component styles
 
-All colours are CSS custom properties (`--bg`, `--surface`, `--primary`, …)
+All colors are CSS custom properties (`--bg`, `--surface`, `--primary`, …)
 defined on `:root`. Dark mode overrides a subset via
 `@media (prefers-color-scheme: dark)`. `gui.theme()` overrides the same
 variables at runtime by injecting a `<style>` tag.
@@ -262,7 +262,7 @@ variables at runtime by injecting a `<style>` tag.
 **Adding CSS for a new widget:**
 
 Append to `_CSS`. Follow the `.guile-<name>` convention. Use `var(--token)`
-for colours so dark mode and themes work for free.
+for colors so dark mode and themes work for free.
 
 ```css
 /* example: code block added above */
@@ -289,8 +289,8 @@ for colours so dark mode and themes work for free.
 | `--text` | primary text |
 | `--text-2` | muted / secondary text |
 | `--border` | borders and dividers |
-| `--border-focus` | focus ring colour |
-| `--danger / --success / --warning` | status colours |
+| `--border-focus` | focus ring color |
+| `--danger / --success / --warning` | status colors |
 | `--r / --r-sm / --r-lg` | border radii |
 | `--shadow / --shadow-sm / --shadow-lg` | box shadows |
 | `--mono` | monospace font stack |
@@ -299,7 +299,7 @@ for colours so dark mode and themes work for free.
 ### `_JS` — incremental DOM patcher + bridge
 
 **`_guilePatch(oldNode, newNode)`** walks both trees and updates only
-attributes and text that differ. Key behaviours:
+attributes and text that differ. Key behaviors:
 - Saves and restores `document.activeElement.value` so focused inputs don't
   lose the cursor on every keystroke (and only assigns on a real difference,
   since setting `.value` resets the caret even for an identical string).
@@ -321,7 +321,7 @@ attributes and text that differ. Key behaviours:
 **Leaflet map registry (`_guileMaps`)** — maps are long-lived imperative
 objects. The patcher skips their DOM subtrees, but `_guileSyncMaps()` re-runs
 after every update to apply marker/config changes detected by comparing
-serialised `cfgJson`.
+serialized `cfgJson`.
 
 ### `get_html(title, use_leaflet, use_leaflet_draw)`
 
@@ -384,7 +384,7 @@ widgets it's essentially free, and it means there are zero rules to learn about
 when things update. The tradeoff was made consciously.
 
 Early versions also proxied operators on `State` (`count > 0` compared the
-inner value). That convenience was removed in 0.7 in favour of one explicit
+inner value). That convenience was removed in 0.7 in favor of one explicit
 rule — read through `.value` — after the proxies proved to silently
 misbehave with numpy arrays and DataFrames. `__str__` survives, so printing
 a state (or using one in an f-string) still shows its value.
@@ -407,7 +407,7 @@ actually work.
 ### The DOM patcher — rerender everything, patch only what changed
 
 This is the part most worth explaining. When state changes, guile re-runs your
-entire `ui()` function, serialises the result to an HTML string, sends it to
+entire `ui()` function, serializes the result to an HTML string, sends it to
 the WebView, and a small JS function (`_guilePatch`, ~40 lines of vanilla JS)
 walks the old and new DOM trees and updates only what changed — preserving
 focus, preserving the input cursor, preserving Leaflet map subtrees that
@@ -446,11 +446,11 @@ the harder engineering call, and the one that's hardest to see from the outside.
 |---|---|---|
 | Add a new widget | `ui.py` | subclass `_Leaf`, implement `render()` |
 | Add widget CSS | `_template.py` | append to `_CSS` string |
-| Add a JS behaviour (e.g. drag, debounce) | `_template.py` | append to `_JS` string; call `_guile.trigger()` to send events back |
+| Add a JS behavior (e.g. drag, debounce) | `_template.py` | append to `_JS` string; call `_guile.trigger()` to send events back |
 | Change the render loop | `_app.py` | `_render()` method |
 | Change how the window is created | `_app.py` | `_App.run()` |
 | Add a new built-in theme | `ui.py` | `THEMES` dict at the bottom of the file |
-| Change how themes compute derived colours | `ui.py` | `_Theme.render()` (lines ~507–558) |
+| Change how themes compute derived colors | `ui.py` | `_Theme.render()` (lines ~507–558) |
 | Change default design tokens | `_template.py` | `:root { … }` block in `_CSS` |
 | Change dark-mode tokens | `_template.py` | `@media (prefers-color-scheme: dark)` block |
 | Add a new State mutation method | `state.py` | add to `State` class |

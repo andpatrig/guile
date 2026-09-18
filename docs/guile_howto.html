@@ -382,9 +382,9 @@ print(list(gui.THEMES.keys()))
 <p>Start from a preset and override individual values, or build a theme entirely from scratch.</p>
 
 <h3>Override part of a preset</h3>
-<pre>gui.theme("forest", primary="#ff6b6b")    # forest colours, red accent
+<pre>gui.theme("forest", primary="#ff6b6b")    # forest colors, red accent
 gui.theme("light", radius=2)              # light theme, sharp corners
-gui.theme("dark",  surface="#242430")     # dark theme, custom card colour</pre>
+gui.theme("dark",  surface="#242430")     # dark theme, custom card color</pre>
 
 <h3>Fully custom</h3>
 <pre>gui.theme(
@@ -392,13 +392,13 @@ gui.theme("dark",  surface="#242430")     # dark theme, custom card colour</pre>
     bg      = "#f0f9ff",   # very light blue background
     surface = "#ffffff",   # white cards
     text    = "#0c1a2e",   # near-black text
-    border  = "#c7dced",   # subtle blue-grey borders
+    border  = "#c7dced",   # subtle blue-gray borders
     radius  = 8,           # px, also accepts "8px"
 )</pre>
 
 <p>Every value you don't pass falls back to the preset (or <code>light</code>
 when you build from scratch). All the rest — hover shades, tints, and the
-danger / success / warning colours — are derived automatically. You never
+danger / success / warning colors — are derived automatically. You never
 need to set them manually.</p>
 
 <h3>Switch themes at runtime</h3>
@@ -421,7 +421,7 @@ def ui():
 <div class="section" id="themes-vars">
 <h2>CSS variables reference</h2>
 
-<p>These are the eight arguments <code>gui.theme()</code> accepts. All other colours are derived from them.</p>
+<p>These are the eight arguments <code>gui.theme()</code> accepts. All other colors are derived from them.</p>
 
 <div class="card">
 <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -436,7 +436,7 @@ def ui():
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">bg</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--bg</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#f2f2f7</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Window / page background</td></tr>
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">surface</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--surface</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#ffffff</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Card and input background</td></tr>
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">surface_2</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--surface-2</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#f5f5f7</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Hover rows, tints, secondary surfaces</td></tr>
-<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">text</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--text</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#1c1c1e</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Primary text colour</td></tr>
+<tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">text</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--text</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#1c1c1e</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Primary text color</td></tr>
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">text_2</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--text-2</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#6e6e73</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Secondary / muted text</td></tr>
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent);border-bottom:1px solid var(--border)">border</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)">--border</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;border-bottom:1px solid var(--border)">#d1d1d6</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px;border-bottom:1px solid var(--border)">Borders, dividers, input outlines</td></tr>
 <tr><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--accent)">radius</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px;color:var(--text-2)">--r</td><td style="padding:7px 12px;font-family:var(--mono);font-size:12px">10px</td><td style="padding:7px 12px;color:var(--text-2);font-size:13px">Border radius of cards and inputs</td></tr>
@@ -668,7 +668,7 @@ apps ever need.</p>
 <h2>Centering a small app</h2>
 
 <p>To drop a single card in the middle of the window, you can wrap everything
-in a full-height, centred column:</p>
+in a full-height, centered column:</p>
 
 <pre>@gui.app("Converter", width=360, height=300)
 def ui():
@@ -680,7 +680,7 @@ def ui():
 
 <p>For simple apps that wrapper is pure boilerplate, so <code>@gui.app()</code>
 takes a <code>center=True</code> shortcut that does the same thing — it fills
-the window and centres its contents on both axes:</p>
+the window and centers its contents on both axes:</p>
 
 <pre>@gui.app("Converter", width=360, height=300, center=True)
 def ui():
@@ -804,7 +804,7 @@ def ui():
 raw CSS to the element. This is for one-off visual tweaks that don't warrant
 a theme change.</p>
 
-<pre># Coloured text
+<pre># Colored text
 gui.text("Warning", color="var(--warning)")
 gui.text("Custom hex", color="#0ea5e9")
 
@@ -812,8 +812,8 @@ gui.text("Custom hex", color="#0ea5e9")
 with gui.card(style="margin-top:24px"):
     gui.title("Spaced out")
 
-# Centred text inside a card
-gui.title("Centred", style="text-align:center")
+# Centered text inside a card
+gui.title("Centered", style="text-align:center")
 
 # Fixed-width number display
 gui.text(count.value, size="2xl", bold=True, style="min-width:64px;text-align:center")
@@ -892,8 +892,8 @@ gui.html("&lt;style&gt;:root { --shadow: none; --shadow-sm: none; }&lt;/style&gt
 gui.html("&lt;style&gt;:root { --shadow: 0 8px 40px rgba(0,0,0,.18); }&lt;/style&gt;")</pre>
 
 <h3>All available variables</h3>
-<pre>/* Colours */
---primary        accent colour (buttons, sliders, focus rings)
+<pre>/* Colors */
+--primary        accent color (buttons, sliders, focus rings)
 --primary-h      darker hover shade of primary (auto-derived by gui.theme)
 --primary-light  tint/ghost background for primary (auto-derived)
 --bg             window background
@@ -901,8 +901,8 @@ gui.html("&lt;style&gt;:root { --shadow: 0 8px 40px rgba(0,0,0,.18); }&lt;/style
 --surface-2      slightly tinted surface (hover rows, secondary panels)
 --text           primary text
 --text-2         secondary / muted text
---border         default border colour
---border-focus   border colour when an input has focus
+--border         default border color
+--border-focus   border color when an input has focus
 --danger         red for danger buttons and error text
 --danger-light   tint for danger backgrounds
 --success        green for success badges
@@ -1402,11 +1402,11 @@ gui.run()</pre>
   content, so an icon passed there would appear as literal markup.
 </div>
 
-<h3>Sizing, colour, and a subtle border</h3>
+<h3>Sizing, color, and a subtle border</h3>
 
 <p>Icons stroke in <code>currentColor</code>, so they inherit the
-surrounding text colour — an active rail item automatically turns the
-theme's primary colour. Recolour or resize a standalone icon through
+surrounding text color — an active rail item automatically turns the
+theme's primary color. Recolor or resize a standalone icon through
 <code>size=</code>, <code>stroke=</code>, and <code>style=</code>. Pass
 <code>border=True</code> to wrap a rail in a subtle themed panel (handy for
 a standalone rail that isn't already inside a bordered sidebar).</p>
@@ -1415,7 +1415,7 @@ a standalone rail that isn't already inside a bordered sidebar).</p>
 view = gui.rail(["Bars", "Lines", "Area"],
                 orientation="horizontal", border=True, key="view")
 
-# A standalone icon, resized and recoloured, via gui.html()
+# A standalone icon, resized and recolored, via gui.html()
 gui.html(gui.icon("triangle-alert", size=18,
                   style="color:var(--danger)"))</pre>
 

@@ -315,6 +315,22 @@ _JS = """
 // Walks old/new DOM trees and surgically patches only what changed.
 // guile-map elements: attributes are patched (so data-guile-map updates)
 // but children are skipped (Leaflet owns that subtree).
+// Preserve unfinished text (e.g. "-" in a numeric field), not merely focus.
+// A committed field, checkbox or dropdown must reflect Python's corrections.
+document.addEventListener('input', function(e) {
+    var el = e.target;
+    if (el.tagName === 'TEXTAREA' ||
+            (el.tagName === 'INPUT' && !['checkbox', 'radio', 'range'].includes(el.type))) {
+        el._guileEditing = true;
+    }
+}, true);
+document.addEventListener('change', function(e) {
+    e.target._guileEditing = !!e.target.multiple;
+}, true);
+document.addEventListener('focusout', function(e) {
+    e.target._guileEditing = false;
+}, true);
+
 function _guilePatch(oldNode, newNode) {
     if (oldNode.nodeType === 3) {
         if (oldNode.nodeValue !== newNode.nodeValue)
@@ -326,7 +342,8 @@ function _guilePatch(oldNode, newNode) {
                       oldNode.classList.contains('guile-map');
 
     var isFocused = (oldNode === document.activeElement);
-    var savedValue = isFocused ? oldNode.value : undefined;
+    var keepEditing = isFocused && oldNode._guileEditing === true;
+    var savedValue = keepEditing ? oldNode.value : undefined;
 
     // Sync attributes
     var na = newNode.attributes || [], oa = oldNode.attributes || [];
@@ -372,10 +389,9 @@ function _guilePatch(oldNode, newNode) {
     // reflecting the value/checked/selected ATTRIBUTES into the displayed
     // state, so attribute patching alone can't apply a Python-side change
     // (e.g. state.set("") to clear a field). Assign the properties
-    // explicitly — but never on the focused element, which keeps whatever
-    // the user is mid-typing. SELECT runs after the child sync above so
+    // explicitly, except while the user is still editing. SELECT runs after the child sync above so
     // the new <option> set is already in place.
-    if (!isFocused && oldNode.tagName) {
+    if (!keepEditing && oldNode.tagName) {
         var tag = oldNode.tagName;
         if (tag === 'INPUT') {
             if (oldNode.type === 'checkbox' || oldNode.type === 'radio') {
@@ -547,18 +563,22 @@ function _guileAttachMapEvents(entry, cfg) {
         // Edit / delete toolbars fire once per affected layer on Save.
         map.on('draw:edited', function(e) {
             if (!entry.shapeEditCid) return;
+            var changes = [];
             e.layers.eachLayer(function(l) {
-                _guile.trigger(entry.shapeEditCid, {
+                changes.push({
                     id: l._guileId || null, type: l._guileType,
                     coords: _guileShapeCoords(l._guileType, l)
-                }, entry.gen);
+                });
             });
+            _guile.batch(entry.shapeEditCid, changes, entry.gen);
         });
         map.on('draw:deleted', function(e) {
             if (!entry.shapeDeleteCid) return;
+            var changes = [];
             e.layers.eachLayer(function(l) {
-                _guile.trigger(entry.shapeDeleteCid, {id: l._guileId || null}, entry.gen);
+                changes.push({id: l._guileId || null});
             });
+            _guile.batch(entry.shapeDeleteCid, changes, entry.gen);
         });
         // While the edit / delete toolbar is active Leaflet.draw owns the
         // layers: it tracks pending edits / removals until Save or Cancel.
@@ -887,6 +907,12 @@ function _guileApplyMarkers(entry, lg, markers) {
 
 // ── Guile bridge ─────────────────────────────────────────────────────────
 window._guile = {
+    sequence: 0,
+    batch: function(cid, values, gen) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.handle_batch) {
+            window.pywebview.api.handle_batch(cid, values, gen, ++window._guile.sequence);
+        }
+    },
     update: function(html) {
         var tmp = document.createElement('div');
         tmp.innerHTML = html;
@@ -919,7 +945,7 @@ window._guile = {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.handle) {
             window.pywebview.api.handle(cid,
                 value === undefined ? null : value,
-                gen === undefined ? null : gen);
+                gen === undefined ? null : gen, ++window._guile.sequence);
         } else {
             console.error('[guile] pywebview api not available');
         }
@@ -931,7 +957,7 @@ window._guile = {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.silent_update) {
             window.pywebview.api.silent_update(cid,
                 value === undefined ? null : value,
-                gen === undefined ? null : gen);
+                gen === undefined ? null : gen, ++window._guile.sequence);
         }
     }
 };

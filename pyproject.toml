@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "guile"
-version = "0.9.2"
+version = "1.0.0"
 authors = [
   { name = "Andres Patrignani", email = "andrespatrignani@ksu.edu" },
 ]
