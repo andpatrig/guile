@@ -1,4 +1,4 @@
-# guile — complete reference for AI assistants (v0.9.1)
+# guile — complete reference for AI assistants (v0.9.2)
 
 guile is a lightweight Python framework for desktop apps. One Python process
 opens a native window (pywebview: WebView2 on Windows, WKWebView on macOS).
@@ -248,7 +248,7 @@ gui.GeoJSON(data, color="#3388ff", weight=2, opacity=1.0, fill_color=None,
             fill_opacity=0.2, popup=None, label=None, on_click=None,
             on_hover=None)
     # Vector features from a dict, JSON string, or .geojson path.
-    # popup: property name, or callable props -> HTML str.
+    # popup: property name, or callable props -> plain-text str (HTML is displayed literally).
     # label: property name or callable — permanent text pill on the feature.
     # on_hover(props) on enter, on_hover(None) on leave (each call renders).
     # on_click(properties) fires with the clicked feature's properties dict

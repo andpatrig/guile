@@ -473,7 +473,7 @@ function _guileAttachMapEvents(entry, cfg) {
         if (newClickCid) {
             (function(cid) {
                 map.on('click', function(e) {
-                    _guile.trigger(cid, {lat: e.latlng.lat, lng: e.latlng.lng});
+                    _guile.trigger(cid, {lat: e.latlng.lat, lng: e.latlng.lng}, entry.gen);
                 });
             })(newClickCid);
         }
@@ -489,12 +489,13 @@ function _guileAttachMapEvents(entry, cfg) {
                 var _moveTimer = null;
                 map.on('moveend', function() {
                     clearTimeout(_moveTimer);
+                    var gen = entry.gen;
                     _moveTimer = setTimeout(function() {
                         var c = map.getCenter();
                         _guile.trigger(cid, {
                             center: [c.lat, c.lng],
                             zoom:   map.getZoom()
-                        });
+                        }, gen);
                     }, 150);
                 });
             })(newMoveCid);
@@ -540,7 +541,7 @@ function _guileAttachMapEvents(entry, cfg) {
                 _guile.trigger(entry.shapeCid, {
                     type: e.layerType,
                     coords: _guileShapeCoords(e.layerType, layer)
-                });
+                }, entry.gen);
             }
         });
         // Edit / delete toolbars fire once per affected layer on Save.
@@ -550,13 +551,13 @@ function _guileAttachMapEvents(entry, cfg) {
                 _guile.trigger(entry.shapeEditCid, {
                     id: l._guileId || null, type: l._guileType,
                     coords: _guileShapeCoords(l._guileType, l)
-                });
+                }, entry.gen);
             });
         });
         map.on('draw:deleted', function(e) {
             if (!entry.shapeDeleteCid) return;
             e.layers.eachLayer(function(l) {
-                _guile.trigger(entry.shapeDeleteCid, {id: l._guileId || null});
+                _guile.trigger(entry.shapeDeleteCid, {id: l._guileId || null}, entry.gen);
             });
         });
         // While the edit / delete toolbar is active Leaflet.draw owns the
@@ -625,8 +626,20 @@ function _guileShapeLayer(shape, style) {
     return null;
 }
 
+// Map labels and popups are plain text, never HTML. Leaflet renders a string
+// argument as innerHTML, so an untrusted GeoJSON property or marker label could
+// smuggle in <script>/<img onerror=…> that runs in the app and can reach the
+// Python bridge. Passing an element instead makes Leaflet insert it verbatim,
+// so the characters show literally. (If a caller ever needs real HTML, that
+// must be a separate, explicit opt-in that sanitises or requires trusted HTML.)
+function _guileTextEl(text) {
+    var el = document.createElement('div');
+    el.textContent = String(text);
+    return el;
+}
+
 function _guileLabel(layer, text) {
-    layer.bindTooltip(String(text), {
+    layer.bindTooltip(_guileTextEl(text), {
         permanent: true, className: 'guile-map-label',
         direction: (layer instanceof L.Marker) ? 'top' : 'center'
     });
@@ -653,13 +666,13 @@ function _guileApplyDrawn(entry, cfg) {
             if (entry.drawBusy) return;            // the draw tool owns this click
             if (!entry.shapeClickCid) return;      // let map on_click fire
             L.DomEvent.stopPropagation(e);
-            _guile.trigger(entry.shapeClickCid, {id: shape.id});
+            _guile.trigger(entry.shapeClickCid, {id: shape.id}, entry.gen);
         });
         layer.on('mouseover', function() {
-            if (entry.shapeHoverCid) _guile.trigger(entry.shapeHoverCid, {id: shape.id});
+            if (entry.shapeHoverCid) _guile.trigger(entry.shapeHoverCid, {id: shape.id}, entry.gen);
         });
         layer.on('mouseout', function() {
-            if (entry.shapeHoverCid) _guile.trigger(entry.shapeHoverCid, null);
+            if (entry.shapeHoverCid) _guile.trigger(entry.shapeHoverCid, null, entry.gen);
         });
         items.addLayer(layer);
     });
@@ -690,6 +703,8 @@ function _guileSyncMaps() {
         var id      = el.id;
         var cfg     = JSON.parse(el.getAttribute('data-guile-map'));
         var cfgJson = JSON.stringify(cfg);
+        var gen     = Number(el.getAttribute('data-guile-gen'));
+        if (_guileMaps[id]) _guileMaps[id].gen = gen;
 
         // Orphan guard. The patcher replaces a whole subtree when an
         // ancestor's id changes (e.g. an unkeyed sidebar element appears or
@@ -720,7 +735,7 @@ function _guileSyncMaps() {
             map.getPane('guile-image').style.zIndex = 350;
             var lg = L.layerGroup().addTo(map);
             var entry = {
-                map: map, layerGroup: lg, cfgJson: cfgJson,
+                map: map, layerGroup: lg, cfgJson: cfgJson, gen: gen,
                 onClickCid: null, onMoveCid: null,
                 drawControl: null, drawnItems: null,
                 tileLayers: [], tilesJson: null,
@@ -735,7 +750,7 @@ function _guileSyncMaps() {
             _guileAttachMapEvents(entry, cfg);
             if (cfg.drawn) _guileApplyDrawn(entry, cfg);
             entry.drawnJson = JSON.stringify([cfg.drawn || null, cfg.draw_style || null]);
-            _guileApplyMarkers(lg, cfg.markers || []);
+            _guileApplyMarkers(entry, lg, cfg.markers || []);
         } else if (_guileMaps[id].cfgJson !== cfgJson) {
             var entry = _guileMaps[id];
             entry.map.setView(cfg.center, cfg.zoom);
@@ -760,7 +775,7 @@ function _guileSyncMaps() {
                 if (cfg.drawn) _guileApplyDrawn(entry, cfg);
                 entry.drawnJson = newDrawnJson;
             }
-            _guileApplyMarkers(entry.layerGroup, cfg.markers || []);
+            _guileApplyMarkers(entry, entry.layerGroup, cfg.markers || []);
             entry.cfgJson = cfgJson;
         }
     });
@@ -817,7 +832,7 @@ function _guileApplyOverlays(entry, layers) {
                     var props = feature.properties || {};
                     if (cfg.popup && props[cfg.popup] !== undefined
                             && props[cfg.popup] !== null) {
-                        lyr.bindPopup(String(props[cfg.popup]));
+                        lyr.bindPopup(_guileTextEl(props[cfg.popup]));
                     }
                     if (cfg.label && props[cfg.label] !== undefined
                             && props[cfg.label] !== null) {
@@ -826,12 +841,12 @@ function _guileApplyOverlays(entry, layers) {
                     if (cfg.cid) {
                         lyr.on('click', function(e) {
                             L.DomEvent.stopPropagation(e); // not also map click
-                            _guile.trigger(cfg.cid, props);
+                            _guile.trigger(cfg.cid, props, entry.gen);
                         });
                     }
                     if (cfg.hover_cid) {
-                        lyr.on('mouseover', function() { _guile.trigger(cfg.hover_cid, props); });
-                        lyr.on('mouseout',  function() { _guile.trigger(cfg.hover_cid, null); });
+                        lyr.on('mouseover', function() { _guile.trigger(cfg.hover_cid, props, entry.gen); });
+                        lyr.on('mouseout',  function() { _guile.trigger(cfg.hover_cid, null, entry.gen); });
                     }
                 }
             });
@@ -852,17 +867,17 @@ function _guileApplyOverlays(entry, layers) {
     else setTimeout(removeOld, 2000);   // fallback if 'load' never fires
 }
 
-function _guileApplyMarkers(lg, markers) {
+function _guileApplyMarkers(entry, lg, markers) {
     markers.forEach(function(m) {
         var marker = L.marker(m.latlng);
-        if (m.popup)   marker.bindPopup(m.popup);
-        if (m.tooltip) marker.bindTooltip(m.tooltip);
+        if (m.popup)   marker.bindPopup(_guileTextEl(m.popup));
+        if (m.tooltip) marker.bindTooltip(_guileTextEl(m.tooltip));
         // Wire marker click if a Python callback was registered.
         if (m.cid) {
             (function(cid) {
                 marker.on('click', function(e) {
                     L.DomEvent.stopPropagation(e); // don't also fire map click
-                    _guile.trigger(cid, null);
+                    _guile.trigger(cid, null, entry.gen);
                 });
             })(m.cid);
         }
@@ -897,10 +912,14 @@ window._guile = {
             entry.map.invalidateSize();
         });
     },
-    trigger: function(cid, value) {
+    // gen is the render generation the handler was emitted on. It rides along
+    // to Python, which drops the event if the page has since been replaced —
+    // so a click left on an old layout can't fire a newly-assigned callback.
+    trigger: function(cid, value, gen) {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.handle) {
             window.pywebview.api.handle(cid,
-                value === undefined ? null : value);
+                value === undefined ? null : value,
+                gen === undefined ? null : gen);
         } else {
             console.error('[guile] pywebview api not available');
         }
@@ -908,10 +927,11 @@ window._guile = {
     // silent: update Python state without triggering a re-render.
     // Used by multiselect onchange so variables.value stays current
     // while the user is mid-selection, without replacing the DOM element.
-    silent: function(cid, value) {
+    silent: function(cid, value, gen) {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.silent_update) {
             window.pywebview.api.silent_update(cid,
-                value === undefined ? null : value);
+                value === undefined ? null : value,
+                gen === undefined ? null : gen);
         }
     }
 };

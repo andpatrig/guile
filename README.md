@@ -122,6 +122,10 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v0.9.2**
+- **Security: map data is no longer interpreted as HTML.** Leaflet renders a string popup/tooltip/label as HTML, so a `gui.leaflet()` layer built from untrusted GeoJSON (or a marker with an untrusted `popup`/`tooltip`) could run injected markup or script in the app. Feature popups, marker popups/tooltips, and permanent labels now render as plain text. **Behaviour change:** a callable `popup=`/`label=` that returned HTML (e.g. `lambda p: f"<b>{p['id']}</b>"`) is now shown literally rather than formatted. If you need rich content, that must be an explicit, sanitised opt-in — open an issue if you rely on it.
+- **Fix: a click during a redraw can no longer trigger the wrong action.** Auto-generated widget ids are positional, so an unkeyed button at a given spot could be "Cancel" in one layout and "Delete" in the next, and callbacks go live a moment before the page repaints. A click left over from the old layout could reach the newly-assigned callback. Every render is now stamped with a generation that rides along with each event; an event from a superseded page is dropped instead of dispatched. This is conservative — a rapid click that spans a redraw can be discarded — but it can never invoke the wrong action. (Keys give a widget stable state, but do not by themselves make its events safe.)
+
 **v0.9.1**
 - The built-in chrome now uses matching Lucide glyphs: the file-picker button's `📁` emoji is a `folder` icon, and the modal close's `✕` is an `x` — both stroke in `currentColor`, so they take the theme colour like everything else. (Their paths are inlined, so file pickers and modals don't load the icon dataset.) The `gui.select()` dropdown chevron was already a matching SVG and is unchanged.
 

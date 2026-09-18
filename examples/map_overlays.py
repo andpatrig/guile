@@ -82,7 +82,7 @@ def ui():
                                                    opacity=opacity.value))
                 layers.append(gui.GeoJSON(
                     PLOTS, color="#ffffff", weight=2, fill_opacity=0.05,
-                    popup=lambda p: f"<b>{p['plot_id']}</b><br>{p['treatment']}",
+                    popup=lambda p: f"{p['plot_id']}: {p['treatment']}",
                     on_click=selected.set,
                 ))
                 # For a large drone mosaic, replace the ImageOverlay with:

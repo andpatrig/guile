@@ -101,7 +101,7 @@ def ui():
                 markers = [
                     gui.Marker(
                         (lat, lon),
-                        popup=f"<b>{name}</b><br>{county} County",
+                        popup=f"{name}, {county} County",
                         tooltip=name,
                     )
                     for name, county, lat, lon in visible

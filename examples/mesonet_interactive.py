@@ -78,7 +78,7 @@ def ui():
                         gui.Marker(
                             (lat, lon),
                             tooltip=name,
-                            popup=f"<b>{name}</b><br>{county} County<br>"
+                            popup=f"{name}, {county} County; "
                                   f"{lat:.4f}°N, {abs(lon):.4f}°W",
                             on_click=(lambda n=name, c=county, la=lat, lo=lon:
                                       on_station_click(n, c, la, lo)),

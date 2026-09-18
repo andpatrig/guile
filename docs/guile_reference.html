@@ -303,7 +303,7 @@ pre {
 <nav id="sidebar">
   <div class="logo">
     <div class="logo-name">gui<span>le</span></div>
-    <div class="logo-sub">API reference v0.9.1</div>
+    <div class="logo-sub">API reference v0.9.2</div>
   </div>
   <div id="nav-links"></div>
 </nav>
@@ -694,7 +694,7 @@ const WIDGETS = [
      ["opacity","float = 1.0","Stroke opacity"],
      ["fill_color","str = None","Fill colour; defaults to color"],
      ["fill_opacity","float = 0.2","Fill opacity"],
-     ["popup","str|Callable = None","Property name to show when a feature is clicked, or a callable props -> str/HTML for custom content"],
+     ["popup","str|Callable = None","Property name to show when a feature is clicked, or a callable props -> str for custom plain-text content (HTML is displayed literally)"],
      ["label","str|Callable = None","Property name, or callable props -> str, shown permanently as a small pill centred on each feature"],
      ["on_click","Callable = None","on_click(properties) — fires with the clicked feature's properties dict"],
      ["on_hover","Callable = None","on_hover(properties) on pointer enter, on_hover(None) on leave. Each call renders — keep it light."],
@@ -705,7 +705,7 @@ const WIDGETS = [
    desc:"A map marker for use with gui.leaflet(). popup appears on click; tooltip appears on hover. on_click fires a Python callback when the marker is clicked (propagation to the map click handler is stopped automatically).",
    args:[
      ["latlng","tuple","(lat, lon) position as floats"],
-     ["popup","str = None","HTML content shown in a popup when the marker is clicked"],
+     ["popup","str = None","Plain text shown in a popup when the marker is clicked (HTML is displayed literally)"],
      ["tooltip","str = None","Text shown on hover"],
      ["on_click","Callable = None","Zero-argument callback fired when this marker is clicked"],
    ],

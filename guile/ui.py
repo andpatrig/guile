@@ -76,23 +76,63 @@ _silent_callbacks: dict = {} # silent handlers (no re-render on update)
 _seen_keys:       set  = set()  # explicit keys used this render
 _warned_dup_keys: set  = set()  # keys already warned about (once per process)
 
+# Render generation — the fix for stale clicks landing on the wrong callback.
+#
+# Auto ids (g1, g2, …) are positional, so widget N is "Cancel" one render and
+# "Delete" the next — same id, different action. Worse, a render commits its new
+# callbacks (see _commit_callbacks) a moment BEFORE the browser repaints, so a
+# click on the still-visible old page can arrive while the live table already
+# holds the new handler: an old "Cancel" click fires the new "Delete".
+#
+# So we stamp every render with a generation number and bake it into every
+# handler the page emits (see _trigger_js / _silent_js and the map config).
+# A click carries the generation of the page it was made on; dispatch() rejects
+# it unless it matches the generation currently committed. A leftover click from
+# a superseded layout is dropped instead of hitting a freshly-assigned callback.
+# This is deliberately conservative — a rapid click that spans a redraw can be
+# discarded — but it can never invoke the wrong action. Keys give a widget a
+# stable id for state, but a key alone does not make its events safe (the same
+# key can front a different action after a change), so this guard applies to
+# keyed and unkeyed widgets alike.
+_generation:      int  = 0   # bumped at the start of each render
+_live_generation: int  = 0   # generation of the last committed render
+
 def _reset_render():
     """Start a fresh render: reset IDs, callbacks, and the auto-key counter."""
-    global _id_counter, _auto_key_counter
+    global _id_counter, _auto_key_counter, _generation
     _id_counter       = 0
     _auto_key_counter = 0   # must reset so widget N always gets key _auto_N
+    _generation      += 1   # this render's handlers carry this generation
     _callbacks.clear()
     _silent_callbacks.clear()
     _seen_keys.clear()
 
 def _commit_callbacks():
     """After a render completes, promote scratch callbacks to live."""
+    global _live_generation
     _live_callbacks.clear()
     _live_callbacks.update({k: v for k, v in _callbacks.items()
                             if not k.endswith('__silent')})
     _silent_callbacks.clear()
     _silent_callbacks.update({k[:-8]: v for k, v in _callbacks.items()
                               if k.endswith('__silent')})
+    # The just-built page becomes the live one: events tagged with this
+    # generation are now the only ones dispatch() will honour.
+    _live_generation = _generation
+
+def _render_generation() -> int:
+    """Generation of the render currently being built. Embedded into every
+    handler so a click reports which page produced it."""
+    return _generation
+
+def _trigger_js(cid: str, value_expr: str = "null") -> str:
+    """Build the JS that reports an event to Python, tagged with this render's
+    generation so dispatch() can reject a click left over from an old layout."""
+    return f"window._guile.trigger('{cid}',{value_expr},{_generation})"
+
+def _silent_js(cid: str, value_expr: str) -> str:
+    """Like _trigger_js, for the silent (no re-render) path."""
+    return f"window._guile.silent('{cid}',{value_expr},{_generation})"
 
 def _next_id(key: Optional[str] = None) -> str:
     global _id_counter
@@ -166,12 +206,18 @@ def _report_callback_error():
         pass                   # never let error reporting raise
 
 
-def dispatch_silent(cid: str, value: Any = None):
+def dispatch_silent(cid: str, value: Any = None, gen: Any = None):
     """
     Call cid's silent handler, if any, without triggering a re-render.
     The handler updates state via set_silent(). Used by multiselect and
     text inputs to keep .value current while the user is mid-interaction.
+
+    gen is the render generation the event was emitted on. A value from a
+    superseded page is dropped rather than applied to a reused id (gen=None
+    skips the check, for callers — e.g. tests — that don't supply one).
     """
+    if gen is not None and gen != _live_generation:
+        return
     entry = _silent_callbacks.get(cid)
     if entry:
         fn, _ = entry
@@ -181,7 +227,7 @@ def dispatch_silent(cid: str, value: Any = None):
             _report_callback_error()
 
 
-def dispatch(cid: str, value: Any = None):
+def dispatch(cid: str, value: Any = None, gen: Any = None):
     """
     Call the live handler for cid exactly once. Used by _Bridge in _app.py.
 
@@ -190,7 +236,14 @@ def dispatch(cid: str, value: Any = None):
     was recorded at registration time (_reg), so no trial-and-error calling.
     Exceptions from the handler are printed and shown as a danger toast,
     never re-dispatched.
+
+    gen is the render generation the click was made on. If it doesn't match the
+    live render, the click came from a page that has since been replaced — drop
+    it, so a stale click can't fire a callback that now sits at the same id
+    (e.g. an old "Cancel" reaching a new "Delete"). gen=None skips the check.
     """
+    if gen is not None and gen != _live_generation:
+        return
     entry = _live_callbacks.get(cid)
     if not entry:
         return
@@ -637,7 +690,7 @@ class _Button(_Leaf):
         cls = f"guile-btn guile-btn-{self._variant}"
         if self._size != "md":
             cls += f" guile-btn-{self._size}"
-        js  = f"window._guile.trigger('{self.id}',null)"
+        js  = _trigger_js(self.id)
         dis = " disabled" if self._disabled else ""
         return (f'<button id="{self.id}" class="{cls}" style="{self._style}"'
                 f' onclick="{js}"{dis}>{_txt(self._label)}</button>')
@@ -688,11 +741,11 @@ class _Input(_Leaf):
 
     def render(self) -> str:
         val     = self._state.value
-        trigger = f"window._guile.trigger('{self.id}',this.value)"
+        trigger = _trigger_js(self.id, "this.value")
         if self._live:
             events = f' oninput="{trigger}"'
         else:
-            silent = f"window._guile.silent('{self.id}',this.value)"
+            silent = _silent_js(self.id, "this.value")
             events = f' oninput="{silent}" onchange="{trigger}"'
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
@@ -799,8 +852,8 @@ class _NumberInput(_Leaf):
         # Same event strategy as _Input: silent per-keystroke state updates,
         # full render on commit (Enter, focus leave, or spinner click —
         # spinner steps fire both input and change).
-        silent  = f"window._guile.silent('{self.id}',this.value)"
-        trigger = f"window._guile.trigger('{self.id}',this.value)"
+        silent  = _silent_js(self.id, "this.value")
+        trigger = _trigger_js(self.id, "this.value")
         dis  = " disabled" if self._disabled else ""
         mn   = f' min="{self._min}"'   if self._min is not None else ""
         mx   = f' max="{self._max}"'   if self._max is not None else ""
@@ -860,11 +913,11 @@ class _TextArea(_Leaf):
 
     def render(self) -> str:
         val     = self._state.value
-        trigger = f"window._guile.trigger('{self.id}',this.value)"
+        trigger = _trigger_js(self.id, "this.value")
         if self._live:
             events = f' oninput="{trigger}"'
         else:
-            silent = f"window._guile.silent('{self.id}',this.value)"
+            silent = _silent_js(self.id, "this.value")
             events = f' oninput="{silent}" onchange="{trigger}"'
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
@@ -899,7 +952,7 @@ class _Checkbox(_Leaf):
 
     def render(self) -> str:
         chk = " checked" if self._state.value else ""
-        js  = f"window._guile.trigger('{self.id}',String(this.checked))"
+        js  = _trigger_js(self.id, "String(this.checked)")
         dis = " disabled" if self._disabled else ""
         return (f'<label id="{self.id}" class="guile-check-group">'
                 f'<input type="checkbox" class="guile-checkbox"{chk}'
@@ -950,7 +1003,7 @@ class _Select(_Leaf):
             f'{_txt(l)}</option>'
             for v, l in self._opts
         )
-        js  = f"window._guile.trigger('{self.id}',this.value)"
+        js  = _trigger_js(self.id, "this.value")
         dis = " disabled" if self._disabled else ""
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
@@ -1048,9 +1101,9 @@ class _MultiSelect(_Leaf):
         collect = (f"JSON.stringify(Array.from(this.selectedOptions)"
                    f".map(function(o){{return o.value}}))")
         # silent update on every change — state updated, no re-render
-        js_change = f"window._guile.silent('{self.id}',{collect})"
+        js_change = _silent_js(self.id, collect)
         # full trigger on blur — state already current, just re-renders
-        js_blur   = f"window._guile.trigger('{self.id}',{collect})"
+        js_blur   = _trigger_js(self.id, collect)
         dis = " disabled" if self._disabled else ""
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
@@ -1093,7 +1146,7 @@ class _Slider(_Leaf):
 
     def render(self) -> str:
         val      = self._state.value
-        trigger  = f"window._guile.trigger('{self.id}',this.value)"
+        trigger  = _trigger_js(self.id, "this.value")
         lbl_html = ""
         val_id   = f"{self.id}-val"   # ID of the live value span
         if self._label:
@@ -1142,7 +1195,7 @@ class _DateInput(_Leaf):
 
     def render(self) -> str:
         val = self._state.value
-        js  = f"window._guile.trigger('{self.id}',this.value)"
+        js  = _trigger_js(self.id, "this.value")
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
         dis = " disabled" if self._disabled else ""
@@ -1187,7 +1240,7 @@ class _DateTimeInput(_Leaf):
 
     def render(self) -> str:
         val = self._state.value
-        js  = f"window._guile.trigger('{self.id}',this.value)"
+        js  = _trigger_js(self.id, "this.value")
         lbl = (f'<span style="font-size:13px;font-weight:500;color:var(--text-2)">'
                f'{_txt(self._label)}</span>') if self._label else ""
         dis = " disabled" if self._disabled else ""
@@ -1306,7 +1359,7 @@ class _FilePicker(_Leaf):
     def set(self, v):        self._state.set(v)
 
     def render(self) -> str:
-        js       = f"window._guile.trigger('{self.id}',null)"
+        js       = _trigger_js(self.id)
         path     = self._state.value
         filename = path.replace("\\", "/").split("/")[-1] if path else ""
         lbl_html = _txt(self._label)
@@ -1374,7 +1427,8 @@ class _Tabs(_Leaf):
         buttons = "".join(
             f'<button class="guile-tab-btn{" guile-tab-active" if l == active else ""}"'
             f' data-cid="{_esc(self.id)}" data-val="{_esc(l)}"'
-            f' onclick="window._guile.trigger(this.dataset.cid,this.dataset.val)">'
+            f' onclick="window._guile.trigger(this.dataset.cid,this.dataset.val,'
+            f'{_render_generation()})">'
             f'{_txt(l)}</button>'
             for l in self._labels
         )
@@ -1494,7 +1548,8 @@ class _Rail(_Leaf):
                 f'<button class="guile-rail-btn{acls}"'
                 f' data-cid="{_esc(self.id)}" data-val="{_esc(val)}"'
                 f' title="{_esc(label)}"'
-                f' onclick="window._guile.trigger(this.dataset.cid,this.dataset.val)">'
+                f' onclick="window._guile.trigger(this.dataset.cid,this.dataset.val,'
+                f'{_render_generation()})">'
                 f'{icon}{lab}</button>')
         bcls = " guile-rail-bordered" if self._border else ""
         return (f'<div id="{self.id}" class="guile-rail guile-rail-{self._orient}{bcls}"'
@@ -1810,7 +1865,9 @@ class GeoJSON:
 
     data       dict, JSON string, or path to a .geojson / .json file.
     popup      property name shown when a feature is clicked, or a callable
-               props -> str/HTML for custom content.
+               props -> str for custom content. Shown as plain text: any HTML
+               is displayed literally, not rendered, so untrusted feature data
+               can't inject markup or script.
     label      property name, or callable props -> str, shown permanently
                as a small pill centred on each feature.
     on_click   on_click(properties) — the clicked feature's properties dict.
@@ -2129,8 +2186,13 @@ class _Map(_Leaf):
                              for l in self._layers],
         }
         cfg_json = _esc(json.dumps(cfg))
+        # The generation rides in its own attribute, NOT inside data-guile-map:
+        # _guileSyncMaps diffs the whole cfg blob to decide what to rebuild, so a
+        # value that changes every render would reset the map view each time. The
+        # map's click handlers read it (as entry.gen) when they fire.
         return (f'<div id="{self.id}" class="guile-map"'
                 f' data-guile-map="{cfg_json}"'
+                f' data-guile-gen="{_render_generation()}"'
                 f' style="{self._style}">'
                 f'<div class="guile-map-canvas"'
                 f' style="height:{self._height}px"></div></div>')
@@ -2178,7 +2240,7 @@ class _Modal(_Container):
             return f'<div id="{self.id}" style="display:none"></div>'
 
         inner      = self._render_children()
-        close_js   = (f"window._guile.trigger('{self.id}-close',null)"
+        close_js   = (_trigger_js(f"{self.id}-close")
                       if self._on_close else "")
         close_btn  = (f'<button onclick="{close_js}" '
                       f'style="background:none;border:none;cursor:pointer;'

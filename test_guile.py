@@ -413,7 +413,7 @@ def test_icon_and_rail():
     # The apostrophe label is escaped in the attribute, never emitted as a raw
     # ' inside the onclick handler (which would be a JS syntax error / injection).
     assert "O&#x27;Brien" in html, "label not attribute-escaped"
-    assert "trigger(this.dataset.cid,this.dataset.val)" in html
+    assert "trigger(this.dataset.cid,this.dataset.val," in html   # + generation arg
 
     # Clicking the third item updates the bound State through the callback.
     dispatch(cids[0], "Plain")
@@ -439,7 +439,7 @@ def test_map_layers_render():
                              opacity=0.5),
             gui.TileOverlay("http://localhost:8000/{z}/{x}/{y}.png",
                             max_zoom=21, tms=True),
-            gui.GeoJSON(geo, popup=lambda p: f"<b>{p['plot_id']}</b>",
+            gui.GeoJSON(geo, popup=lambda p: f"Plot {p['plot_id']}",
                         on_click=clicked.append),
         ])
 
@@ -457,7 +457,7 @@ def test_map_layers_render():
     assert tiles["options"]["tms"] is True
     assert tiles["options"]["maxNativeZoom"] == 21
     assert gj["popup"] == "_guile_popup"
-    assert gj["data"]["features"][0]["properties"]["_guile_popup"] == "<b>P1</b>"
+    assert gj["data"]["features"][0]["properties"]["_guile_popup"] == "Plot P1"
     assert "_guile_popup" not in geo["features"][0]["properties"], \
         "callable popup must not mutate the caller's GeoJSON"
 
@@ -530,6 +530,170 @@ def test_map_drawn_and_labels():
     except ValueError:
         pass
     return "drawn ids/style/label ok; 4 shape callbacks + GeoJSON label/hover"
+
+
+def test_stale_click_rejected():
+    """A click left over from a superseded layout must not fire a callback that
+    now sits at the same auto-generated id. Reproduces the reported bug: an old
+    'Cancel' click reaching a freshly-assigned 'Delete'."""
+    import guile.ui as _ui
+
+    calls = []
+
+    reset_globals()
+    render_ui(lambda: gui.button("Cancel", on_click=lambda: calls.append("cancel")))
+    gen_old = _ui._live_generation
+    cid     = list(_ui._live_callbacks.keys())[0]   # auto id, e.g. "g1"
+
+    # Same position, now a destructive action — same positional id, new handler.
+    render_ui(lambda: gui.button("Delete", on_click=lambda: calls.append("delete")))
+    gen_new = _ui._live_generation
+    assert cid in _ui._live_callbacks, "auto id reused as expected"
+    assert gen_new != gen_old, "each render gets a fresh generation"
+
+    # The delayed click from page 1 carries the old generation: it is dropped,
+    # not routed to Delete.
+    dispatch(cid, None, gen_old)
+    assert calls == [], f"stale click fired the new callback: {calls}"
+
+    # A click from the current page still works.
+    dispatch(cid, None, gen_new)
+    assert calls == ["delete"], calls
+
+    # No generation supplied (older callers / tests) is not rejected.
+    dispatch(cid, None)
+    assert calls == ["delete", "delete"], calls
+    return "stale-generation click dropped; current + untagged dispatched"
+
+
+def test_map_strings_render_as_text():
+    """Untrusted map strings (GeoJSON popup/label, marker popup/tooltip) reach
+    Leaflet as text nodes, never as raw strings it would parse as HTML."""
+    from guile import _template as T
+    js = T._JS
+
+    assert "function _guileTextEl(" in js, "text-node helper missing"
+    # The three sinks all go through the helper.
+    assert "bindPopup(_guileTextEl(props[cfg.popup]))" in js
+    assert "bindPopup(_guileTextEl(m.popup))" in js
+    assert "bindTooltip(_guileTextEl(m.tooltip))" in js
+    assert "layer.bindTooltip(_guileTextEl(text)" in js
+    # And none of them hand Leaflet a bare string (which it renders as innerHTML).
+    for bad in ("bindPopup(String(", "bindPopup(m.popup)", "bindPopup(props[cfg.popup])",
+                "bindTooltip(m.tooltip)", "bindTooltip(String(text)"):
+        assert bad not in js, f"unsanitised Leaflet sink still present: {bad}"
+    return "GeoJSON/marker labels + popups rendered as text, not HTML"
+
+
+def test_map_events_across_redraws():
+    """Execute the real JS with a small Leaflet double, then dispatch its
+    messages in Python. Unchanged maps must stay interactive after a redraw;
+    delayed events must retain their original generation."""
+    import json, re, html, shutil, subprocess
+    import guile.ui as U
+    from guile import _template as T
+    node = shutil.which("node")
+    if not node:
+        return "SKIP: Node.js required for map event integration test"
+    calls = []
+    payload = '<img src=x onerror="window.injected=true">'
+    geo = {"type": "Feature", "properties": {"name": payload},
+           "geometry": {"type": "Point", "coordinates": [0, 0]}}
+
+    def build():
+        gui.leaflet(key="map", on_click=lambda lat, lng: calls.append("map"),
+                    on_move=lambda center, zoom: calls.append("move"),
+                    markers=[gui.Marker((0, 0), popup=payload, tooltip=payload,
+                                        on_click=lambda: calls.append("marker"))],
+                    layers=[gui.GeoJSON(geo, popup="name", label="name",
+                                        on_click=lambda props: calls.append("geo"))])
+
+    reset_globals()
+    first, _ = render_ui(build)
+    old_gen = U._live_generation
+    second, _ = render_ui(build)
+    gen = U._live_generation
+    cfg = html.unescape(re.search(r'data-guile-map="([^"]+)"', second).group(1))
+    assert cfg == html.unescape(re.search(r'data-guile-map="([^"]+)"', first).group(1))
+    setup = "const cfg = " + cfg + ";\n"
+    setup += f"let generation = {old_gen}; const nextGeneration = {gen};\n"
+    setup += r'''
+const assert = require('assert');
+global.window = global;
+const messages = [], timers = new Map(), content = [], markers = [], features = [];
+let timerId = 0, views = 0;
+global.setTimeout = fn => { timers.set(++timerId, fn); return timerId; };
+global.clearTimeout = id => timers.delete(id);
+function flush() { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); }
+const el = {id: 'gk-map', querySelector: () => ({}),
+    getAttribute: name => name === 'data-guile-map' ? JSON.stringify(cfg) : String(generation)};
+global.document = {addEventListener() {}, body: {contains: () => true},
+    querySelectorAll: () => [el], createElement: tag => ({tagName: tag})};
+global.pywebview = {api: {handle: (...args) => messages.push(args)}};
+function layer() { return {events: {}, on(name, fn) { this.events[name] = fn; },
+    addTo() { return this; }, bindPopup(value) { content.push(value); },
+    bindTooltip(value) { content.push(value); }}; }
+const map = Object.assign(layer(), {off(name) { delete this.events[name]; },
+    setView() { views++; }, createPane() {}, getPane: () => ({style: {}}),
+    getCenter: () => ({lat: 0, lng: 0}), getZoom: () => 10, getContainer: () => el});
+global.L = {map: () => map, Marker: function() {}, DomEvent: {stopPropagation() {}},
+    layerGroup: () => Object.assign(layer(), {clearLayers() {}}), tileLayer: () => layer(),
+    marker: () => { const m = layer(); markers.push(m); return m; },
+    geoJSON(data, options) { const f = layer(); features.push(f);
+        options.onEachFeature(data, f); return layer(); }};
+'''
+    checks = r'''
+_guileSyncMaps();
+assert.strictEqual(typeof _guileMaps[el.id].gen, 'number');
+map.events.moveend(); // delayed event from the old page
+generation = nextGeneration;
+_guileSyncMaps(); // same config; must not reset the view or rebuild layers
+assert.strictEqual(views, 1);
+assert.strictEqual(markers.length, 1);
+assert.strictEqual(features.length, 1);
+flush();
+assert.strictEqual(messages[0][2], nextGeneration - 1);
+map.events.click({latlng: {lat: 0, lng: 0}});
+markers[0].events.click({});
+features[0].events.click({});
+map.events.moveend(); flush();
+messages.slice(1).forEach(args => assert.strictEqual(args[2], nextGeneration));
+assert.strictEqual(content.length, 4);
+content.forEach(value => {
+    assert.strictEqual(typeof value, 'object');
+    assert.strictEqual(value.textContent, cfg.markers[0].popup);
+    assert.strictEqual(value.innerHTML, undefined);
+});
+console.log(JSON.stringify(messages));
+'''
+    result = subprocess.run([node, "-"], input=setup + T._JS + checks,
+                            capture_output=True, text=True, encoding="utf-8", timeout=10)
+    assert result.returncode == 0, result.stderr
+    for cid, value, event_gen in json.loads(result.stdout):
+        dispatch(cid, value, event_gen)
+    assert calls == ["map", "marker", "geo", "move"], calls
+    return "map callbacks survive redraw; stale move dropped; popup text stays literal"
+
+
+def test_stale_input_events_through_bridge():
+    """Both queued input paths reject old-page values, including keyed inputs."""
+    import guile.ui as U
+    value = gui.state("initial")
+    app = make_app(lambda: gui.input(value=value, key="field"))
+    bridge = _Bridge(app)
+    app._queue.put(("render", None, None)); drain(app)
+    old_gen = U._live_generation
+    app._queue.put(("render", None, None)); drain(app)
+    gen = U._live_generation
+    bridge.handle("gk-field", "stale commit", old_gen)
+    bridge.silent_update("gk-field", "stale typing", old_gen)
+    drain(app)
+    assert value.value == "initial"
+    bridge.silent_update("gk-field", "typing", gen); drain(app)
+    assert value.value == "typing"
+    bridge.handle("gk-field", "committed", gen); drain(app)
+    assert value.value == "committed"
+    return "stale commit/typing rejected; current commit/typing accepted"
 
 
 def test_template_js_parses():
@@ -723,6 +887,10 @@ CORE_TESTS = [
     test_icon_and_rail,
     test_map_layers_render,
     test_map_drawn_and_labels,
+    test_stale_click_rejected,
+    test_map_strings_render_as_text,
+    test_map_events_across_redraws,
+    test_stale_input_events_through_bridge,
 ]
 
 

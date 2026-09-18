@@ -77,8 +77,8 @@ class _App:
         self._use_leaflet_draw = False  # set to True by gui.leaflet(draw=...)
 
         # The single event queue. Items are tuples:
-        #   ("event",  cid, value)  — user interaction → dispatch(cid, value)
-        #   ("silent", cid, value)  — state update only, no render
+        #   ("event",  cid, value, gen) — user interaction → dispatch(cid, value, gen)
+        #   ("silent", cid, value, gen) — state update only, no render
         #   ("render", None, None)  — a State changed, re-render needed
         #   ("call",   fn,  None)   — run fn() on the worker thread; used by
         #                             gui.task() to deliver on_done/on_error
@@ -199,13 +199,17 @@ class _App:
                 pass
 
             needs_render = False
-            for kind, cid, value in batch:
+            for item in batch:
+                # event/silent items carry a 4th field, the render generation
+                # the event was emitted on; render/call items are 3-tuples.
+                kind, cid, value = item[0], item[1], item[2]
+                gen = item[3] if len(item) > 3 else None
                 if kind == "event":
                     # .set() calls inside the callback queue "render" items
                     # that land in the next batch and coalesce into one render.
-                    _dispatch(cid, value)
+                    _dispatch(cid, value, gen)
                 elif kind == "silent":
-                    _dispatch_silent(cid, value)
+                    _dispatch_silent(cid, value, gen)
                 elif kind == "render":
                     needs_render = True
                 elif kind == "call":
@@ -290,18 +294,21 @@ class _Bridge:
     def __init__(self, app: _App):
         self._app = app
 
-    def handle(self, cid: str, value=None):
+    def handle(self, cid: str, value=None, gen=None):
         """
         Called by JS when the user interacts with a widget.
         Must return immediately — doing work here blocks the WebView
         message thread, which would deadlock evaluate_js().
-        """
-        self._app._queue.put(("event", cid, value))
 
-    def silent_update(self, cid: str, value=None):
+        gen is the render generation the page carried when the event fired;
+        it travels to dispatch(), which drops events from a superseded page.
+        """
+        self._app._queue.put(("event", cid, value, gen))
+
+    def silent_update(self, cid: str, value=None, gen=None):
         """
         Called by JS to update state without triggering a re-render.
         Used by multiselect (and text inputs) while the user is
         mid-interaction: state stays current, DOM is left alone.
         """
-        self._app._queue.put(("silent", cid, value))
+        self._app._queue.put(("silent", cid, value, gen))
