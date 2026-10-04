@@ -2,7 +2,7 @@
 examples/map_overlays.py — Image overlay + GeoJSON on a map.
 
 Drapes a georeferenced raster (here a synthetic "NDVI" image generated on
-the fly, so the example needs no files) over satellite imagery, draws plot
+the fly, so the example needs no files) over the street map, draws plot
 boundaries from GeoJSON on top, and reacts when a plot is clicked.
 
 For large drone mosaics, do NOT embed the image — pre-tile it and use
@@ -92,7 +92,7 @@ def ui():
                 # `python -m http.server 8000` in the tiles' parent folder.
                 with gui.card(padding=8):
                     gui.leaflet(center=((SOUTH + NORTH) / 2, (WEST + EAST) / 2),
-                                zoom=15, height=500, tiles="satellite",
+                                zoom=15, height=500,
                                 layers=layers, key="field-map")
 
             # ── Controls / selection ─────────────────────────────────────────

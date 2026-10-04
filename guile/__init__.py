@@ -560,23 +560,22 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
     selection); "label" pins a text pill on the shape. drawn=[] clears.
     drawn= also displays with draw=False (read-only view, no toolbar).
 
-    Tile layers (base imagery) — all keyless public servers:
-        tiles="street"     — OpenStreetMap (default)
-        tiles="satellite"  — Esri World Imagery
-        tiles="hybrid"     — satellite + place / road labels
-        tiles="terrain"    — OpenTopoMap
-        tiles="light"      — Esri Light Gray Canvas (muted, good under data)
-        tiles="dark"       — Esri Dark Gray Canvas
+    Tile layers (base imagery):
+        tiles="street"     — OpenStreetMap (default; the only built-in)
         tiles="<url>"      — any XYZ template with {z}/{x}/{y}
         tiles={"url": "...", "attribution": "...", "max_zoom": 19}
 
-    Switch views live by binding tiles to a State:
+    For satellite or styled maps, use a provider of your choice and put
+    your own API key in the URL — guile does not maintain provider lists:
 
+        IMAGERY = {"url": "https://tiles.example.com/{z}/{x}/{y}.jpg"
+                          "?key=YOUR_KEY",
+                   "attribution": "© Example", "max_zoom": 20}
         view = gui.state("street")
-        gui.select(["street", "satellite", "hybrid"], "Map view",
+        gui.select({"street": "Street", "imagery": "Imagery"}, "Map view",
                    value=view, on_change=view.set, key="view")
-        gui.leaflet(center=(39.19, -96.58), zoom=13,
-                    tiles=view.value, key="map")
+        gui.leaflet(center=(39.19, -96.58), zoom=13, key="map",
+                    tiles=IMAGERY if view.value == "imagery" else "street")
 
     Per-marker callbacks:
         gui.Marker((lat, lon), on_click=fn)

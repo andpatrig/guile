@@ -122,8 +122,8 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
-**v1.0.1**
-- **Fix: `gui.leaflet(tiles="light")` and `tiles="dark"` show real maps again.** CARTO, which served both, now requires an API key and returned an "API KEY REQUIRED" image for every tile. Both presets now use Esri's keyless Light Gray / Dark Gray Canvas (base + labels), the same provider as `"satellite"`. Esri's native tiles stop at zoom 16; beyond that Leaflet upscales them, up to zoom 19.
+**v1.1.0**
+- **Breaking: OpenStreetMap is now the only built-in base map.** `tiles="satellite"`, `"hybrid"`, `"terrain"`, `"light"` and `"dark"` are removed. The trigger: CARTO, which served `"light"`/`"dark"`, started requiring an API key and returned an "API KEY REQUIRED" image for every tile, and other commercial "free" tile servers can do the same at any time. Instead of maintaining a provider list, guile keeps the community-run OpenStreetMap as the default and lets you bring your own provider: pass its XYZ URL, with your API key in it if it needs one, e.g. `tiles={"url": "https://.../{z}/{x}/{y}.jpg?key=YOUR_KEY", "attribution": "..."}`. Using a removed name raises a `ValueError` explaining this, instead of silently showing a blank map. The how-to has a new "bring your own provider" section, and the map examples now run on the default street map.
 - The landing page has a new gallery: code side by side with a screenshot of that exact app (layouts, widgets, tabs, button rails, maps, metric cards, figures). `tools/doc_shots.py` regenerates the screenshots and the gallery.
 - `examples/icon_rail.py` and the how-to sidebar snippets add `align="stretch"` to the sidebar row, so the sidebar fills the window height instead of floating in the middle.
 

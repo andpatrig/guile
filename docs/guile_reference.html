@@ -303,7 +303,7 @@ pre {
 <nav id="sidebar">
   <div class="logo">
     <div class="logo-name">gui<span>le</span></div>
-    <div class="logo-sub">API reference v1.0.1</div>
+    <div class="logo-sub">API reference v1.1.0</div>
   </div>
   <div id="nav-links"></div>
 </nav>
@@ -640,7 +640,7 @@ const WIDGETS = [
    },
 
   {cat:"Media", id:"leaflet", name:"gui.leaflet()", tag:"media",
-   desc:"Interactive Leaflet map with selectable tile layers (street, satellite, hybrid, terrain, light, dark, or a custom URL). Requires an internet connection. Pan/zoom state is preserved across re-renders. Supports click, pan/zoom, and drawing callbacks.",
+   desc:"Interactive Leaflet map on OpenStreetMap, or on any tile provider you choose via its URL (with your own API key if needed). Requires an internet connection. Pan/zoom state is preserved across re-renders. Supports click, pan/zoom, and drawing callbacks.",
    args:[
      ["center","tuple","(lat, lon) center point as floats"],
      ["zoom","int = 10","Initial zoom level: 1 = world, 10 = city, 15 = street"],
@@ -656,7 +656,7 @@ const WIDGETS = [
      ["on_shape_delete","Callable = None","on_shape_delete(id) — fires per shape when the delete toolbar is saved"],
      ["on_shape_click","Callable = None","on_shape_click(id) — a drawn shape was clicked (map on_click is not also fired)"],
      ["on_shape_hover","Callable = None","on_shape_hover(id) on pointer enter, on_shape_hover(None) on leave"],
-     ["tiles","str|dict|list = 'street'","Base map: 'street','satellite','hybrid','terrain','light','dark', a custom XYZ URL, or a {url, attribution, max_zoom} dict. Bind to a State to switch views live."],
+     ["tiles","str|dict|list = 'street'","Base map: 'street' (OpenStreetMap, the only built-in), a custom XYZ URL from your provider (put your API key in it if required), or a {url, attribution, max_zoom} dict. Bind to a State to switch views live."],
      ["layers","list = None","Overlay layers drawn in list order between the base tiles and markers: gui.ImageOverlay, gui.TileOverlay, gui.GeoJSON"],
      ["style","str = ''","Raw CSS on the map wrapper div"],
      ["key","str","Required — preserves map state between renders"],

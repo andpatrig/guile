@@ -1968,19 +1968,15 @@ class _Map(_Leaf):
         draw=False / draw=[]          — no tools (default)
 
     Tile layers (base map imagery):
-        tiles="street"       — OpenStreetMap (default)
-        tiles="satellite"    — Esri World Imagery
-        tiles="hybrid"       — satellite + place / road labels
-        tiles="terrain"      — OpenTopoMap (contours, relief)
-        tiles="light"        — Esri Light Gray Canvas (muted, good under data)
-        tiles="dark"         — Esri Dark Gray Canvas
-        tiles="<url>"        — any XYZ template, e.g.
-                               "https://.../{z}/{x}/{y}.png"
+        tiles="street"       — OpenStreetMap (default; the only built-in)
+        tiles="<url>"        — any XYZ template from your provider, e.g.
+                               "https://.../{z}/{x}/{y}.png?key=YOUR_KEY"
         tiles={"url": "...", "attribution": "...", "max_zoom": 19}
-        tiles=[layer, layer] — stack layers (advanced custom hybrid)
+        tiles=[layer, layer] — stack layers (e.g. imagery + labels)
 
-    All presets use keyless public tile servers (no API token needed) and
-    require internet. Switch views live by binding tiles to a State.
+    Tiles need internet. Satellite or styled maps come from a provider you
+    choose, with your own API key if it requires one. Switch views live by
+    binding tiles to a State.
 
     Overlay layers (drawn in list order, between base tiles and markers):
         layers=[ImageOverlay(...), TileOverlay(...), GeoJSON(...)]
@@ -2002,56 +1998,17 @@ class _Map(_Leaf):
     """
     _DRAW_ALL = ["rectangle", "polygon", "polyline", "circle", "marker"]
 
-    # Each preset is a list of raster layers drawn bottom-to-top. Multi-layer
-    # presets (hybrid) put a transparent label overlay on top of imagery.
+    # guile bundles exactly one keyless base map: OpenStreetMap. Commercial
+    # "free" tile servers have a habit of starting to require API keys, so
+    # any other imagery comes from the user as a URL (with their own key).
     _TILE_PRESETS = {
         "street": [{
             "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
             "options": {"attribution": "© OpenStreetMap contributors",
                         "maxZoom": 19},
         }],
-        "satellite": [{
-            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                   "World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            "options": {"attribution": "Tiles © Esri", "maxZoom": 19},
-        }],
-        "hybrid": [
-            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                    "World_Imagery/MapServer/tile/{z}/{y}/{x}",
-             "options": {"attribution": "Tiles © Esri", "maxZoom": 19}},
-            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                    "Reference/World_Boundaries_and_Places/MapServer/tile/"
-                    "{z}/{y}/{x}",
-             "options": {"attribution": "", "maxZoom": 19}},
-        ],
-        "terrain": [{
-            "url": "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-            "options": {"attribution": "© OpenStreetMap, SRTM | © OpenTopoMap",
-                        "maxZoom": 17},
-        }],
-        # Esri gray canvas (CARTO basemaps now require an API key). Native
-        # tiles stop at z16; maxNativeZoom lets Leaflet upscale beyond that.
-        "light": [
-            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                    "Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-             "options": {"attribution": "Tiles © Esri", "maxZoom": 19,
-                         "maxNativeZoom": 16}},
-            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                    "Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
-             "options": {"attribution": "", "maxZoom": 19,
-                         "maxNativeZoom": 16}},
-        ],
-        "dark": [
-            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                    "Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-             "options": {"attribution": "Tiles © Esri", "maxZoom": 19,
-                         "maxNativeZoom": 16}},
-            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
-                    "Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
-             "options": {"attribution": "", "maxZoom": 19,
-                         "maxNativeZoom": 16}},
-        ],
     }
+    _REMOVED_TILES = ("satellite", "hybrid", "terrain", "light", "dark")
 
     @classmethod
     def _normalize_tiles(cls, tiles) -> list:
@@ -2066,6 +2023,14 @@ class _Map(_Leaf):
             if isinstance(item, str):
                 if item in cls._TILE_PRESETS:      # preset name
                     return list(cls._TILE_PRESETS[item])
+                if item in cls._REMOVED_TILES:
+                    raise ValueError(
+                        f'tiles="{item}" is no longer built in (removed in '
+                        'guile 1.1.0). guile only bundles "street" '
+                        '(OpenStreetMap). For other imagery pass your '
+                        'provider\'s XYZ URL, with your own API key if it '
+                        'needs one: tiles={"url": "https://.../{z}/{x}/{y}'
+                        '.png?key=YOUR_KEY", "attribution": "..."}')
                 return [{"url": item,              # bare URL template
                          "options": {"attribution": "", "maxZoom": 19}}]
             if isinstance(item, dict):

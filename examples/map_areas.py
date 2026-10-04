@@ -78,7 +78,6 @@ def ui():
                     shapes.append(s)
                 with gui.card(padding=8):
                     gui.leaflet(center=(39.19, -96.58), zoom=15, height=520,
-                                tiles="satellite",
                                 draw=["polygon", "rectangle", "circle"],
                                 drawn=shapes,
                                 draw_style={"color": "#39ff14", "weight": 3,

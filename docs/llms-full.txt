@@ -1,4 +1,4 @@
-# guile — complete reference for AI assistants (v1.0.1)
+# guile — complete reference for AI assistants (v1.1.0)
 
 guile is a lightweight Python framework for desktop apps. One Python process
 opens a native window (pywebview: WebView2 on Windows, WKWebView on macOS).
@@ -222,7 +222,9 @@ gui.leaflet(center=(lat, lon), zoom=10, height=380, markers=[...],
     # on_click(lat, lon); on_move(center_tuple, zoom);
     # on_shape(type, coords) with draw=True or draw=["rectangle","polygon",
     # "polyline","circle","marker"].
-    # tiles: "street"|"satellite"|"hybrid"|"terrain"|"light"|"dark"|url|dict
+    # tiles: "street" (OpenStreetMap, the only built-in) | XYZ url | dict
+    #   {"url", "attribution", "max_zoom"} | list. Other imagery = your
+    #   provider's URL with your own key; "satellite" etc. raise ValueError.
     # layers: overlay list drawn in order between base tiles and markers —
     #   base tiles < TileOverlay < ImageOverlay < GeoJSON < markers
     # drawn: Python-OWNED shapes [{"id","type","coords","style"?,"label"?}]
@@ -396,7 +398,7 @@ def ui():
     with gui.row(gap=14, padding=20):
         with gui.col(fill=True):
             gui.leaflet(
-                center=(39.19, -96.5875), zoom=16, height=560, tiles="satellite",
+                center=(39.19, -96.5875), zoom=16, height=560,
                 layers=[gui.TileOverlay(TILES + "/{z}/{x}/{y}.png", max_zoom=21, bounds=BOUNDS),
                         gui.GeoJSON("field_boundary.geojson", color="#ffffff", weight=1, fill_opacity=0)],
                 draw=["polygon", "rectangle", "circle"],

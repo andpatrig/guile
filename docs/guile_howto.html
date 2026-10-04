@@ -1606,17 +1606,12 @@ so — always pass one.</p>
 
 stations = [("Manhattan", 39.19, -96.58), ("Salina", 38.84, -97.61)]
 picked   = gui.state(None)            # name of the clicked station
-view     = gui.state("satellite")     # bound to a select → live base-map switch
 
 @gui.app("Stations", width=820, height=560)
 def ui():
     with gui.col(padding=20, gap=12):
-        gui.select(["street", "satellite", "hybrid", "terrain"], "Base map",
-                   value=view, on_change=view.set, key="view")
-
         gui.leaflet(
-            center=(39.0, -97.0), zoom=8, height=420,
-            tiles=view.value,                          # preset name or XYZ URL
+            center=(39.0, -97.0), zoom=8, height=420,  # OpenStreetMap by default
             markers=[gui.Marker((lat, lon), tooltip=name,
                                 on_click=lambda n=name: picked.set(n))
                      for name, lat, lon in stations],
@@ -1630,9 +1625,39 @@ gui.run()</pre>
 <div class="note">
 Tiles come from public servers, so maps need an internet connection.
 <code>on_click(lat, lon)</code> fires on the background; a marker's own
-<code>on_click</code> fires instead when a marker is hit. Bind
-<code>tiles=</code> to a state, as above, to switch imagery without
-rebuilding the map.
+<code>on_click</code> fires instead when a marker is hit.
+</div>
+
+<h3>Satellite and other base maps: bring your own provider</h3>
+
+<p>guile ships one base map, <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>,
+because it is community-run and needs no key. For satellite imagery or a
+styled map, pick any provider that serves XYZ tiles (Mapbox, MapTiler,
+Esri, Stadia, Thunderforest, your own server…), copy its tile URL, and put
+your API key in it. guile passes it straight to Leaflet, so the provider,
+the key, and its terms are yours to manage.</p>
+
+<pre>IMAGERY = {
+    "url": "https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=YOUR_KEY",
+    "attribution": "© MapTiler © OpenStreetMap contributors",
+    "max_zoom": 20,
+}
+
+view = gui.state("street")
+
+# In ui():
+gui.select({"street": "Street", "imagery": "Satellite"}, "Base map",
+           value=view, on_change=view.set, key="view")
+gui.leaflet(center=(39.19, -96.58), zoom=14, key="map",
+            tiles=IMAGERY if view.value == "imagery" else "street")</pre>
+
+<div class="note">
+Keep keys out of shared code: read them with
+<code>os.environ["MAPTILER_KEY"]</code> rather than pasting them into the
+script. OpenStreetMap's volunteer servers are fine for lab apps and small
+teams; for heavy use, its <a href="https://operations.osmfoundation.org/policies/tiles/">tile
+usage policy</a> asks you to switch to a provider. A list of tile layers
+stacks them, e.g. imagery plus a transparent labels layer.
 </div>
 </div>
 
@@ -1659,7 +1684,7 @@ def ui():
         gui.slider("Opacity", min=0, max=1, step=0.05,
                    value=opacity, on_change=opacity.set, key="op")
         gui.leaflet(
-            center=(39.19, -96.5875), zoom=15, height=480, tiles="satellite",
+            center=(39.19, -96.5875), zoom=15, height=480,
             layers=[
                 gui.ImageOverlay("ndvi.png",
                                  bounds=((39.180, -96.600), (39.200, -96.575)),  # (S,W),(N,E)
@@ -1695,7 +1720,7 @@ BOUNDS = ((39.180, -96.600), (39.200, -96.575))    # extent of the mosaic
 
 @gui.app("Orthomosaic", width=900, height=640)
 def ui():
-    gui.leaflet(center=(39.19, -96.5875), zoom=16, height=560, tiles="satellite",
+    gui.leaflet(center=(39.19, -96.5875), zoom=16, height=560,
                 layers=[gui.TileOverlay(TILES + "/{z}/{x}/{y}.png",
                                         max_zoom=21, bounds=BOUNDS, opacity=0.9)],
                 key="map")
@@ -1729,7 +1754,7 @@ def ui():
     with gui.row(gap=14, padding=20):
         with gui.col(fill=True):
             gui.leaflet(
-                center=(39.19, -96.5875), zoom=15, height=560, tiles="satellite",
+                center=(39.19, -96.5875), zoom=15, height=560,
                 layers=[
                     # A wide dark stroke under a thin bright one reads as a glow,
                     # because layers stack in list order.
@@ -1810,7 +1835,7 @@ def ui():
     with gui.row(gap=14, padding=20):
         with gui.col(fill=True):
             gui.leaflet(
-                center=(39.19, -96.5875), zoom=15, height=560, tiles="satellite",
+                center=(39.19, -96.5875), zoom=15, height=560,
                 draw=["polygon", "rectangle", "circle"],
                 drawn=shapes,
                 draw_style={"color": "#39ff14", "weight": 3, "fill_opacity": 0.05},

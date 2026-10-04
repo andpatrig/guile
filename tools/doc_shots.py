@@ -190,20 +190,19 @@ STATIONS = [("Manhattan", 39.21, -96.59), ("Hays", 38.85, -99.34),
             ("Colby", 39.39, -101.07), ("Garden City", 38.00, -100.82),
             ("Hutchinson", 37.93, -98.02), ("Cherokee", 37.20, -94.98)]
 
-view = gui.state("street")
+picked = gui.state("Click a station")
 
 @gui.app("Map", width=720, height=380)
 def ui():
     with gui.row(gap=16, padding=16, align="flex-start"):
         with gui.card(gap=12, style="width:190px;flex-shrink:0"):
             gui.title("Mesonet", size="lg")
-            gui.select(["street", "satellite", "terrain"], "Base map",
-                       value=view, on_change=view.set)
             gui.badge(f"{len(STATIONS)} stations")
+            gui.text(picked.value, muted=True, size="sm")
         with gui.card(padding=8, fill=True):
-            gui.leaflet(center=(38.5, -98.3), zoom=6, height=320,
-                        tiles=view.value, key="map",
-                        markers=[gui.Marker((lat, lon), tooltip=name)
+            gui.leaflet(center=(38.5, -98.3), zoom=6, height=320, key="map",
+                        markers=[gui.Marker((lat, lon), tooltip=name,
+                                     on_click=lambda n=name: picked.set(n))
                                  for name, lat, lon in STATIONS])
 
 gui.run()
@@ -298,7 +297,7 @@ GALLERY = [
      "Icon + label rails for sidebars and toolbars, with ~2100 bundled icons.",
      "guile_howto.html#pattern-rail", "How-to: button rails"),
     ("map", "Maps",
-     "Interactive Leaflet maps with markers, overlays and drawing tools.",
+     "Interactive Leaflet maps on OpenStreetMap, with markers, overlays and drawing.",
      "guile_howto.html#map-basics", "How-to: maps"),
     ("dashboard", "Metric cards",
      "Equal-width cards from a plain for loop: give each one fill=True.",
