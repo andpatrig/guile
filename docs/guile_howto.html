@@ -772,7 +772,7 @@ in a <code>style=</code> string on any container.</p>
 
 <pre>@gui.app("Dashboard", width=800, height=600)
 def ui():
-    with gui.row(gap=0, style="height:100vh"):
+    with gui.row(gap=0, align="stretch", style="height:100vh"):
 
         # ── Sidebar ──────────────────────────────────
         with gui.col(
@@ -1372,7 +1372,7 @@ set (~2100 icons, vendored — no network, no dependency).</p>
 
 @gui.app("Rail demo", width=720, height=480)
 def ui():
-    with gui.row(gap=0, style="height:100vh"):
+    with gui.row(gap=0, align="stretch", style="height:100vh"):
 
         # A vertical rail makes a compact sidebar.
         with gui.col(padding=10, style="background:var(--surface-2);"

@@ -75,7 +75,7 @@ def icon_grid(names) -> str:
 
 @gui.app("Rail & Icon Showcase", width=860, height=620)
 def ui():
-    with gui.row(gap=0, style="height:100vh"):
+    with gui.row(gap=0, align="stretch", style="height:100vh"):
 
         # ── Vertical rail: a compact sidebar ───────────────────────────────
         with gui.col(padding=10, style="background:var(--surface-2);"
