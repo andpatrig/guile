@@ -122,6 +122,11 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v1.0.1**
+- **Fix: `gui.leaflet(tiles="light")` and `tiles="dark"` show real maps again.** CARTO, which served both, now requires an API key and returned an "API KEY REQUIRED" image for every tile. Both presets now use Esri's keyless Light Gray / Dark Gray Canvas (base + labels), the same provider as `"satellite"`. Esri's native tiles stop at zoom 16; beyond that Leaflet upscales them, up to zoom 19.
+- The landing page has a new gallery: code side by side with a screenshot of that exact app (layouts, widgets, tabs, button rails, maps, metric cards, figures). `tools/doc_shots.py` regenerates the screenshots and the gallery.
+- `examples/icon_rail.py` and the how-to sidebar snippets add `align="stretch"` to the sidebar row, so the sidebar fills the window height instead of floating in the middle.
+
 **v1.0.0**
 - **`gui.run()` now waits for in-flight work before returning.** Closing the window stops new interaction, but any already-started `gui.task()` jobs and their completion callbacks now finish before `run()` returns — so save-on-exit code written after `gui.run()` sees their final results instead of racing them. Long-running jobs therefore delay return; task functions must eventually finish. The dev-mode file watcher also stops promptly on close instead of lingering.
 - **Events dispatch in the order the user made them.** pywebview delivers browser API calls on independent threads, so rapid interactions could be processed out of order; each event now carries a sequence number and is restored to browser order before dispatch.

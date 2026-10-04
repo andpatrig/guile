@@ -565,8 +565,8 @@ def leaflet(center: tuple = (0.0, 0.0), *, zoom: int = 10,
         tiles="satellite"  — Esri World Imagery
         tiles="hybrid"     — satellite + place / road labels
         tiles="terrain"    — OpenTopoMap
-        tiles="light"      — Carto Positron (muted, good under data)
-        tiles="dark"       — Carto Dark Matter
+        tiles="light"      — Esri Light Gray Canvas (muted, good under data)
+        tiles="dark"       — Esri Dark Gray Canvas
         tiles="<url>"      — any XYZ template with {z}/{x}/{y}
         tiles={"url": "...", "attribution": "...", "max_zoom": 19}
 

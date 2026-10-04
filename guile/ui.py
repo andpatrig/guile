@@ -1972,8 +1972,8 @@ class _Map(_Leaf):
         tiles="satellite"    — Esri World Imagery
         tiles="hybrid"       — satellite + place / road labels
         tiles="terrain"      — OpenTopoMap (contours, relief)
-        tiles="light"        — Carto Positron (muted, good under data)
-        tiles="dark"         — Carto Dark Matter
+        tiles="light"        — Esri Light Gray Canvas (muted, good under data)
+        tiles="dark"         — Esri Dark Gray Canvas
         tiles="<url>"        — any XYZ template, e.g.
                                "https://.../{z}/{x}/{y}.png"
         tiles={"url": "...", "attribution": "...", "max_zoom": 19}
@@ -2029,16 +2029,28 @@ class _Map(_Leaf):
             "options": {"attribution": "© OpenStreetMap, SRTM | © OpenTopoMap",
                         "maxZoom": 17},
         }],
-        "light": [{
-            "url": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-            "options": {"attribution": "© OpenStreetMap © CARTO",
-                        "maxZoom": 20, "subdomains": "abcd"},
-        }],
-        "dark": [{
-            "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-            "options": {"attribution": "© OpenStreetMap © CARTO",
-                        "maxZoom": 20, "subdomains": "abcd"},
-        }],
+        # Esri gray canvas (CARTO basemaps now require an API key). Native
+        # tiles stop at z16; maxNativeZoom lets Leaflet upscale beyond that.
+        "light": [
+            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                    "Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+             "options": {"attribution": "Tiles © Esri", "maxZoom": 19,
+                         "maxNativeZoom": 16}},
+            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                    "Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+             "options": {"attribution": "", "maxZoom": 19,
+                         "maxNativeZoom": 16}},
+        ],
+        "dark": [
+            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                    "Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+             "options": {"attribution": "Tiles © Esri", "maxZoom": 19,
+                         "maxNativeZoom": 16}},
+            {"url": "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                    "Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+             "options": {"attribution": "", "maxZoom": 19,
+                         "maxNativeZoom": 16}},
+        ],
     }
 
     @classmethod
