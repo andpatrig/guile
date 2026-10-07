@@ -1768,7 +1768,7 @@ def _image_src(source) -> str:
 
     URLs and data: URIs pass through. Local paths and raw bytes become a
     base64 data URI — the same route gui.figure() takes — because the
-    WebView page is loaded from a string and cannot fetch file:// paths.
+    WebView page (served from 127.0.0.1) cannot fetch file:// paths.
     """
     import os, base64, mimetypes
     if isinstance(source, (bytes, bytearray)):
@@ -2003,7 +2003,7 @@ class _Map(_Leaf):
     # any other imagery comes from the user as a URL (with their own key).
     _TILE_PRESETS = {
         "street": [{
-            "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
             "options": {"attribution": "© OpenStreetMap contributors",
                         "maxZoom": 19},
         }],

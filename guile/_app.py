@@ -37,6 +37,7 @@ import html
 import json
 import queue
 import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import traceback
 from typing import Callable, Optional
 
@@ -72,6 +73,7 @@ class _App:
         self.debug      = debug
         self._build     = None   # the ui() function supplied by the user
         self._window    = None   # pywebview window object
+        self._server    = None   # _PageServer that serves the page HTML
         self._ready     = False  # True after the page finishes loading
         self._use_leaflet      = False  # set to True by gui.leaflet()
         self._use_leaflet_draw = False  # set to True by gui.leaflet(draw=...)
@@ -112,6 +114,9 @@ class _App:
         try:
             self._run_window(build_fn)
         finally:
+            if self._server is not None:
+                self._server.close()
+                self._server = None
             self._on_closed()
             # Do not join from the native closed event: callbacks may still
             # be returning from a native dialog. The GUI loop has ended here.
@@ -145,11 +150,17 @@ class _App:
             pass
 
         api = _Bridge(self)
+        # Serve the page from a loopback origin instead of html=. A page
+        # loaded from a string has no origin, so the browser sends no
+        # Referer, and OpenStreetMap answers every tile with an
+        # "Access blocked" image. http://127.0.0.1:<port>/ is a real origin.
+        self._server = _PageServer(get_html(
+            self.title,
+            use_leaflet=self._use_leaflet,
+            use_leaflet_draw=self._use_leaflet_draw))
         self._window = webview.create_window(
             title=self.title,
-            html=get_html(self.title,
-                          use_leaflet=self._use_leaflet,
-                          use_leaflet_draw=self._use_leaflet_draw),
+            url=self._server.url,
             js_api=api,
             width=self.width,
             height=self.height,
@@ -329,6 +340,43 @@ class _App:
                 + json.dumps(panel))
         except Exception:
             pass
+
+
+class _PageServer:
+    """
+    Serves the page HTML at http://127.0.0.1:<free port>/ so the WebView
+    has a real origin (and therefore sends a Referer to tile servers).
+    Only "/" answers; the page itself is static — every render after the
+    first load goes through evaluate_js, not HTTP.
+    """
+
+    def __init__(self, page: str):
+        body = page.encode("utf-8")
+
+        class _Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path.split("?", 1)[0] != "/":
+                    self.send_error(404)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):   # keep the console quiet
+                pass
+
+        self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+        self._httpd.daemon_threads = True
+        self.url = f"http://127.0.0.1:{self._httpd.server_port}/"
+        threading.Thread(target=self._httpd.serve_forever, daemon=True,
+                         name="guile-page-server").start()
+
+    def close(self):
+        self._httpd.shutdown()
+        self._httpd.server_close()
 
 
 class _Bridge:

@@ -122,6 +122,10 @@ Everything else is Python standard library.
 ---
 
 ## Changelog
+**v1.1.1**
+- **Fix: OpenStreetMap tiles showed "Access blocked".** guile loaded its page from a string, so the page had no origin and the browser sent no `Referer` header; OpenStreetMap's tile servers answer such requests with an "Access blocked" image. guile now serves the page from a small built-in server on `http://127.0.0.1:<free port>/` (standard library only, local machine only, closed with the window), so tile requests carry a valid Referer and the default street map loads normally. If you worked around this with a custom `tiles=` URL, you can go back to the default.
+- The OpenStreetMap URL no longer uses the deprecated `a./b./c.` subdomains (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`).
+
 **v1.1.0**
 - **Breaking: OpenStreetMap is now the only built-in base map.** `tiles="satellite"`, `"hybrid"`, `"terrain"`, `"light"` and `"dark"` are removed. The trigger: CARTO, which served `"light"`/`"dark"`, started requiring an API key and returned an "API KEY REQUIRED" image for every tile, and other commercial "free" tile servers can do the same at any time. Instead of maintaining a provider list, guile keeps the community-run OpenStreetMap as the default and lets you bring your own provider: pass its XYZ URL, with your API key in it if it needs one, e.g. `tiles={"url": "https://.../{z}/{x}/{y}.jpg?key=YOUR_KEY", "attribution": "..."}`. Using a removed name raises a `ValueError` explaining this, instead of silently showing a blank map. The how-to has a new "bring your own provider" section, and the map examples now run on the default street map.
 - The landing page has a new gallery: code side by side with a screenshot of that exact app (layouts, widgets, tabs, button rails, maps, metric cards, figures). `tools/doc_shots.py` regenerates the screenshots and the gallery.
